@@ -26,25 +26,19 @@ Vector3 getRandomRay(Vector3 ndir, Vector3 udir, Vector3 vdir) {
     double v = r * sin(phi);
     double n = sqrt(1 - r*r);
 
-    /*udir = udir*u;
-    vdir = vdir*v;
-    ndir = ndir*n;*/
-
     //# Convert to a direction on the hemisphere defined by the normal
     return udir*u + vdir*v + ndir*n;
     
-//    return add(add(udir, vdir), ndir);
 }
 
+//Builds an arbitrary orthogonal coordinate system, with one of its axes being 'ndir'
 void getBase(Vector3 ndir, Vector3 &c1, Vector3 &c2) {
-    //"""Builds an arbitrary orthogonal coordinate system, with one of its axes being 'ndir'"""
     c1 = Vector3(0,0,1);
     if (c1.dot(ndir) == 1) //are colinear --> cannot build coordinate base
         c1 = Vector3(0,1,0);
         
     c2 = normalized( c1.cross(ndir));
     c1 = normalized( c2.cross(ndir));
-    //return (ndir, c1, c2);
 }
 
 Color3 getColor(Vector3 ray_src, Vector3 ray_dir, const list<SceneObject*> &objects, int depth = 0)
@@ -69,12 +63,13 @@ Color3 getColor(Vector3 ray_src, Vector3 ray_dir, const list<SceneObject*> &obje
         double c = normalized(-Vector3(-1, -2, -1)).dot(ray_dir);
         return Color3(c,c,c);
     }
-    
+    Color3 color = closestObject->getColor();
+
+    if (color.r > 1 || color.g > 1 || color.b > 1) return color; //is an emitter    
     
     Vector3 intersect_pos = ray_src + ray_dir * closestDist;
 
-    Color3 color = closestObject->getColor();
-    if (depth >= 4)
+    if (depth >= 8)
         return Color3(0,0,0);
 
     
@@ -85,38 +80,24 @@ Color3 getColor(Vector3 ray_src, Vector3 ray_dir, const list<SceneObject*> &obje
     
     
     ray_dir = getRandomRay( n, udir, vdir );
-    // it still works here
-    //return color;
     ray_src = intersect_pos + ray_dir * 1E-6;
-    //return Color3(closestDist/3, closestDist/3, closestDist/3);
-    
-    /*
-    if ( color.r == 1 && color.g == 1)
-    {    
-        string s = "";
-        for (int i = 0; i < depth; i++) s+="    ";
-        cout << s << "depth is " << depth << endl;
-        cout << s << "base is " << n << ", " << udir << ", " << vdir << endl;
-        cout << s << "new ray is " << ray_src << "->" << ray_dir << endl;
-    }*/
     
     Color3 c2 = getColor( ray_src, ray_dir, objects, depth+1);
 
-    //cout << s << "recursive color is " << c2 << endl;
-    return Color3( color.r * c2.r * 0.9, 
-                   color.g * c2.g * 0.9, 
-                   color.b * c2.b * 0.9);
+    return Color3( color.r * c2.r * 0.8,
+                   color.g * c2.g * 0.8, 
+                   color.b * c2.b * 0.8);
     
 }
 
 int main()
 {
     objects.push_back( new Plane( Vector3(0,0,0), Vector3(0,0,1), Color3(1,  0.5, 0.5) ) );
-    objects.push_back( new Plane( Vector3(0,0,0), Vector3(0,1,0), Color3(0.8,  1, 0.8) ) );
+    objects.push_back( new Plane( Vector3(0,0,0), Vector3(0,1,0), Color3(0.7,  1, 0.7) ) );
     objects.push_back( new Plane( Vector3(0,0,0), Vector3(1,0,0), Color3(0.5,0.5,   1) ) );
-    objects.push_back( new Plane( Vector3(0.2,0.2,0.2), Vector3(1,1,1).normalized(), Color3(0.5,0.5,0.5) ));
+    objects.push_back( new Plane( Vector3(0.2,0.2,0.2), Vector3(1,1,1).normalized(), Color3(1,1,0.7) ));
     objects.push_back( new Sphere( Vector3(0.2, 0.3, 0.6), 0.2, Color3(1,1,1)));
-    objects.push_back( new Sphere( Vector3(0.7, 0.5, 0), 0.2, Color3(5,5,5)));
+    objects.push_back( new Sphere( Vector3(0.7, 0.5, -0.2), 0.3, Color3(5,5,5)));
 
 
     Vector3 light_pos(1,1,1);
@@ -129,32 +110,24 @@ int main()
     std::cout << "cam_right: " << cam_right << endl;
     std::cout << "cam_up: " << cam_up << endl;
     std::cout << "cam_dir: " << cam_dir << endl;
-    static const int img_width = 400;
-    static const int img_height= 400;
+    static const int img_width = 1920;
+    static const int img_height= 1080;
 
-    uint8_t* pixel_buffer = new uint8_t[3*400*400];
-    for (int y = 0; y < 400; y++) 
+    uint8_t* pixel_buffer = new uint8_t[3*img_width*img_height];
+    for (int y = 0; y < img_height; y++) 
     {
-        if (y % 40 == 0)
+        if (y % 30 == 0)
         {
-            cout << (y*100 / img_width) << "%" << endl;
+            cout << (y*100 / img_height) << "%" << endl;
             //write_png_file( "out.png", img_width, img_height, PNG_COLOR_TYPE_RGB, pixel_buffer);
         }
-        for (int x = 0; x < 400; x++) {
-        
-            
-            /*Vector3 ray_screen = normalized( cam_pos + cam_dir + (cam_right * ( (x-200)*5/double(img_width)))  + (cam_up * ((y-200)*5/double(img_height))) );
-            Vector3 ray_dir =    normalized( ray_screen - cam_pos);*/
-        
+        for (int x = 0; x < img_width; x++) {
         
             Vector3 ray_dir = normalized( cam_dir + 
-                                          cam_right* (0.25*(x-200)/(double)img_width) + 
-                                          cam_up*    (0.25*(y-200)/(double)img_height) );
+                                          cam_right* (0.25*(x-(img_width/2))/(double)img_width) + 
+                                          cam_up*    (0.25*(img_height/(double)img_width)*(y-(img_height/2))/(double)img_height) );
             
-            
-            //cout << x << ", " << y << ", " << ray_dir << ", " << closestDist << endl;
-            
-            static const int NUM_ITERATIONS = 100;
+            static const int NUM_ITERATIONS = 10000;
             Color3 col_acc(0,0,0);
             for (int i = 0; i < NUM_ITERATIONS; i++)
             {
@@ -162,11 +135,8 @@ int main()
                 
             }
             col_acc = col_acc / (double)NUM_ITERATIONS;
-            //closestObject ? closestObject->getColor() : Color3(0,0,0);
-            //cout << "## Final Color is " << col << endl;
-            //Color3 col = closestObject ? Color3(closestDist/2, closestDist/2, closestDist/2) : Color3(0,0,0);
-            //Color3 col = Color3(fabs(ray_dir.x), fabs(ray_dir.y), fabs(ray_dir.z));
-            
+
+          
             pixel_buffer[(y*img_width+x)*3 + 0] = min(col_acc.r*255, 255.0);
             pixel_buffer[(y*img_width+x)*3 + 1] = min(col_acc.g*255, 255.0);
             pixel_buffer[(y*img_width+x)*3 + 2] = min(col_acc.b*255, 255.0);
