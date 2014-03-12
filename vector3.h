@@ -6,6 +6,7 @@
 class Vector3 {
 public:
     Vector3( double _x, double _y, double _z);
+    Vector3( );
     
     Vector3 operator+(const Vector3 &other) const;
     Vector3 operator-(const Vector3 &other) const;

@@ -1,5 +1,5 @@
 
-SRC = main.cc png_helper.cc parseLayout.cc vector3.cc
+SRC = vector3.cc png_helper.cc main.cc parseLayout.cc 
 
 OBJ  = $(SRC:.cc=.o)
 
@@ -9,13 +9,15 @@ OBJ  = $(SRC:.cc=.o)
 # integer overflow
 # WARNING: the gcc option -O2 appears to negate the effects of -ftrapv ! 
 
-FLAGS = -g -Wall -Wextra -DNDEBUG -O2
+
+OPT_FLAGS = -O2
+FLAGS = -g -Wall -Wextra -flto -DNDEBUG $(OPT_FLAGS)
 
 #FLAGS = -ftrapv -g -Wall -Wextra 
 #FLAGS = -ftrapv -g -Wall -Wextra -fprofile-arcs -ftest-coverage
 CFLAGS = $(FLAGS) -std=c99
 CCFLAGS = $(FLAGS) -std=c++11
-LD_FLAGS = #-fprofile-arcs#--as-needed
+LD_FLAGS = -flto $(OPT_FLAGS) #-fprofile-arcs#--as-needed
 .PHONY: all clean
 
 all: make.dep radiosity
@@ -25,6 +27,11 @@ radiosity: $(OBJ)
 	@echo [LD ] $@
 	@g++ $^  $(LD_FLAGS) -lpng -o $@
 
+#fast: $(SRC)
+#	@echo [C++] $(SRC)
+#	@g++ $(CCFLAGS) -fwhole-program -o radiosity $(SRC) -lpng
+#	#@g++ $(CCFLAGS) -o radiosity $(SRC) -lpng
+	
 %.o: %.cc
 	@echo [C++] $<
 #	@g++ $(CCFLAGS) `pkg-config --cflags cairo` $< -c -o $@

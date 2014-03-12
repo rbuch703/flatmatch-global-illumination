@@ -6,6 +6,7 @@
 
 using namespace std;
 
+Vector3::Vector3( ) {}
 Vector3::Vector3( double _x, double _y, double _z): x(_x), y(_y), z(_z) {}
     
 Vector3  Vector3::operator+(const Vector3 &other) const { return Vector3( x+other.x, y+other.y, z+other.z); }
@@ -40,7 +41,7 @@ double Vector3::squaredLength() const { return x*x+y*y+z*z; }
 double Vector3::length() const { return sqrt(x*x+y*y+z*z); }
     
 Vector3 Vector3::normalized() const { 
-    double len = sqrt(this->dot(*this));
+    double len = sqrt(x*x+y*y+z*z);
     return *this / len;
 }
     

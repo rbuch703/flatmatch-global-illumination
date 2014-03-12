@@ -66,11 +66,12 @@ Color3 getColor(Vector3 ray_src, Vector3 ray_dir, const list<SceneObject*> &obje
         //double c = normalized(-Vector3(-1, -2, -1)).dot(ray_dir);
         //return Color3(c,c,c);
     }
-    Color3 color = closestObject->getColor();
-    
-    if (color.r > 1 || color.g > 1 || color.b > 1) return color; //is an emitter    
-    
+
     Vector3 intersect_pos = ray_src + ray_dir * closestDist;
+
+    Color3 color = closestObject->getColor(intersect_pos);
+    //return color;
+    if (color.r > 1 || color.g > 1 || color.b > 1) return color; //is an emitter    
 
     /*double diffuse = (-ray_dir).dot(closestObject->normalAt(intersect_pos));
     if (diffuse <0) diffuse = 0;
@@ -139,7 +140,7 @@ int main()
                                           cam_right* (1.25*(x-(img_width/2))/(double)img_width) + 
                                           cam_up*    (1.25*(img_height/(double)img_width)*(y-(img_height/2))/(double)img_height) );
             
-            static const int NUM_ITERATIONS = 100;
+            static const int NUM_ITERATIONS = 1000;
             Color3 col_acc(0,0,0);
             for (int i = 0; i < NUM_ITERATIONS; i++)
             {
