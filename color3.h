@@ -10,17 +10,17 @@ public:
     Color3 operator+(const Color3 &other) { return Color3( r+other.r, g+other.g, b+other.b); }
     Color3 operator-(const Color3 &other) { return Color3( r-other.r, g-other.g, b-other.b); }
 
-    Color3 operator*(const double a) { return Color3( r+a, g+a, b+a); }
+    Color3 operator*(const double a) { return Color3( r*a, g*a, b*a); }
     Color3 operator/(const double a) { return Color3( r/a, g/a, b/a); }
 
 public:
     double r, g, b;
 };
 
-ostream& operator<<(ostream &os, const Color3 &col)
+/*static std::ostream& operator<<(std::ostream &os, const Color3 &col)
 {
     os << "(" << col.r << ", " << col.g << ", " << col.b << ")";
     return os;
-}
+}*/
 
 #endif

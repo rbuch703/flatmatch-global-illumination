@@ -3,6 +3,7 @@
 
 #include "vector3.h"
 #include "color3.h"
+#include <math.h>
 
 class SceneObject {
 public:

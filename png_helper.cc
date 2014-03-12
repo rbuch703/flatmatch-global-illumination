@@ -50,7 +50,9 @@ void read_png_file(const char* file_name, int &width, int& height, int& color_ty
         width = png_get_image_width(png_ptr, info_ptr);
         height = png_get_image_height(png_ptr, info_ptr);
         color_type = png_get_color_type(png_ptr, info_ptr);
-        int bit_depth = png_get_bit_depth(png_ptr, info_ptr);
+        #ifndef NDEBUG
+            int bit_depth = png_get_bit_depth(png_ptr, info_ptr);
+        #endif
         assert(bit_depth == 8);
         unsigned int num_channels   = png_get_channels(png_ptr, info_ptr);        
         assert(( color_type == PNG_COLOR_TYPE_RGB && num_channels ==3) || (color_type == PNG_COLOR_TYPE_RGBA && num_channels == 4));

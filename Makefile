@@ -1,5 +1,5 @@
 
-SRC = main.cc png_helper.cc
+SRC = main.cc png_helper.cc parseLayout.cc vector3.cc
 
 OBJ  = $(SRC:.cc=.o)
 
@@ -8,7 +8,9 @@ OBJ  = $(SRC:.cc=.o)
 # already uses all bits of an int64_t, so, more complex algorithms could easily cause an - otherwise undetected -
 # integer overflow
 # WARNING: the gcc option -O2 appears to negate the effects of -ftrapv ! 
+
 FLAGS = -g -Wall -Wextra -DNDEBUG -O2
+
 #FLAGS = -ftrapv -g -Wall -Wextra 
 #FLAGS = -ftrapv -g -Wall -Wextra -fprofile-arcs -ftest-coverage
 CFLAGS = $(FLAGS) -std=c99
