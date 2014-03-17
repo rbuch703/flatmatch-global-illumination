@@ -1,5 +1,5 @@
 
-SRC = vector3.cc png_helper.cc main.cc parseLayout.cc 
+SRC = vector3.cc png_helper.cc main.cc parseLayout.cc sceneObject.cc
 
 OBJ  = $(SRC:.cc=.o)
 
