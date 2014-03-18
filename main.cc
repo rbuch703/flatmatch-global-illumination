@@ -2,20 +2,20 @@
 #include "vector3.h"
 #include "sceneObject.h"
 #include "parseLayout.h"
+#include "png_helper.h"
 
 #include <list>
+#include <vector>
 #include <iostream>
 #include <stdint.h>
 #include <stdlib.h> //for rand()
 #include <string>
+#include <string.h> //for memset
 using namespace std;
 
-void read_png_file(const char* file_name, int &width, int& height, int& color_type, uint8_t* &pixel_buffer );
-void write_png_file(const char* file_name, int width, int height, int color_type, uint8_t *pixel_buffer);
-static const int PNG_COLOR_TYPE_RGB  = 2;
-static const int PNG_COLOR_TYPE_RGBA = 6;
 
-list<SceneObject*> objects;
+list<Rectangle*> objects;
+
 
 
 Vector3 getRandomRay(Vector3 ndir, Vector3 udir, Vector3 vdir) {
@@ -43,12 +43,12 @@ void getBase(Vector3 ndir, Vector3 &c1, Vector3 &c2) {
     c1 = normalized( c2.cross(ndir));
 }
 
-SceneObject* getClosestObject(const Vector3 &ray_src, const Vector3 &ray_dir, const list<SceneObject*> &objects, double &dist_out)
+Rectangle* getClosestObject(const Vector3 &ray_src, const Vector3 &ray_dir, const list<Rectangle*> &objects, double &dist_out)
 {
-    SceneObject *closestObject = NULL;
+    Rectangle *closestObject = NULL;
     dist_out = INFINITY;
 
-    for ( list<SceneObject*>::const_iterator it = objects.begin(); it != objects.end(); it++)
+    for ( list<Rectangle*>::const_iterator it = objects.begin(); it != objects.end(); it++)
     {
         double dist = (*it)->intersects( ray_src, ray_dir);
         if (dist < 0)
@@ -62,11 +62,11 @@ SceneObject* getClosestObject(const Vector3 &ray_src, const Vector3 &ray_dir, co
     return closestObject;
 }
 
-Color3 getColor(Vector3 ray_src, Vector3 ray_dir, const list<SceneObject*> &objects, int depth = 0)
+Color3 getColor(Vector3 ray_src, Vector3 ray_dir, const list<Rectangle*> &objects, int depth = 0)
 {
 
     double hitDist;
-    SceneObject *hitObject = getClosestObject(ray_src, ray_dir, objects, hitDist);
+    Rectangle *hitObject = getClosestObject(ray_src, ray_dir, objects, hitDist);
 
     if (! hitObject) //no hit --> simulate white area light source with direction (-1,-2,-1)
     {
@@ -78,10 +78,10 @@ Color3 getColor(Vector3 ray_src, Vector3 ray_dir, const list<SceneObject*> &obje
     Vector3 intersect_pos = ray_src + ray_dir * hitDist;
 
     Color3 color = hitObject->getColor(intersect_pos);
-    //return color;
+    return color;
     if (color.r > 1 || color.g > 1 || color.b > 1) return color; //is an emitter    
 
-    /*double diffuse = (-ray_dir).dot(closestObject->normalAt(intersect_pos));
+    /*double diffuse = (-ray_dir).dot(closestObject->getNormalAt(intersect_pos));
     if (diffuse <0) diffuse = 0;
     return color * diffuse;*/
     //return Color3(diffuse, diffuse, diffuse);
@@ -93,7 +93,7 @@ Color3 getColor(Vector3 ray_src, Vector3 ray_dir, const list<SceneObject*> &obje
     
     Vector3 udir(0,0,0);
     Vector3 vdir(0,0,0);
-    Vector3 n = hitObject->normalAt(intersect_pos);
+    Vector3 n = hitObject->getNormalAt(intersect_pos);
     getBase( n, /*ref*/udir, /*ref*/vdir);
     
     
@@ -102,10 +102,7 @@ Color3 getColor(Vector3 ray_src, Vector3 ray_dir, const list<SceneObject*> &obje
     
     Color3 c2 = getColor( ray_src, ray_dir, objects, depth+1);
 
-    return color*c2*0.7;/*Color3( color.r * c2.r * 0.8,
-                   color.g * c2.g * 0.8, 
-                   color.b * c2.b * 0.8);*/
-    
+    return color*c2*0.7;    
 }
 
 int main()
@@ -118,7 +115,88 @@ int main()
     for ( list<Rectangle>::const_iterator it = rects.begin(); it != rects.end(); it++)
         objects.push_back( new Rectangle(*it));
 
-    Vector3 light_pos(1,1,1);
+    vector<Rectangle*> windows;
+    for ( list<Rectangle*>::const_iterator it = objects.begin(); it != objects.end(); it++)
+    {
+        //Color3 col = (*it)->getColor( (*it)->getTileCenter(0) );
+        Color3 col = ((Rectangle*)(*it))->getTile((*it)->getTileCenter(0)).getColor();
+        if (col.r > 1 || col.g > 1 || col.b > 1)
+            windows.push_back( *it);
+    }
+    cout << "Registered " << windows.size() << " windows" << endl;
+
+    
+    for ( unsigned int i = 0; i < windows.size(); i++)
+    {
+        Rectangle &window = *(windows[i]);
+        for (int j = 0; j < window.getNumTiles(); j++)
+            window.getTile(j).setLightColor( Color3(1, 1, 1) );
+
+        Vector3 src = window.getOrigin();
+        Vector3 xDir= window.getWidthVector();
+        Vector3 yDir= window.getHeightVector();
+        
+        double area = xDir.length() * yDir.length();
+        cout << "Photon-Mapping window " << (i+1) << "/" << windows.size() << " with size " << area << endl;
+        
+        // is guaranteed to have the same normal everywhere, so just take that one of the first tile
+        
+        Vector3 xNorm = normalized(xDir);
+        Vector3 yNorm = normalized(yDir);
+        assert( n.dot(xNorm) < 1E-10);      //all need to be perpendicular to form an orthogonal base
+        assert( n.dot(yNorm) < 1E-10);
+        assert( xNorm.dot(yNorm) < 1E-10);
+        
+        
+        int numSamplesPerArea = 1000*50;
+        
+        for (int i = 0; i < numSamplesPerArea*area; i++)
+        {
+            double dx = rand() / (double)RAND_MAX;
+            double dy = rand() / (double)RAND_MAX;
+            //Color3 col = window.getColor(pos);    //TODO: use light emitter color for lighting instead of fixed light brightness
+            Vector3 pos = src + xDir*dx + yDir*dy;
+            Vector3 n   = window.getNormalAt( pos ); 
+
+            Vector3 ray_dir = getRandomRay(n, xNorm, yNorm);
+            Color3 lightCol = window.getColor( pos );
+            
+            for (int depth = 0; depth < 4; depth++)
+            {
+                
+                double dist;
+                Rectangle *hit = getClosestObject(pos, ray_dir, objects, dist);
+                if (!hit) continue;
+                
+                Vector3 hitPos = pos + ray_dir * dist;
+                Tile& tile = ((Rectangle*)hit)->getTile(hitPos);
+                Color3 light = tile.getLightColor() + lightCol* (4/(TILE_SIZE*TILE_SIZE*numSamplesPerArea*12.5));
+                tile.setLightColor(light);
+                
+                lightCol = lightCol * 0.7 * tile.getColor();
+                
+                // prepare next (diffuse reflective) ray
+                n = hit->getNormalAt(hitPos);
+                Vector3 u,v;
+                getBase(n, /*out*/u, /*out*/v);
+                ray_dir = getRandomRay(n, u, v);
+                pos = hitPos;
+            }
+        }
+    }
+
+    int idx = 0;
+    char num[50];
+    for ( list<Rectangle*>::const_iterator it = objects.begin(); it != objects.end(); it++)
+    {
+        snprintf(num, 49, "%d", idx);
+        string filename = string("tiles/tile_") + num + ".png";
+        (*it)->saveAs(filename.c_str());
+        idx++;
+    }
+    
+
+    //Vector3 light_pos(1,1,1);
     Vector3 cam_pos(420,882,120);
     Vector3 cam_dir  = normalized(Vector3(320, 205, 120) - cam_pos) ;
     Vector3 cam_up(0,0,1);
@@ -128,38 +206,15 @@ int main()
     std::cout << "cam_right: " << cam_right << endl;
     std::cout << "cam_up: " << cam_up << endl;
     std::cout << "cam_dir: " << cam_dir << endl;
-    static const int img_width = 800;
-    static const int img_height= 600;
+    static const int img_width = 1920;
+    static const int img_height= 1080;
 
-#if 0
-    for (list<SceneObject*>::iterator it = objects.begin(); it != objects.end(); it++)
-    {
-        SceneObject &obj = **it;
-        for (int tileId = 0; tileId < obj.getNumTiles(); tileId++)
-        {
-            Vector3 pos = obj.getTileCenter(tileId);
-            
-            Color3 objCol = obj.getColor(pos);
-            if (objCol.r > 1 || objCol.g > 1 || objCol.b > 1)
-                continue; // is a light emitter itself, no need co compute occlusion
-            
-            double dist;
-            SceneObject *hitObj = getClosestObject( pos, normalized(Vector3(0, -2, 1)), objects, dist);
-            if (!hitObj) { /*obj.setTileColor(tileId, Color3(0,0,0));*/ continue;}
-
-            Vector3 hitPos = pos + normalized(Vector3(0, -2, 1)) * dist;
-            Color3 hitColor = hitObj->getColor( hitPos );
-            if (hitColor.r < 1 && hitColor.g < 1 && hitColor.b < 1)
-                continue;
-                //obj.setTileColor(tileId, Color3(0,0,0));
-            obj.setTileColor(tileId, Color3(2,2,2));
-        }
-    }
-#endif
     uint8_t* pixel_buffer = new uint8_t[3*img_width*img_height];
+    memset(pixel_buffer, 0, 3*img_width*img_height);
+    
     for (int y = 0; y < img_height; y++) 
     {
-        if (y % 3 == 0)
+        if (y % 30 == 0)
         {
             cout << (y*100 / img_height) << "%" << endl;
             write_png_file( "out.png", img_width, img_height, PNG_COLOR_TYPE_RGB, pixel_buffer);
@@ -169,7 +224,7 @@ int main()
                                           cam_right* (1.25*(x-(img_width/2))/(double)img_width) + 
                                           cam_up*    (1.25*(img_height/(double)img_width)*(y-(img_height/2))/(double)img_height) );
             
-            static const int NUM_ITERATIONS = 10000;
+            static const int NUM_ITERATIONS = 1;
             Color3 col_acc(0,0,0);
             for (int i = 0; i < NUM_ITERATIONS; i++)
             {
@@ -188,7 +243,7 @@ int main()
     write_png_file( "out.png", img_width, img_height, PNG_COLOR_TYPE_RGB, pixel_buffer);
     
     delete [] pixel_buffer;
-    for ( list<SceneObject*>::iterator it = objects.begin(); it != objects.end(); it++)
+    for ( list<Rectangle*>::iterator it = objects.begin(); it != objects.end(); it++)
         delete *it;
     return 0;
 }

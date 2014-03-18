@@ -1,11 +1,11 @@
 #include "sceneObject.h"
 
 #include <stdlib.h> // for rand()
+#include "png_helper.h"
 
-static const double TILE_SIZE = 10;
 
-Tile::Tile(const Color3& _col): col(_col), lightColor(1,1,1) {}
-Tile::Tile(): col(0.5, rand() / (double)RAND_MAX, rand() / (double)RAND_MAX), lightColor(1,1,1) {};
+Tile::Tile(const Color3& _col): col(_col), lightColor(0,0,0) {}
+Tile::Tile(): col(0.5, rand() / (double)RAND_MAX, rand() / (double)RAND_MAX), lightColor(0,0,0) {};
     
 Color3 Tile::getCombinedColor() const{ return col*lightColor;}
 
@@ -94,7 +94,7 @@ double Rectangle::intersects( Vector3 ray_src, Vector3 ray_dir) {
     
 }
 
-Vector3 Rectangle::normalAt(const Vector3&) {
+Vector3 Rectangle::getNormalAt(const Vector3&) const {
     return n;
 }
 
@@ -117,9 +117,21 @@ int Rectangle::getTileIdAt(const Vector3 &p) const
     if (ty < 0) ty = 0;
     if (ty >= vNumTiles) ty = vNumTiles - 1;
     
-    assert(ty*hNumTiles + tx <= getNumTiles());
+    assert(ty*hNumTiles + tx < getNumTiles());
     return ty*hNumTiles + tx;
 }
+
+Tile& Rectangle::getTile(const Vector3 &pos)
+{
+    return tiles[getTileIdAt(pos)];
+}
+
+Tile& Rectangle::getTile(const int tileId)
+{
+    assert(tileId >= 0 && tileId < getNumTiles());
+    return tiles[tileId];
+}
+
 
 Vector3 Rectangle::getTileCenter(int id) const
 {
@@ -143,7 +155,7 @@ Color3 Rectangle::getColor(const Vector3 &pos) const
     double dist = (pos - p).length();
     //cout << dist << endl;
     double fac = (1-dist/7.0);*/
-    return tiles[tile_id].getColor();//*fac*fac;
+    return tiles[tile_id].getCombinedColor();//*fac*fac;
     //return Color3(r,g,b); 
 
 }
@@ -152,6 +164,27 @@ void Rectangle::setTileColor(const int tileId, const Color3 &color) {
     assert (tileId >= 0 && tileId < hNumTiles*vNumTiles);
     tiles[tileId].setLightColor(color);
 }
+
+static uint8_t clamp(double d)
+{
+    if (d < 0) d = 0;
+    if (d > 255) d = 255;
+    return d;
+}
+
+void Rectangle::saveAs(const char *filename) const
+{
+    uint8_t *data = new uint8_t[hNumTiles*vNumTiles*3];
+    for (int i = 0; i < hNumTiles*vNumTiles; i++)
+    {
+        data[i*3+0] = clamp(tiles[i].getCombinedColor().r*255);
+        data[i*3+1] = clamp(tiles[i].getCombinedColor().g*255);
+        data[i*3+2] = clamp(tiles[i].getCombinedColor().b*255);
+    }
+    
+    write_png_file(filename, hNumTiles, vNumTiles, PNG_COLOR_TYPE_RGB, data);
+}
+
 
 
 Plane::Plane( const Vector3 &_pos, const Vector3 &_n, const Color3 &_col):  pos(_pos), n(_n), tile(_col) {}
@@ -164,7 +197,7 @@ double Plane::intersects( Vector3 ray_src, Vector3 ray_dir) {
     return n.dot( pos - ray_src ) / denom;
 }
 
-Vector3 Plane::normalAt(const Vector3&)        { return n;   }
+Vector3 Plane::getNormalAt(const Vector3&) const       { return n;   }
 int Plane::getNumTiles() const                 { return 1;   }
 int Plane::getTileIdAt(const Vector3 &) const  { return 0;   }
 Vector3 Plane::getTileCenter(int) const        { return pos; }
@@ -201,7 +234,7 @@ public:
         return d1 < d2 ? d1 : d2;
     }
 
-    Vector3 normalAt(const Vector3 &p) {
+    Vector3 getNormalAt(const Vector3 &p) const{
         return (p - pos).normalized();
     }
 
