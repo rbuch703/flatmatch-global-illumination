@@ -87,7 +87,7 @@ Color3 getColor(Vector3 ray_src, Vector3 ray_dir, const list<SceneObject*> &obje
     //return Color3(diffuse, diffuse, diffuse);
 
 
-    if ((depth >= 8) or (color == Color3(0,0,0)))
+    if ((depth >= 4) or (color == Color3(0,0,0)))
         return Color3(0,0,0);
 
     
@@ -102,16 +102,17 @@ Color3 getColor(Vector3 ray_src, Vector3 ray_dir, const list<SceneObject*> &obje
     
     Color3 c2 = getColor( ray_src, ray_dir, objects, depth+1);
 
-    return Color3( color.r * c2.r * 0.8,
+    return color*c2*0.7;/*Color3( color.r * c2.r * 0.8,
                    color.g * c2.g * 0.8, 
-                   color.b * c2.b * 0.8);
+                   color.b * c2.b * 0.8);*/
     
 }
 
 int main()
 {
-    objects.push_back( new Rectangle( Vector3(0,0,0), Vector3(0, 1000, 0), Vector3(1000, 0, 0), Color3(0.5, 0.5, 0.5)));    // floor
-    objects.push_back( new Rectangle( Vector3(0,0,200), Vector3(1000, 0, 0), Vector3(0, 1000, 0), Color3(0.5, 0.5, 0.5)));  // ceiling
+    static const Color3 wallColor(0.8, 0.8, 0.8);
+    objects.push_back( new Rectangle( Vector3(0,0,0), Vector3(0, 1000, 0), Vector3(1000, 0, 0), wallColor));    // floor
+    objects.push_back( new Rectangle( Vector3(0,0,200), Vector3(1000, 0, 0), Vector3(0, 1000, 0), wallColor));  // ceiling
     
     list<Rectangle> rects = parseLayout("layout.png");
     for ( list<Rectangle>::const_iterator it = rects.begin(); it != rects.end(); it++)
@@ -127,8 +128,8 @@ int main()
     std::cout << "cam_right: " << cam_right << endl;
     std::cout << "cam_up: " << cam_up << endl;
     std::cout << "cam_dir: " << cam_dir << endl;
-    static const int img_width = 400;
-    static const int img_height= 300;
+    static const int img_width = 800;
+    static const int img_height= 600;
 
 #if 0
     for (list<SceneObject*>::iterator it = objects.begin(); it != objects.end(); it++)
@@ -168,7 +169,7 @@ int main()
                                           cam_right* (1.25*(x-(img_width/2))/(double)img_width) + 
                                           cam_up*    (1.25*(img_height/(double)img_width)*(y-(img_height/2))/(double)img_height) );
             
-            static const int NUM_ITERATIONS = 1000;
+            static const int NUM_ITERATIONS = 10000;
             Color3 col_acc(0,0,0);
             for (int i = 0; i < NUM_ITERATIONS; i++)
             {

@@ -1,6 +1,19 @@
 #include "sceneObject.h"
 
+#include <stdlib.h> // for rand()
+
 static const double TILE_SIZE = 10;
+
+Tile::Tile(const Color3& _col): col(_col), lightColor(1,1,1) {}
+Tile::Tile(): col(0.5, rand() / (double)RAND_MAX, rand() / (double)RAND_MAX), lightColor(1,1,1) {};
+    
+Color3 Tile::getCombinedColor() const{ return col*lightColor;}
+
+void   Tile::setLightColor(const Color3& color) { lightColor = color;}
+Color3 Tile::getLightColor() const { return lightColor;}
+
+void   Tile::setColor(const Color3& color) { col = color;}
+Color3 Tile::getColor() const { return col;}
 
 
 Rectangle::Rectangle( const Vector3 &_pos, const Vector3 &_width, const Vector3 &_height):
@@ -139,6 +152,27 @@ void Rectangle::setTileColor(const int tileId, const Color3 &color) {
     assert (tileId >= 0 && tileId < hNumTiles*vNumTiles);
     tiles[tileId].setLightColor(color);
 }
+
+
+Plane::Plane( const Vector3 &_pos, const Vector3 &_n, const Color3 &_col):  pos(_pos), n(_n), tile(_col) {}
+
+double Plane::intersects( Vector3 ray_src, Vector3 ray_dir) {
+    double denom = n.dot(ray_dir);
+    if (denom == 0)
+        return -1;
+        
+    return n.dot( pos - ray_src ) / denom;
+}
+
+Vector3 Plane::normalAt(const Vector3&)        { return n;   }
+int Plane::getNumTiles() const                 { return 1;   }
+int Plane::getTileIdAt(const Vector3 &) const  { return 0;   }
+Vector3 Plane::getTileCenter(int) const        { return pos; }
+
+Color3 Plane::getColor(const Vector3 &) const { return tile.getCombinedColor(); };
+
+void Plane::setTileColor(const int, const Color3 &color) {tile.setLightColor(color); }
+
     
 /*
 class Sphere: public SceneObject {

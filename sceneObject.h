@@ -8,16 +8,16 @@
 
 class Tile {
 public:
-    Tile(const Color3& _col): col(_col), lightColor(1,1,1) {}
-    Tile(): col(0.5, rand() / (double)RAND_MAX, rand() / (double)RAND_MAX), lightColor(1,1,1) {};
+    Tile(const Color3& _col);
+    Tile();
     
-    Color3 getCombinedColor() const{ return col*lightColor;}
+    Color3 getCombinedColor() const;
 
-    void   setLightColor(const Color3& color) { lightColor = color;}
-    Color3 getLightColor() const { return lightColor;}
+    void   setLightColor(const Color3& color);
+    Color3 getLightColor() const;
 
-    void   setColor(const Color3& color) { col = color;}
-    Color3 getColor() const { return col;}
+    void   setColor(const Color3& color);
+    Color3 getColor() const;
 
 private:
     Color3 col;
@@ -39,29 +39,14 @@ public:
 class Plane: public SceneObject {
 
 public:
-    Plane( const Vector3 &_pos, const Vector3 &_n, const Color3 &_col = Color3(0.5, 0.5, 0.5) ):  pos(_pos), n(_n), tile(_col) {}
-
-    double intersects( Vector3 ray_src, Vector3 ray_dir) {
-        double denom = n.dot(ray_dir);
-        if (denom == 0)
-            return -1;
-            
-        return n.dot( pos - ray_src ) / denom;
-    }
-
-    Vector3 normalAt(const Vector3&)        { return n;   }
-
-    int getNumTiles() const                 { return 1;   }
-    int getTileIdAt(const Vector3 &) const  { return 0;   }
-    Vector3 getTileCenter(int) const        { return pos; }
-
-    
-    Color3 getColor(const Vector3 &) const { return tile.getCombinedColor(); };
-
-    void setTileColor(const int, const Color3 &color) {
-        tile.setLightColor(color);
-    }
-    
+    Plane( const Vector3 &_pos, const Vector3 &_n, const Color3 &_col = Color3(0.5, 0.5, 0.5) );
+    double intersects( Vector3 ray_src, Vector3 ray_dir);
+    Vector3 normalAt(const Vector3&)        ;
+    int getNumTiles() const                 ;
+    int getTileIdAt(const Vector3 &) const  ;
+    Vector3 getTileCenter(int) const        ;
+    Color3 getColor(const Vector3 &) const ;
+    void setTileColor(const int, const Color3 &color) ;
 private:
     Vector3 pos, n;
     Tile    tile;
