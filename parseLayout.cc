@@ -1,5 +1,5 @@
 
-#include <list>
+#include <vector>
 #include "parseLayout.h"
 
 #include <assert.h>
@@ -15,10 +15,10 @@ static const double HEIGHT = 200;
 
 using namespace std;
 
-list<Rectangle> parseLayout(const char* const filename) {
+vector<Rectangle> parseLayout(const char* const filename) {
     static const Color3 wallColor(0.8, 0.8, 0.8);
     static const Color3 windowColor(15, 14, 12);
-    list<Rectangle> segments;
+    vector<Rectangle> segments;
     int width, height, color_type;
     uint32_t *pixel_buffer;
     read_png_file(filename, width, height, color_type, (uint8_t*&)pixel_buffer);

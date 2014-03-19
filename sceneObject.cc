@@ -70,7 +70,7 @@ Rectangle::Rectangle( const Vector3 &_pos, const Vector3 &_width, const Vector3 
     //numTiles = ;
 }
 #endif
-double Rectangle::intersects( Vector3 ray_src, Vector3 ray_dir) {
+double Rectangle::intersects( Vector3 ray_src, Vector3 ray_dir, double closestDist) {
     if (ray_dir.dot(n) > 0) return -1; //backface culling
     double denom = n.dot(ray_dir);
     if (denom == 0)
@@ -79,7 +79,13 @@ double Rectangle::intersects( Vector3 ray_src, Vector3 ray_dir) {
     double fac = n.dot( pos - ray_src ) / denom;
     if (fac < 0) return fac;    //is behind camera, cannot be hit
     
-    Vector3 p = ray_src + ray_dir * fac;
+    Vector3 ray = ray_dir * fac;
+    
+    //early termination: if further away than the closest hit (so far), we can ignore this hit
+    if (closestDist * closestDist < ray.squaredLength())
+        return -1;
+    
+    Vector3 p = ray_src + ray;
     Vector3 pDir = p - pos;
     
     double dx, dy;
@@ -189,7 +195,7 @@ void Rectangle::saveAs(const char *filename) const
 
 Plane::Plane( const Vector3 &_pos, const Vector3 &_n, const Color3 &_col):  pos(_pos), n(_n), tile(_col) {}
 
-double Plane::intersects( Vector3 ray_src, Vector3 ray_dir) {
+double Plane::intersects( Vector3 ray_src, Vector3 ray_dir, double) {
     double denom = n.dot(ray_dir);
     if (denom == 0)
         return -1;

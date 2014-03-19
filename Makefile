@@ -3,15 +3,8 @@ SRC = vector3.cc png_helper.cc main.cc parseLayout.cc sceneObject.cc
 
 OBJ  = $(SRC:.cc=.o)
 
-# -ftrapv is extremely important to catch integer overflow bugs, which are otherwise hard to detect
-# OSM data covers almost the entire range of int32_t; multiplying two values (required for some algorithms)
-# already uses all bits of an int64_t, so, more complex algorithms could easily cause an - otherwise undetected -
-# integer overflow
-# WARNING: the gcc option -O2 appears to negate the effects of -ftrapv ! 
-
-
 OPT_FLAGS = -O2
-FLAGS = -g -Wall -Wextra -flto -DNDEBUG $(OPT_FLAGS)
+FLAGS = -g -Wall -Wextra -DNDEBUG $(OPT_FLAGS) -flto
 
 #FLAGS = -ftrapv -g -Wall -Wextra 
 #FLAGS = -ftrapv -g -Wall -Wextra -fprofile-arcs -ftest-coverage

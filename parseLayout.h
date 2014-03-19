@@ -2,10 +2,10 @@
 #ifndef PARSELAYOUT_H
 #define PARSELAYOUT_H
 
-#include <list>
+#include <vector>
 #include "sceneObject.h"
 
-std::list<Rectangle> parseLayout(const char* const filename);
+std::vector<Rectangle> parseLayout(const char* const filename);
 
 
 #endif
