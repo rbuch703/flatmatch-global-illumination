@@ -1,10 +1,10 @@
 
-SRC = vector3.cc png_helper.cc main.cc parseLayout.cc sceneObject.cc
+SRC = png_helper.cc main.cc parseLayout.cc sceneObject.cc #vector3.cc
 
 OBJ  = $(SRC:.cc=.o)
 
 OPT_FLAGS = -O2
-FLAGS = -g -Wall -Wextra -DNDEBUG $(OPT_FLAGS) -flto
+FLAGS = -g -Wall -Wextra -msse3 -DNDEBUG $(OPT_FLAGS) -flto
 
 #FLAGS = -ftrapv -g -Wall -Wextra 
 #FLAGS = -ftrapv -g -Wall -Wextra -fprofile-arcs -ftest-coverage

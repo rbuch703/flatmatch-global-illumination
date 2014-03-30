@@ -1,12 +1,12 @@
 #ifndef SCENEOBJECT_H
 #define SCENEOBJECT_H
 
-#include "vector3.h"
+#include "vector3_sse.h"
 #include "color3.h"
 #include <math.h>
 #include "assert.h"
 
-static const double TILE_SIZE = 5;
+static const float TILE_SIZE = 5;
 
 
 class Tile {
@@ -29,7 +29,7 @@ private:
 class SceneObject {
 public:
     virtual ~SceneObject() {};
-    virtual double intersects( Vector3 ray_src, Vector3 ray_dir, double closestDist = INFINITY) = 0; //return the distance of the closest intersection, or a negative value if no intersection exists
+    virtual float intersects( Vector3 ray_src, Vector3 ray_dir, float closestDist = INFINITY) = 0; //return the distance of the closest intersection, or a negative value if no intersection exists
     virtual Vector3 getNormalAt(const Vector3 &pos) const = 0;
     virtual Color3 getColor(const Vector3 &pos) const = 0;
     virtual int getNumTiles() const = 0;
@@ -42,7 +42,7 @@ class Plane: public SceneObject {
 
 public:
     Plane( const Vector3 &_pos, const Vector3 &_n, const Color3 &_col = Color3(0.5, 0.5, 0.5) );
-    double intersects( Vector3 ray_src, Vector3 ray_dir, double closestDist = INFINITY);
+    float intersects( Vector3 ray_src, Vector3 ray_dir, float closestDist = INFINITY);
     Vector3 getNormalAt(const Vector3&) const       ;
     int getNumTiles() const                 ;
     int getTileIdAt(const Vector3 &) const  ;
@@ -59,7 +59,7 @@ class Rectangle : public SceneObject {
 public:
     Rectangle( const Vector3 &_pos, const Vector3 &_width, const Vector3 &_height);
     Rectangle( const Vector3 &_pos, const Vector3 &_width, const Vector3 &_height, const Color3 &col);
-    double intersects( Vector3 ray_src, Vector3 ray_dir, double closestDist = INFINITY);
+    float intersects( Vector3 ray_src, Vector3 ray_dir, float closestDist = INFINITY);
     Vector3 getNormalAt(const Vector3&) const;    
     int getNumTiles() const;    
     int getTileIdAt(const Vector3 &p) const;    
@@ -76,8 +76,8 @@ private:
     Vector3 pos, width, height, n;
     Vector3 width_norm, height_norm;
     Vector3 width_per_tile, height_per_tile;
-    //double r, g, b;
-    double hLength, vLength;
+    //float r, g, b;
+    float hLength, vLength;
     
     int hNumTiles, vNumTiles;
     Tile* tiles;

@@ -50,7 +50,7 @@ vector<Rectangle> parseLayout(const char* const filename) {
                        pixel_buffer[(y-1) * width + x] != BLACK && 
                        pixel_buffer[ y    * width + x] == BLACK)
                     x++;
-                segments.push_back(Rectangle( Vector3(x,y,0), Vector3(start_x-x,0,0), Vector3(0,0,HEIGHT), wallColor));        
+                segments.push_back(Rectangle( createVector3(x,y,0), createVector3(start_x-x,0,0), createVector3(0,0,HEIGHT), wallColor));        
 //                segments.push_back(WallSegment( x, y, start_x, y));
             }
 
@@ -61,9 +61,9 @@ vector<Rectangle> parseLayout(const char* const filename) {
                        pixel_buffer[(y-1) * width + x] == GRAY && 
                        pixel_buffer[ y    * width + x] == GREEN)
                     x++;
-                segments.push_back(Rectangle( Vector3(start_x,y,0),  Vector3(x-start_x,0,0), Vector3(0,0,70), wallColor ));
-                segments.push_back(Rectangle( Vector3(start_x,y,70), Vector3(x-start_x,0,0), Vector3(0,0,180-70), windowColor));
-                segments.push_back(Rectangle( Vector3(start_x,y,180),Vector3(x-start_x,0,0), Vector3(0,0,HEIGHT-180), wallColor));
+                segments.push_back(Rectangle( createVector3(start_x,y,0),  createVector3(x-start_x,0,0), createVector3(0,0,70), wallColor ));
+                segments.push_back(Rectangle( createVector3(start_x,y,70), createVector3(x-start_x,0,0), createVector3(0,0,180-70), windowColor));
+                segments.push_back(Rectangle( createVector3(start_x,y,180),createVector3(x-start_x,0,0), createVector3(0,0,HEIGHT-180), wallColor));
 
 
 //                segments.push_back(WallSegment( x, y, start_x, y));
@@ -79,7 +79,7 @@ vector<Rectangle> parseLayout(const char* const filename) {
                        pixel_buffer[ y    * width + x] != BLACK)
                     x++;
                     
-                segments.push_back(Rectangle( Vector3(start_x,y,0), Vector3(x-start_x,0,0), Vector3(0,0,HEIGHT), wallColor));
+                segments.push_back(Rectangle( createVector3(start_x,y,0), createVector3(x-start_x,0,0), createVector3(0,0,HEIGHT), wallColor));
                 //segments.push_back(WallSegment( start_x, y, x, y));
             }
             
@@ -91,9 +91,9 @@ vector<Rectangle> parseLayout(const char* const filename) {
                        pixel_buffer[ y    * width + x] == GRAY)
                     x++;
                     
-                segments.push_back(Rectangle( Vector3(x,y,0), Vector3(start_x-x,0,0), Vector3(0,0,70), wallColor));
-                segments.push_back(Rectangle( Vector3(x,y,70), Vector3(start_x-x,0,0), Vector3(0,0,180-70), windowColor));
-                segments.push_back(Rectangle( Vector3(x,y,180), Vector3(start_x-x,0,0), Vector3(0,0,HEIGHT-180), wallColor));
+                segments.push_back(Rectangle( createVector3(x,y,0), createVector3(start_x-x,0,0), createVector3(0,0,70), wallColor));
+                segments.push_back(Rectangle( createVector3(x,y,70), createVector3(start_x-x,0,0), createVector3(0,0,180-70), windowColor));
+                segments.push_back(Rectangle( createVector3(x,y,180), createVector3(start_x-x,0,0), createVector3(0,0,HEIGHT-180), wallColor));
                 //segments.push_back(WallSegment( start_x, y, x, y));
             }            
         }
@@ -109,7 +109,7 @@ vector<Rectangle> parseLayout(const char* const filename) {
                        pixel_buffer[y * width +  x   ] == BLACK)
                     y++;
                 
-                segments.push_back(Rectangle( Vector3(x,start_y,0), Vector3(0,y-start_y,0), Vector3(0,0,HEIGHT), wallColor));
+                segments.push_back(Rectangle( createVector3(x,start_y,0), createVector3(0,y-start_y,0), createVector3(0,0,HEIGHT), wallColor));
                 //segments.push_back(WallSegment( x, start_y , x, y));
             }
             
@@ -121,7 +121,7 @@ vector<Rectangle> parseLayout(const char* const filename) {
                        pixel_buffer[y * width +  x   ] != BLACK)
                     y++;
                 
-                segments.push_back(Rectangle( Vector3(x,y,0), Vector3(0,start_y-y,0), Vector3(0,0,HEIGHT), wallColor));
+                segments.push_back(Rectangle( createVector3(x,y,0), createVector3(0,start_y-y,0), createVector3(0,0,HEIGHT), wallColor));
                 //segments.push_back(WallSegment( x, y, x, start_y));
             }
         

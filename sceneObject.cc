@@ -5,7 +5,7 @@
 
 
 Tile::Tile(const Color3& _col): col(_col), lightColor(0,0,0) {}
-Tile::Tile(): col(0.5, rand() / (double)RAND_MAX, rand() / (double)RAND_MAX), lightColor(0,0,0) {};
+Tile::Tile(): col(0.5, rand() / (float)RAND_MAX, rand() / (float)RAND_MAX), lightColor(0,0,0) {};
     
 Color3 Tile::getCombinedColor() const{ return col*lightColor;}
 
@@ -18,25 +18,25 @@ Color3 Tile::getColor() const { return col;}
 
 Rectangle::Rectangle( const Vector3 &_pos, const Vector3 &_width, const Vector3 &_height):
         pos(_pos), width(_width), height(_height), 
-        n(normalized(height.cross(width))),
+        n(normalized(cross(height,width))),
         width_norm (normalized(width)),
         height_norm (normalized(height)),
-        hLength( width.length()),
-        vLength(height.length()) {
+        hLength( length(width)),
+        vLength( length(height)) {
     /*r = 0.5;
-    g = rand() / (double)RAND_MAX;
-    b = rand() / (double)RAND_MAX;*/
+    g = rand() / (float)RAND_MAX;
+    b = rand() / (float)RAND_MAX;*/
     
-    hNumTiles = round(width.length() / TILE_SIZE);
+    hNumTiles = round(length(width) / TILE_SIZE);
     if (hNumTiles < 1) hNumTiles = 1;
     
-    vNumTiles = round(height.length()/ TILE_SIZE);
+    vNumTiles = round(length(height)/ TILE_SIZE);
     if (vNumTiles < 1) vNumTiles = 1;
     
     tiles = new Tile[vNumTiles * hNumTiles];
     
-    width_per_tile = width / hNumTiles;
-    height_per_tile= height/ vNumTiles;
+    width_per_tile = div(width, hNumTiles);
+    height_per_tile= div(height, vNumTiles);
     //numTiles = ;
 }
 
@@ -54,8 +54,8 @@ Rectangle::Rectangle( const Vector3 &_pos, const Vector3 &_width, const Vector3 
         hLength( width.length()),
         vLength(height.length()) {
     /*r = 0.5;
-    g = rand() / (double)RAND_MAX;
-    b = rand() / (double)RAND_MAX;*/
+    g = rand() / (float)RAND_MAX;
+    b = rand() / (float)RAND_MAX;*/
     
     hNumTiles = round(width.length() / TILE_SIZE);
     if (hNumTiles < 1) hNumTiles = 1;
@@ -70,28 +70,27 @@ Rectangle::Rectangle( const Vector3 &_pos, const Vector3 &_width, const Vector3 
     //numTiles = ;
 }
 #endif
-double Rectangle::intersects( Vector3 ray_src, Vector3 ray_dir, double closestDist) {
-    if (ray_dir.dot(n) > 0) return -1; //backface culling
-    double denom = n.dot(ray_dir);
+float Rectangle::intersects( Vector3 ray_src, Vector3 ray_dir, float closestDist) {
+    if (dot(ray_dir,n) > 0) return -1; //backface culling
+    float denom = dot(n, ray_dir);
     if (denom == 0)
         return -1;
         
-    double fac = n.dot( pos - ray_src ) / denom;
+    //float fac = n.dot( pos - ray_src ) / denom;
+    float fac = dot(n, sub(pos, ray_src)) / denom;
     if (fac < 0) return fac;    //is behind camera, cannot be hit
     
-    Vector3 ray = ray_dir * fac;
+    Vector3 ray = mul(ray_dir, fac);
     
     //early termination: if further away than the closest hit (so far), we can ignore this hit
-    if (closestDist * closestDist < ray.squaredLength())
+    if (closestDist * closestDist < squaredLength(ray) )
         return -1;
     
-    Vector3 p = ray_src + ray;
-    Vector3 pDir = p - pos;
+    Vector3 p = add(ray_src, ray);
+    Vector3 pDir = sub(p, pos);
     
-    double dx, dy;
-    
-    dx = width_norm.dot(pDir);
-    dy = height_norm.dot(pDir);
+    float dx = dot( width_norm, pDir);
+    float dy = dot(height_norm, pDir);
     
     if (dx < 0 || dy < 0) return -1;
     if (dx > hLength || dy > vLength) return -1;
@@ -112,10 +111,10 @@ int Rectangle::getNumTiles() const
 int Rectangle::getTileIdAt(const Vector3 &p) const
 {
     Vector3 pDir = p - pos; //vector from rectangle origin (its lower left corner) to current point
-    double dx, dy;
+    float dx, dy;
     
-    dx = width_norm.dot(pDir);
-    dy = height_norm.dot(pDir);
+    dx = dot(width_norm, pDir);
+    dy = dot(height_norm,pDir);
     int tx = (dx*hNumTiles) / hLength;
     int ty = (dy*vNumTiles) / vLength;
     if (tx < 0) tx = 0;
@@ -149,7 +148,8 @@ Vector3 Rectangle::getTileCenter(int id) const
     if (ty < 0) ty = 0;
     if (ty >= vNumTiles) ty = vNumTiles - 1;
 
-    return pos + width_per_tile * (tx+0.5) + height_per_tile * (ty+0.5);
+    //return pos + width_per_tile * (tx+0.5) + height_per_tile * (ty+0.5);
+    return add(pos, add( mul(width_per_tile, (tx+0.5)), mul( height_per_tile, (ty+0.5))));
     //return pos;
 }
     
@@ -158,9 +158,9 @@ Color3 Rectangle::getColor(const Vector3 &pos) const
     int tile_id = getTileIdAt(pos);
     /*Vector3 p = getTileCenter(tile_id);
     
-    double dist = (pos - p).length();
+    float dist = (pos - p).length();
     //cout << dist << endl;
-    double fac = (1-dist/7.0);*/
+    float fac = (1-dist/7.0);*/
     return tiles[tile_id].getCombinedColor();//*fac*fac;
     //return Color3(r,g,b); 
 
@@ -171,7 +171,7 @@ void Rectangle::setTileColor(const int tileId, const Color3 &color) {
     tiles[tileId].setLightColor(color);
 }
 
-static uint8_t clamp(double d)
+static uint8_t clamp(float d)
 {
     if (d < 0) d = 0;
     if (d > 255) d = 255;
@@ -195,12 +195,13 @@ void Rectangle::saveAs(const char *filename) const
 
 Plane::Plane( const Vector3 &_pos, const Vector3 &_n, const Color3 &_col):  pos(_pos), n(_n), tile(_col) {}
 
-double Plane::intersects( Vector3 ray_src, Vector3 ray_dir, double) {
-    double denom = n.dot(ray_dir);
+float Plane::intersects( Vector3 ray_src, Vector3 ray_dir, float) {
+    float denom = dot(n,ray_dir);
     if (denom == 0)
         return -1;
         
-    return n.dot( pos - ray_src ) / denom;
+    //return n.dot( pos - ray_src ) / denom;
+    return dot(n, sub(pos, ray_src) ) / denom;
 }
 
 Vector3 Plane::getNormalAt(const Vector3&) const       { return n;   }
@@ -216,20 +217,20 @@ void Plane::setTileColor(const int, const Color3 &color) {tile.setLightColor(col
 /*
 class Sphere: public SceneObject {
 public:
-    Sphere( const Vector3 &_pos, double _r, const Color3 &_col = Color3(0.5, 0.5, 0.5) ):  pos(_pos), r(_r), col(_col) {}
+    Sphere( const Vector3 &_pos, float _r, const Color3 &_col = Color3(0.5, 0.5, 0.5) ):  pos(_pos), r(_r), col(_col) {}
 
-    double intersects( Vector3 ray_src, Vector3 ray_dir) {
+    float intersects( Vector3 ray_src, Vector3 ray_dir) {
         Vector3 center_line = ray_src - pos;
-        double tmp = ray_dir.dot(center_line);
-        double s1 = tmp * tmp;
-        double s2 = center_line.squaredLength();
-        double q = s1 - s2 + r * r;
+        float tmp = ray_dir.dot(center_line);
+        float s1 = tmp * tmp;
+        float s2 = center_line.squaredLength();
+        float q = s1 - s2 + r * r;
 
         if (q < 0)
             return -1.0;
             
-        double d1 = - tmp + sqrt(q);
-        double d2 = - tmp - sqrt(q);
+        float d1 = - tmp + sqrt(q);
+        float d2 = - tmp - sqrt(q);
         
         if (d1 < 0) 
             return d2;
@@ -248,7 +249,7 @@ public:
     
 private:
     Vector3     pos;
-    double      r;
+    float      r;
     Color3      col;
 };*/
 
