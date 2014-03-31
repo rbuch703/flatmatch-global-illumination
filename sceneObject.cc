@@ -71,14 +71,15 @@ Rectangle::Rectangle( const Vector3 &_pos, const Vector3 &_width, const Vector3 
 }
 #endif
 float Rectangle::intersects( Vector3 ray_src, Vector3 ray_dir, float closestDist) {
-    if (dot(ray_dir,n) > 0) return -1; //backface culling
+    //if (dot(ray_dir,n) > 0) return -1; //backface culling
     float denom = dot(n, ray_dir);
-    if (denom == 0)
+    if (denom >= 0) // == 0 > ray lies on plane; >0 --> is a backface
         return -1;
         
     //float fac = n.dot( pos - ray_src ) / denom;
     float fac = dot(n, sub(pos, ray_src)) / denom;
-    if (fac < 0) return fac;    //is behind camera, cannot be hit
+    if (fac < 0) 
+        return -1;    //is behind camera, cannot be hit
     
     Vector3 ray = mul(ray_dir, fac);
     
@@ -92,8 +93,7 @@ float Rectangle::intersects( Vector3 ray_src, Vector3 ray_dir, float closestDist
     float dx = dot( width_norm, pDir);
     float dy = dot(height_norm, pDir);
     
-    if (dx < 0 || dy < 0) return -1;
-    if (dx > hLength || dy > vLength) return -1;
+    if (dx < 0 || dy < 0|| dx > hLength || dy > vLength) return -1;
     return fac;
     
     

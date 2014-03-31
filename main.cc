@@ -17,8 +17,38 @@ using namespace std;
 vector<Rectangle*> objects;
 
 
+Vector3 getUniformDistributedRandomRay(Vector3 ndir, Vector3 udir, Vector3 vdir)
+{
+    //Marsaglia polar method for creating gaussian-distributed random variates
+    float x = (rand() / (float)RAND_MAX)*2 - 1.0; // uniform in [-1, 1]
+    float y = (rand() / (float)RAND_MAX)*2 - 1.0; // uniform in [-1, 1]
+    float s = x*x+y*y;
 
-Vector3 getRandomRay(Vector3 ndir, Vector3 udir, Vector3 vdir) {
+    float u = x * sqrt( (-2*log(s)/s)); //has to be the natural logarithm! ( c's log() is fine)
+    float v = y * sqrt( (-2*log(s)/s));
+
+    x = (rand() / (float)RAND_MAX)*2 - 1.0; // uniform in [-1, 1]
+    y = (rand() / (float)RAND_MAX)*2 - 1.0; // uniform in [-1, 1]
+    s = x*x+y*y;
+    float n = x * sqrt( (-2*log(s)/s));    
+
+    float len = sqrt(u*u+v*v+n*n);
+    u/=len;
+    v/=len;
+    n/=len;
+
+    if (n < 0)
+        n = -n; // project from sphere to hemisphere (no light from inside the apartment
+        
+    if (v > 0)  //project to lower quadsphere (no light from below the horizon)
+        v = -v;
+
+    //# Convert to a direction on the hemisphere defined by the normal
+    return add(add(mul(udir, u), mul(vdir, v)), mul(ndir, n));
+
+}
+
+Vector3 getCosineDistributedRandomRay(Vector3 ndir, Vector3 udir, Vector3 vdir) {
     //# Compute a uniformly distributed point on the unit disk
     float r = sqrt(rand() / (float)RAND_MAX);
     float phi = 2 * 3.141592 * rand() / (float)RAND_MAX;
@@ -117,7 +147,7 @@ int main()
         Vector3 xNorm = normalized(xDir);
         Vector3 yNorm = normalized(yDir);
         
-        int numSamplesPerArea = 10;
+        int numSamplesPerArea = 1000;
         
         for (int i = 0; i < numSamplesPerArea*area; i++)
         {
@@ -128,7 +158,7 @@ int main()
             Vector3 pos = add( src, add(mul(xDir, dx), mul(yDir, dy)));
             Vector3 n   = window.getNormalAt( pos ); 
 
-            Vector3 ray_dir = getRandomRay(n, xNorm, yNorm);
+            Vector3 ray_dir = getUniformDistributedRandomRay(n, xNorm, yNorm);
             pos = add(pos, mul(ray_dir, 1E-10f)); //to prevent self-intersection on the light source geometry
             Color3 lightCol = window.getColor( pos );
             
@@ -156,7 +186,7 @@ int main()
                 n = hit->getNormalAt(hitPos);
                 Vector3 u,v;
                 getBase(n, /*out*/u, /*out*/v);
-                ray_dir = getRandomRay(n, u, v);
+                ray_dir = getCosineDistributedRandomRay(n, u, v);
                 pos = hitPos;
             }
         }
