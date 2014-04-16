@@ -19,7 +19,7 @@ vector<Rectangle*> objects;
 
 Vector3 getUniformDistributedRandomRay(Vector3 ndir, Vector3 udir, Vector3 vdir)
 {
-    //Marsaglia polar method for creating gaussian-distributed random variates
+/*    //Marsaglia polar method for creating gaussian-distributed random variates
     float x = (rand() / (float)RAND_MAX)*2 - 1.0; // uniform in [-1, 1]
     float y = (rand() / (float)RAND_MAX)*2 - 1.0; // uniform in [-1, 1]
     float s = x*x+y*y;
@@ -35,11 +35,18 @@ Vector3 getUniformDistributedRandomRay(Vector3 ndir, Vector3 udir, Vector3 vdir)
     float len = sqrt(u*u+v*v+n*n);
     u/=len;
     v/=len;
-    n/=len;
+    n/=len;*/
+    
+    //HACK: computes not a spherically uniform distribution, but a lambertian quarter-sphere (lower half of hemisphere)
+    //# Compute a uniformly distributed point on the unit disk
+    float r = sqrt(rand() / (float)RAND_MAX);
+    float phi = 2 * 3.141592 * rand() / (float)RAND_MAX;
 
-    if (n < 0)
-        n = -n; // project from sphere to hemisphere (no light from inside the apartment
-        
+    //# Project point onto unit hemisphere
+    float u = r * cos(phi);
+    float v = r * sin(phi);
+    float n = sqrt(1 - r*r);
+
     if (v > 0)  //project to lower quadsphere (no light from below the horizon)
         v = -v;
 
@@ -162,7 +169,7 @@ int main()
             pos = add(pos, mul(ray_dir, 1E-10f)); //to prevent self-intersection on the light source geometry
             Color3 lightCol = window.getColor( pos );
             
-            for (int depth = 0; depth < 6; depth++)
+            for (int depth = 0; depth < 8; depth++)
             {
                 
                 float dist;
@@ -239,9 +246,13 @@ int main()
             /*col.r = sqrt(col.r);
             col.g = sqrt(col.g);
             col.b = sqrt(col.b);*/
-            col.r = log(1+col.r) / log(2);  // conversion from light intensity to perceived brightness
+            /*col.r = log(1+col.r) / log(2);  // conversion from light intensity to perceived brightness
             col.g = log(1+col.g) / log(2);
-            col.b = log(1+col.b) / log(2);
+            col.b = log(1+col.b) / log(2);*/
+            
+            col.r = 1 - exp(-col.r);
+            col.g = 1 - exp(-col.g);
+            col.b = 1 - exp(-col.b);
 
           
           

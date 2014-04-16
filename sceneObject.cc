@@ -178,14 +178,25 @@ static uint8_t clamp(float d)
     return d;
 }
 
+//convert light energy to perceived brightness
+float convert(float color)
+{
+    return 1 - exp(-color);
+}
+
 void Rectangle::saveAs(const char *filename) const
 {
     uint8_t *data = new uint8_t[hNumTiles*vNumTiles*3];
     for (int i = 0; i < hNumTiles*vNumTiles; i++)
     {
-        data[i*3+0] = clamp(tiles[i].getCombinedColor().r*255);
-        data[i*3+1] = clamp(tiles[i].getCombinedColor().g*255);
-        data[i*3+2] = clamp(tiles[i].getCombinedColor().b*255);
+            /*col.r = 1 - exp(-col.r);
+            col.g = 1 - exp(-col.g);
+            col.b = 1 - exp(-col.b);*/
+
+    
+        data[i*3+0] = clamp( convert(tiles[i].getCombinedColor().r)*255);
+        data[i*3+1] = clamp( convert(tiles[i].getCombinedColor().g)*255);
+        data[i*3+2] = clamp( convert(tiles[i].getCombinedColor().b)*255);
     }
     
     write_png_file(filename, hNumTiles, vNumTiles, PNG_COLOR_TYPE_RGB, data);

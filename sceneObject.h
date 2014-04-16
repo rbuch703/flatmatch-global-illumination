@@ -6,7 +6,7 @@
 #include <math.h>
 #include "assert.h"
 
-static const float TILE_SIZE = 10;
+static const float TILE_SIZE = 4;
 
 
 class Tile {
