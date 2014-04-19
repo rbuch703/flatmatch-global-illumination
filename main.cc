@@ -1,8 +1,8 @@
 
-#include "vector3_sse.h"
 #include "sceneObject.h"
 #include "parseLayout.h"
 #include "png_helper.h"
+#include "vector3_cl.h"
 
 #include <list>
 #include <vector>
@@ -109,9 +109,9 @@ Vector3 getObjectColorAt(Rectangle* rect, Vector3 pos)
 {
     
     Vector3 light = lightColors[ rect->lightBaseIdx + getTileIdAt(rect, pos)];
-    return createVector3( light[0] * rect->color[0],
-                          light[1] * rect->color[1],
-                          light[2] * rect->color[2]);
+    return createVector3( light.s[0] * rect->color.s[0],
+                          light.s[1] * rect->color.s[1],
+                          light.s[2] * rect->color.s[2]);
 }
 
 Vector3 getColor(Vector3 ray_src, Vector3 ray_dir, Rectangle* objects, int numObjects/*, int depth = 0*/)
@@ -130,6 +130,7 @@ Vector3 getColor(Vector3 ray_src, Vector3 ray_dir, Rectangle* objects, int numOb
 
 int main()
 {
+    cout << "Rectangle size is " << sizeof(Rectangle) << " bytes" << endl;
     static const Vector3 wallColor = createVector3(0.8, 0.8, 0.8);
     
     vector<Rectangle> rects = parseLayout("layout.png");
@@ -157,7 +158,7 @@ int main()
     {
         //Color3 col = (*it)->getColor( (*it)->getTileCenter(0) );
         Vector3 col = objects[i].color;
-        if (col[0] > 1 || col[1] > 1 || col[2] > 1)
+        if (col.s[0] > 1 || col.s[1] > 1 || col.s[2] > 1)
             windows.push_back( objects[i]);
     }
     cout << "Registered " << windows.size() << " windows" << endl;
@@ -206,19 +207,20 @@ int main()
                 Vector3 hitPos = add(pos, mul(ray_dir, dist));
                 //Tile& tile = getTileAt(hit, hitPos);
                 Vector3 tileCol = hit->color;
-                if (tileCol[0] > 1 || tileCol[1] > 1 || tileCol[2] > 1)    //hit a light source
+                if (tileCol.s[0] > 1 || tileCol.s[1] > 1 || tileCol.s[2] > 1)    //hit a light source
                     continue;
                 
                 //Normalize light transfer by tile area and number of rays per area of the light source
                 //the constant 2.0 is an experimentally-determined factor
-                lightColors[ hit->lightBaseIdx + getTileIdAt(hit, hitPos)] +=
-                    lightCol* (1 / (TILE_SIZE*TILE_SIZE*numSamplesPerArea*2));
+                lightColors[ hit->lightBaseIdx + getTileIdAt(hit, hitPos)] = 
+                    add(lightColors[ hit->lightBaseIdx + getTileIdAt(hit, hitPos)],
+                        mul(lightCol, (1 / (TILE_SIZE*TILE_SIZE*numSamplesPerArea*2))));
                 //Color3 light = tile.getLightColor() + lightCol* (1 / (TILE_SIZE*TILE_SIZE*numSamplesPerArea*2));
                 //tile.setLightColor(light);
                 
-                lightCol[0] *= 0.9 * hit->color[0];// = Vector3( lightCol * ;//tile.getColor();
-                lightCol[1] *= 0.9 * hit->color[1];
-                lightCol[2] *= 0.9 * hit->color[2];
+                lightCol.s[0] *= 0.9 * hit->color.s[0];// = Vector3( lightCol * ;//tile.getColor();
+                lightCol.s[1] *= 0.9 * hit->color.s[1];
+                lightCol.s[2] *= 0.9 * hit->color.s[2];
                 // prepare next (diffuse reflective) ray
                 Vector3 u,v;
                 createBase(hit->n, /*out*/u, /*out*/v);
@@ -277,15 +279,15 @@ int main()
             col.g = log(1+col.g) / log(2);
             col.b = log(1+col.b) / log(2);*/
             
-            col[0] = 1 - exp(-col[0]);
-            col[1] = 1 - exp(-col[1]);
-            col[2] = 1 - exp(-col[2]);
+            col.s[0] = 1 - exp(-col.s[0]);
+            col.s[1] = 1 - exp(-col.s[1]);
+            col.s[2] = 1 - exp(-col.s[2]);
 
           
           
-            pixel_buffer[(y*img_width+x)*3 + 0] = min(col[0]*255, 255.0f);
-            pixel_buffer[(y*img_width+x)*3 + 1] = min(col[1]*255, 255.0f);
-            pixel_buffer[(y*img_width+x)*3 + 2] = min(col[2]*255, 255.0f);
+            pixel_buffer[(y*img_width+x)*3 + 0] = min(col.s[0]*255, 255.0f);
+            pixel_buffer[(y*img_width+x)*3 + 1] = min(col.s[1]*255, 255.0f);
+            pixel_buffer[(y*img_width+x)*3 + 2] = min(col.s[2]*255, 255.0f);
         }
     }
     cout << "writing file with dimensions " << img_width << "x" << img_height << endl;

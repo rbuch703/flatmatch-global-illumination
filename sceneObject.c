@@ -99,7 +99,7 @@ int getNumTiles(const Rectangle *rect)
 
 int getTileIdAt(const Rectangle *rect, const Vector3 p)
 {
-    Vector3 pDir = p - rect->pos; //vector from rectangle origin (its lower left corner) to current point
+    Vector3 pDir = sub(p,rect->pos); //vector from rectangle origin (its lower left corner) to current point
     float dx, dy;
     
     dx = dot(rect->width_norm, pDir);
@@ -186,9 +186,9 @@ void saveAs(const Rectangle *rect, const char *filename, Vector3 *lights)
             col.g = 1 - exp(-col.g);
             col.b = 1 - exp(-col.b);*/
         
-        data[i*3+0] = clamp( convert(rect->color[0] * lights[rect->lightBaseIdx + i][0])*255);
-        data[i*3+1] = clamp( convert(rect->color[1] * lights[rect->lightBaseIdx + i][1])*255);
-        data[i*3+2] = clamp( convert(rect->color[2] * lights[rect->lightBaseIdx + i][2])*255);
+        data[i*3+0] = clamp( convert(rect->color.s[0] * lights[rect->lightBaseIdx + i].s[0])*255);
+        data[i*3+1] = clamp( convert(rect->color.s[1] * lights[rect->lightBaseIdx + i].s[1])*255);
+        data[i*3+2] = clamp( convert(rect->color.s[2] * lights[rect->lightBaseIdx + i].s[2])*255);
     }
     
     write_png_file(filename, rect->hNumTiles, rect->vNumTiles, PNG_COLOR_TYPE_RGB, data);

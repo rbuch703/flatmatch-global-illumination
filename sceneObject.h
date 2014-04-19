@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 
-#include "vector3_sse.h"
+#include "vector3_cl.h"
 //#include "color3.h"
 #include <math.h>
 #include "assert.h"
@@ -14,38 +14,17 @@ extern "C" {
 
 static const float TILE_SIZE = 4;
 
-/*
-class Tile {
-public:
-    Tile(const Color3& _col);
-    Tile();
-    
-    Color3 getCombinedColor() const;
+typedef struct /*__attribute__ ((aligned(16))) */Rectangle{
 
-    void   setLightColor(const Color3& color);
-    Color3 getLightColor() const;
-
-    void   setColor(const Color3& color);
-    Color3 getColor() const;
-private:
-    Color3 col;
-    Color3 lightColor;
-};*/
-
-typedef struct Rectangle{
-
-//public:
-//private:
     Vector3 pos, width, height, n;
     Vector3 width_norm, height_norm;
     Vector3 width_per_tile, height_per_tile;
     Vector3 color;
-    //float r, g, b;
     float hLength, vLength;
     
     int hNumTiles, vNumTiles;
     int lightBaseIdx;
-    //Tile* tiles;
+
 } Rectangle;
 
 

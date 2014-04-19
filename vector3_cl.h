@@ -1,20 +1,15 @@
-#ifndef VECTOR3_SSE_H
-#define VECTOR3_SSE_H
+#ifndef VECTOR3_CL_H
+#define VECTOR3_CL_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-//#include <iostream>
-//#include <pmmintrin.h>
-
-//#include <math.h>
-
 /* the vector3 class is a performance hotspot. It should therefore stay in a 
 header file in order to allow for more agressive inlining by the compiler*/
-#include <x86intrin.h>
+#include <CL/cl.h>
 
-typedef __m128 Vector3;
+typedef cl_float3 Vector3;
 
 Vector3 add(const Vector3 a, const Vector3 b);
 Vector3 sub(const Vector3 a, const Vector3 b);

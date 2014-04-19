@@ -1,22 +1,13 @@
-#ifndef VECTOR3_SSE_H
-#define VECTOR3_SSE_H
 
-#include "vector3_sse.h"
+#include "vector3_cl.h"
 
-//#include <iostream>
 #include <math.h>
-//#include <pmmintrin.h>
-#include <x86intrin.h>
 
-typedef __m128 Vector3;
+typedef cl_float3 Vector3;
 
-//#include <math.h>
 
-/* the vector3 class is a performance hotspot. It should therefore stay in a 
-header file in order to allow for more agressive inlining by the compiler*/
-
-Vector3 add(const Vector3 a, const Vector3 b) { return _mm_add_ps(a, b); }
-Vector3 sub(const Vector3 a, const Vector3 b) { return _mm_sub_ps(a, b); }
+Vector3 add(Vector3 a, Vector3 b) { Vector3 res = { s: {a.s[0]+b.s[0], a.s[1]+b.s[1], a.s[2]+b.s[2]} }; return res;}
+Vector3 sub(Vector3 a, Vector3 b) { Vector3 res = { s: {a.s[0]-b.s[0], a.s[1]-b.s[1], a.s[2]-b.s[2]} }; return res;}
 
 /*inline Vector3 mul(float a, const Vector3 b) { 
     __m128 tmp = _mm_load1_ps(&a);
@@ -24,13 +15,17 @@ Vector3 sub(const Vector3 a, const Vector3 b) { return _mm_sub_ps(a, b); }
 }*/
 
 Vector3 mul(const Vector3 b, float a) { 
-    __m128 tmp = _mm_load1_ps(&a);
-    return _mm_mul_ps(tmp, b);
+    Vector3 res = {s: {b.s[0]*a, 
+                       b.s[1]*a, 
+                       b.s[2]*a} }; 
+    return res;
 }
 
 Vector3 div_vec3(const Vector3 a, float b) { 
-    __m128 tmp = _mm_load1_ps(&b);
-    return _mm_div_ps(a, tmp);
+    Vector3 res = {s: {a.s[0]/b, 
+                       a.s[1]/b,
+                       a.s[2]/b} }; 
+    return res;
 }
 
 
@@ -39,28 +34,25 @@ Vector3 div_vec3(const Vector3 a, float b) {
     return _mm_div_ps(a, tmp);
 }*/
 
-Vector3 createVector3(float x, float y, float z)
+Vector3 createVector3(float _x, float _y, float _z)
 {
-    __attribute__ ((aligned (16))) float tmp[4] = {x,y,z,0.0};
-    return _mm_load_ps(tmp);
+    //__attribute__ ((aligned (16))) float tmp[4] = {x,y,z,0.0};
+    //return _mm_load_ps(tmp);
+    Vector3 res = {s: {_x, _y, _z} };
+    return res;
 }
 
 float dot(const Vector3 a, const Vector3 b)     //copied from the internet, not verified
 { 
-    __m128 r1 = _mm_mul_ps(a, b);
-    __m128 r2 = _mm_hadd_ps(r1, r1);
-    __m128 r3 = _mm_hadd_ps(r2, r2);
-    float result;
-    _mm_store_ss(&result, r3);
-    return result;
+    return a.s[0]*b.s[0] + a.s[1]*b.s[1] + a.s[2]*b.s[2];
 }
 
 Vector3 cross(const Vector3 a, const Vector3 b)      //copied from the internet, not verified
 {
-  return _mm_sub_ps(
-    _mm_mul_ps(_mm_shuffle_ps(a, a, _MM_SHUFFLE(3, 0, 2, 1)), _mm_shuffle_ps(b, b, _MM_SHUFFLE(3, 1, 0, 2))),
-    _mm_mul_ps(_mm_shuffle_ps(a, a, _MM_SHUFFLE(3, 1, 0, 2)), _mm_shuffle_ps(b, b, _MM_SHUFFLE(3, 0, 2, 1)))
-  );
+    Vector3 res = {s: { a.s[1]*b.s[2] - a.s[2]*b.s[1], 
+                        a.s[2]*b.s[0] - a.s[0]*b.s[2], 
+                        a.s[0]*b.s[1] - a.s[1]*b.s[0]} };
+  return res;
 }
 
 float squaredLength(const Vector3 a) 
@@ -71,8 +63,11 @@ float squaredLength(const Vector3 a)
 float length(const Vector3 a) { return sqrtf( dot(a,a) ); }
 
 Vector3 normalized(const Vector3 a) {
-    float len = length(a);
-    return _mm_div_ps( a, _mm_load1_ps(&len));
+    float fac = 1.0f / length(a);
+    Vector3 res = {s: {a.s[0] * fac, 
+                       a.s[1] * fac, 
+                       a.s[2] * fac } };
+    return res;
 }
 
 
@@ -93,5 +88,3 @@ Vector3 normalized(const Vector3 a) {
     return os;
 }*/
 
-
-#endif
