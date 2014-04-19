@@ -10,6 +10,9 @@ public:
     Color3 operator+(const Color3 &other) const { return Color3( r+other.r, g+other.g, b+other.b); }
     Color3 operator-(const Color3 &other) const { return Color3( r-other.r, g-other.g, b-other.b); }
 
+
+    Color3& operator+=(const Color3 &other) { r+=other.r; g+=other.g; b+=other.b; return *this; }
+
     Color3 operator*(const double a) const { return Color3( r*a, g*a, b*a); }
     Color3 operator*(const Color3 &other) const { return Color3(r*other.r, g*other.g, b*other.b);}
     Color3 operator/(const double a) const { return Color3( r/a, g/a, b/a); }
