@@ -1,8 +1,11 @@
 
-SRC = png_helper.c main.cc parseLayout.cc sceneObject.c vector3_cl.c #vector3.cc
+SRC_C = png_helper.c sceneObject.c vector3_cl.c
+SRC_CC = main.cc parseLayout.cc
+SRC = $(SRC_C) $(SRC_CC)
 
-#OBJ  = $(SRC:.cc=.o)
-OBJ = png_helper.o main.o parseLayout.o sceneObject.o vector3_cl.o
+OBJ_C  = $(SRC_C:.c=.o)
+OBJ_CC = $(SRC_CC:.cc=.oo)
+OBJ    = $(OBJ_C) $(OBJ_CC)
 
 OPT_FLAGS = -O2 
 FLAGS = -g -Wall -Wextra -msse3 -DNDEBUG $(OPT_FLAGS) -flto
@@ -19,40 +22,22 @@ LD_FLAGS = $(PROFILE) -lm -flto $(OPT_FLAGS)
 all: make.dep radiosity
 #	 @echo [ALL] $<
 
-radiosity: $(OBJ)
-	@echo [LD ] $@
+radiosity: $(OBJ_C) $(OBJ_CC)
+	@echo [LD] $@
 	@g++ $^  $(LD_FLAGS) -lpng -o $@
 
-#fast: $(SRC)
-#	@echo [C++] $(SRC)
-#	@g++ $(CCFLAGS) -fwhole-program -o radiosity $(SRC) -lpng
-#	#@g++ $(CCFLAGS) -o radiosity $(SRC) -lpng
-
-sceneObject.o: sceneObject.c
+%.o: %.c
 	@echo [CC] $<
-#	@g++ $(CCFLAGS) `pkg-config --cflags cairo` $< -c -o $@
-	@gcc $(CFLAGS) $< -c -o $@
-
-png_helper.o: png_helper.c
-	@echo [CC] $<
-#	@g++ $(CCFLAGS) `pkg-config --cflags cairo` $< -c -o $@
-	@gcc $(CFLAGS) $< -c -o $@
-
-vector3_cl.o: vector3_cl.c
-	@echo [CC] $<
-#	@g++ $(CCFLAGS) `pkg-config --cflags cairo` $< -c -o $@
 	@gcc $(CFLAGS) $< -c -o $@
 
 	
-%.o: %.cc
-	@echo [C++] $<
-#	@g++ $(CCFLAGS) `pkg-config --cflags cairo` $< -c -o $@
+%.oo: %.cc
+	@echo [CP] $<
 	@g++ $(CCFLAGS) $< -c -o $@
 
-	
 clean:
 	@echo [CLEAN]
-	@rm -rf *.o
+	@rm -rf *.o *.oo
 	@rm -rf *~
 	@rm -rf radiosity
 	@rm -rf coverage.info callgrind.out.*

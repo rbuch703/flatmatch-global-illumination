@@ -3,6 +3,8 @@ syntax:glob
 
 *~
 *.o
+*.oo
+
 *.png
 callgrind.*
 
