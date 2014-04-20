@@ -1,5 +1,5 @@
 
-SRC_C = png_helper.c sceneObject.c vector3_cl.c
+SRC_C = png_helper.c rectangle.c vector3_cl.c
 SRC_CC = main.cc parseLayout.cc
 SRC = $(SRC_C) $(SRC_CC)
 
@@ -8,7 +8,7 @@ OBJ_CC = $(SRC_CC:.cc=.oo)
 OBJ    = $(OBJ_C) $(OBJ_CC)
 
 OPT_FLAGS = -O2 
-FLAGS = -g -Wall -Wextra -msse3 -DNDEBUG $(OPT_FLAGS) -flto
+FLAGS = -g -Wall -Wextra -msse3 -DNDEBUG #$(OPT_FLAGS) -flto
 
 PROFILE =
 #PROFILE = -fprofile-generate
@@ -16,7 +16,7 @@ PROFILE =
 
 CFLAGS = $(FLAGS) $(PROFILE) -std=c99
 CCFLAGS = $(FLAGS) $(PROFILE) -std=c++11
-LD_FLAGS = $(PROFILE) -lm -flto $(OPT_FLAGS) 
+LD_FLAGS = $(PROFILE) -lm -lOpenCL -flto $(OPT_FLAGS) 
 .PHONY: all clean
 
 all: make.dep radiosity

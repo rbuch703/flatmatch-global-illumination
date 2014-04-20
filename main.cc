@@ -1,5 +1,5 @@
 
-#include "sceneObject.h"
+#include "rectangle.h"
 #include "parseLayout.h"
 #include "png_helper.h"
 #include "vector3_cl.h"
@@ -9,13 +9,13 @@
 #include <iostream>
 #include <stdint.h>
 #include <stdlib.h> //for rand()
-#include <string>
+//#include <string>
 #include <string.h> //for memset
 using namespace std;
 
 
 Rectangle* objects;
-int numObjects;
+cl_int numObjects;
 
 Vector3* lightColors;
 int numLightColors;
@@ -128,14 +128,15 @@ Vector3 getColor(Vector3 ray_src, Vector3 ray_dir, Rectangle* objects, int numOb
     return getObjectColorAt(hitObject, intersect_pos);
 }
 
-int main()
+
+void loadGeometry()
 {
-    cout << "Rectangle size is " << sizeof(Rectangle) << " bytes" << endl;
     static const Vector3 wallColor = createVector3(0.8, 0.8, 0.8);
     
     vector<Rectangle> rects = parseLayout("layout.png");
     numObjects = 2 + rects.size();
-    objects = (Rectangle*)malloc( numObjects * sizeof(Rectangle));
+    if (0 != posix_memalign((void**)&objects, 16, numObjects * sizeof(Rectangle))) return;
+    //objects = (Rectangle*)malloc( numObjects * sizeof(Rectangle));
     objects[0] = createRectangleWithColor( createVector3(0,0,0), createVector3(0, 1000, 0), createVector3(1000, 0, 0), wallColor);    // floor
     objects[1] = createRectangleWithColor( createVector3(0,0,200), createVector3(1000, 0, 0), createVector3(0, 1000, 0), wallColor);  // ceiling
 
@@ -152,6 +153,122 @@ int main()
     lightColors = (Vector3*) malloc( numLightColors * sizeof(Vector3));
     for (int i = 0; i < numLightColors; i++)
         lightColors[i] = createVector3(0,0,0);
+}
+
+void printDeviceString(cl_device_id dev_id)
+{
+    size_t res_size;
+    cout << "device " << dev_id << endl;
+
+    clGetDeviceInfo( dev_id,   CL_DEVICE_NAME , 0, NULL, &res_size);
+    //cout << "\t result size is " << res_size << " bytes" << endl;
+    
+    char * res = new char[res_size];
+    res[0] = 0;
+    
+    #ifndef NDEBUG
+    cl_int status =
+    #endif
+        clGetDeviceInfo( dev_id,   CL_DEVICE_NAME  , res_size, res, NULL);
+    assert(status == CL_SUCCESS);
+    
+    //cout << "\t status code is " << status << endl;
+  	cout << "\t has name '" << res << "'" << endl;
+  	delete [] res;
+}
+
+void clErrorFunc ( const char *errinfo, const void * /*private_info*/, size_t /*cb*/, void * /*user_data*/)
+{
+    cout << errinfo << endl;
+}
+
+void initCl(cl_context *ctx, cl_device_id *device) {
+    
+	cl_uint numPlatforms = 0;	//the NO. of platforms
+    clGetPlatformIDs(0, NULL, &numPlatforms);
+    assert( numPlatforms == 1);
+    cout << "OpenCl found " << numPlatforms << " platforms" << endl;
+	cl_platform_id platform_id;// = (cl_platform_id* )malloc(numPlatforms* sizeof(cl_platform_id));
+	clGetPlatformIDs(numPlatforms, &platform_id, NULL);
+
+    cl_uint numDevices = 0;
+	clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_GPU, 0, NULL, &numDevices);
+	assert(numDevices == 1);
+	//cl_device_id device_id = 0;
+	clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_GPU, numDevices, device, NULL);
+    printDeviceString( *device );
+    
+    
+    cout << "CL_INVALID_DEVICE:  " << CL_INVALID_DEVICE << endl;
+    cout << "CL_INVALID_VALUE:   " << CL_INVALID_VALUE << endl;
+    cout << "CL_INVALID_PLATFORM:" << CL_INVALID_PLATFORM << endl;
+    cout << "CL_DEVICE_NOT_AVAILABLE" << CL_DEVICE_NOT_AVAILABLE << endl;
+    cout << "CL_DEVICE_NOT_FOUND" << CL_DEVICE_NOT_FOUND << endl;
+    cout << "CL_OUT_OF_HOST_MEMORY" << CL_OUT_OF_HOST_MEMORY << endl;
+    cout << "CL_INVALID_DEVICE_TYPE" << CL_INVALID_DEVICE_TYPE << endl;
+
+    cl_context_properties properties[] = {CL_CONTEXT_PLATFORM, (cl_context_properties)platform_id, 0};
+
+    cl_int status;
+    *ctx = clCreateContext(properties, numDevices, device, clErrorFunc,NULL,&status);
+    assert(status == CL_SUCCESS);
+
+}
+
+
+char* getProgramString(const char* filename)
+{
+    char* res;
+    
+    FILE *f = fopen(filename, "rb");
+    fseek(f, 0, SEEK_END);
+    size_t size = ftell(f);
+    res = (char*)malloc( size+1); //plus zero-termination
+
+    fseek(f, 0, SEEK_SET);
+    size_t nRead = fread(res, size, 1, f);
+    res[size] = '\0';
+    fclose(f);
+    
+    if (nRead != 1)
+    {
+        free(res);
+        res = NULL;
+    }
+    
+    return res;    
+}
+
+cl_program createProgram(cl_context ctx, cl_device_id device, const char* src)
+{
+    cl_int status;    
+	cl_program program = clCreateProgramWithSource(ctx, 1, &src, NULL, &status);
+    cout << "clCreateProgramWithSource: " << status << endl;
+	assert(status == CL_SUCCESS);
+
+	status = clBuildProgram(program, 1,&device,"-g",NULL,NULL);
+    cout << "clBuildProgram: " << status << endl;
+	assert(status == CL_SUCCESS);
+    if (status != CL_SUCCESS)
+    {
+        size_t size = 0;
+        clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, NULL, &size);
+        char* msg = (char*)malloc(size);
+        clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, size, msg, NULL);
+        cout << msg << endl;
+        free(msg);
+        cout << "Compilation errors found, exiting ..." << endl;
+        exit(0);
+        //return 0;   
+    }
+    return program;
+}
+
+int main()
+{
+    cout << "Rectangle size is " << sizeof(Rectangle) << " bytes" << endl;
+
+    loadGeometry();
 
     vector<Rectangle> windows;
     for ( int i = 0; i < numObjects; i++)
@@ -163,6 +280,21 @@ int main()
     }
     cout << "Registered " << windows.size() << " windows" << endl;
 
+
+    cl_context ctx;
+    cl_device_id device;
+	initCl(&ctx, &device);
+	cl_command_queue queue = clCreateCommandQueue(ctx, device, 0, NULL);
+	
+    cout << "context: " << ctx << ", queue: " << queue << endl;
+    char* program_str = getProgramString("photonmap.cl");
+
+    cl_program prog = createProgram(ctx, device, program_str);
+    free(program_str);
+
+
+    cl_mem rectBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY |CL_MEM_COPY_HOST_PTR, numObjects * sizeof(Rectangle),(void *) objects, NULL);
+    cout << "rectBuffer: " << rectBuffer << endl;
     
     for ( unsigned int i = 0; i < windows.size(); i++)
     {
@@ -177,15 +309,34 @@ int main()
         
         //float area = xDir.length() * yDir.length();
         float area = length(xDir) * length(yDir);
-        cout << "Photon-Mapping window " << (i+1) << "/" << windows.size() << " with size " << area << endl;
          
         Vector3 xNorm = normalized(xDir);
         Vector3 yNorm = normalized(yDir);
         
-        int numSamplesPerArea = 10;
+        /* ================= */
+        /* SET ACCURACY HERE */
+        /* ================= */
+        static const int numSamplesPerArea = 1000;
+        int numSamples = numSamplesPerArea * area;
+
+        cout << "Photon-Mapping window " << (i+1) << "/" << windows.size() << " with " << numSamples << " samples" << endl;
+        Vector3 *ray_src, *ray_dir;
+        if (0 != posix_memalign((void**)&ray_src, 16, numSamples * sizeof(Vector3))) return -1;
+        if (0 != posix_memalign((void**)&ray_dir, 16, numSamples * sizeof(Vector3))) return -1;
+
+        int     *hit_obj;
+        if (0 != posix_memalign((void**)&hit_obj, 16, numSamples * sizeof(int) )) return -1;
+
+        float   *hit_dist;
+        if (0 != posix_memalign((void**)&hit_dist,16, numSamples * sizeof(float) )) return -1;
         
-        for (int i = 0; i < numSamplesPerArea*area; i++)
+        
+        
+
+        for (int i = 0; i < numSamples; i++)
         {
+            
+
             float dx = rand() / (float)RAND_MAX;
             float dy = rand() / (float)RAND_MAX;
 
@@ -193,11 +344,68 @@ int main()
             Vector3 pos = add( src, add(mul(xDir, dx), mul(yDir, dy)));
             Vector3 n   = window.n;
 
-            Vector3 ray_dir = getUniformDistributedRandomRay(n, xNorm, yNorm);
-            pos = add(pos, mul(ray_dir, 1E-10f)); //to prevent self-intersection on the light source geometry
+            ray_dir[i] = getUniformDistributedRandomRay(n, xNorm, yNorm);
+            hit_obj[i] = -1;
+            hit_dist[i] = INFINITY;
+
+            pos = add(pos, mul(ray_dir[i], 1E-10f)); //to prevent self-intersection on the light source geometry
+            ray_src[i] = pos;
+        }
+
+	    cl_mem rayDirBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY |CL_MEM_COPY_HOST_PTR, numSamples * sizeof(Vector3),(void *) ray_dir, NULL);
+	    cl_mem raySrcBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY |CL_MEM_COPY_HOST_PTR, numSamples * sizeof(Vector3),(void *) ray_src, NULL);
+	    cl_mem hitObjBuffer = clCreateBuffer(ctx, CL_MEM_WRITE_ONLY|CL_MEM_COPY_HOST_PTR, numSamples * sizeof(cl_int),(void *) hit_obj, NULL);
+	    cl_mem hitDistBuffer= clCreateBuffer(ctx, CL_MEM_WRITE_ONLY|CL_MEM_COPY_HOST_PTR, numSamples * sizeof(float),(void *) hit_dist, NULL);
+
+        cl_int status = 0;
+        cl_kernel kernel = clCreateKernel(prog,"photonmap", &status);
+        cout << "clCreateKernel: " << status << endl;
+        /*Step 9: Sets Kernel arguments.*/
+        status = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&raySrcBuffer);
+        status = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&rayDirBuffer);
+        status = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void *)&rectBuffer);
+        status = clSetKernelArg(kernel, 3, sizeof(cl_int), (void *)&numObjects);
+        status = clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&hitObjBuffer);
+        status = clSetKernelArg(kernel, 5, sizeof(cl_mem), (void *)&hitDistBuffer);
+
+        size_t workSize = numSamples;
+    	status = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &workSize, NULL, 0, NULL, NULL);
+    	cout << "clEnqueueNDRangeKernel: " << status << endl;
+        clFinish(queue);
+        
+	    cout << "kernel processing complete, exiting ..." << endl;
+
+        clEnqueueReadBuffer(queue, hitObjBuffer, CL_TRUE, 0, numSamples * sizeof(cl_int),  (void *) hit_obj, 0, NULL, NULL);
+        clEnqueueReadBuffer(queue, hitDistBuffer, CL_TRUE, 0, numSamples * sizeof(float),  (void *) hit_dist, 0, NULL, NULL);
+        
+        clReleaseMemObject(rayDirBuffer);
+        clReleaseMemObject(raySrcBuffer);
+        clReleaseMemObject(hitObjBuffer);
+        clReleaseMemObject(hitDistBuffer);
+
+        for (int i = 0; i < numSamples; i++)
+        {
             Vector3 lightCol = window.color;
+            //cout << "hit_obj[" << i << "] = " << hit_obj[i] << endl;
+            if (hit_obj[i] == -1) continue;
             
-            for (int depth = 0; depth < 8; depth++)
+            Rectangle *hit = &objects[ hit_obj[i]];
+            Vector3 hitPos = add(ray_src[i], mul(ray_dir[i], hit_dist[i]));
+
+            Vector3 tileCol = hit->color;
+            if (tileCol.s[0] > 1 || tileCol.s[1] > 1 || tileCol.s[2] > 1)    //hit a light source
+                continue;
+
+            lightColors[ hit->lightBaseIdx + getTileIdAt(hit, hitPos)] = 
+                add(lightColors[ hit->lightBaseIdx + getTileIdAt(hit, hitPos)],
+                    mul(lightCol, (1 / (TILE_SIZE*TILE_SIZE*numSamplesPerArea*2))));
+            
+        }
+	    //exit(0);  
+
+            //Vector3 lightCol = window.color;
+            #if 0
+            for (int depth = 0; depth < 1; depth++)
             {
                 
                 float dist;
@@ -227,8 +435,11 @@ int main()
                 ray_dir = getCosineDistributedRandomRay(hit->n, u, v);
                 pos = hitPos;
             }
-        }
+            #endif
+        //}
     }
+
+    clReleaseMemObject(rectBuffer);
 
     char num[50];
     for ( int i = 0; i < numObjects; i++)

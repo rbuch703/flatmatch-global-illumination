@@ -12,7 +12,7 @@ extern "C" {
 #include "assert.h"
 
 
-static const float TILE_SIZE = 4;
+static const float TILE_SIZE = 10;
 
 typedef struct __attribute__ ((aligned(16))) Rectangle{
     Vector3 pos, width, height, n;

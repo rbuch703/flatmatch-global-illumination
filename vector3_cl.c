@@ -22,9 +22,10 @@ Vector3 mul(const Vector3 b, float a) {
 }
 
 Vector3 div_vec3(const Vector3 a, float b) { 
-    Vector3 res = {s: {a.s[0]/b, 
-                       a.s[1]/b,
-                       a.s[2]/b} }; 
+    float rec = 1.0f/b;
+    Vector3 res = {s: {a.s[0]*rec, 
+                       a.s[1]*rec,
+                       a.s[2]*rec} }; 
     return res;
 }
 

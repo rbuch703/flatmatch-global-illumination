@@ -3,7 +3,7 @@
 #define PARSELAYOUT_H
 
 #include <vector>
-#include "sceneObject.h"
+#include "rectangle.h"
 
 std::vector<Rectangle> parseLayout(const char* const filename);
 
