@@ -21,8 +21,8 @@ Rectangle createRectangle( const Vector3 _pos, const Vector3 _width, const Vecto
     //HACK: cl_float3 is actually a float[4] to ensure 16 bytes alignment
     //      use the extraneous float to store the vector length
     //      (in effect this make the vector a unit vector in homogenous coordinates)
-    res.width.s[3] = length(res.width);
-    res.height.s[3]= length(res.height);
+    /*res.width.s[3] = length(res.width);
+    res.height.s[3]= length(res.height);*/
     /*res.width_norm = ;
     res.height_norm = ;*/
 
@@ -60,13 +60,13 @@ float intersects( const Rectangle *rect, Vector3 ray_src, Vector3 ray_dir, float
     Vector3 p = add(ray_src, ray);
     Vector3 pDir = sub(p, rect->pos);
     
-    /*float width_len  = length(rect->width);
-    float height_len = length(rect->height);*/
+    float width_len  = length(rect->width);
+    float height_len = length(rect->height);
     
-    float dx = dot( div_vec3( rect->width, rect->width.s[3]), pDir);
-    float dy = dot( div_vec3( rect->height, rect->height.s[3]), pDir);
+    float dx = dot( div_vec3( rect->width, width_len), pDir);
+    float dy = dot( div_vec3( rect->height, height_len), pDir);
     
-    if (dx < 0 || dy < 0|| dx > rect->width.s[3] || dy > rect->height.s[3] ) return -1;
+    if (dx < 0 || dy < 0|| dx > width_len || dy > height_len ) return -1;
     return fac;
 }
 
