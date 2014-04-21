@@ -311,7 +311,7 @@ int main()
         //Vector3 xNorm = normalized(xDir);
         //Vector3 yNorm = normalized(yDir);
         
-        cout << "Photon-Mapping window " << (i+1) << "/" << windows.size() << " with " << numSamples << " samples" << endl;
+        cout << "Photon-Mapping window " << (i+1) << "/" << windows.size() << " with " << (int)(numSamples/1000000) << "M samples" << endl;
 
         cl_int status = 0;
 	    cl_mem lightColorsBuffer = clCreateBuffer(ctx, CL_MEM_WRITE_ONLY|CL_MEM_COPY_HOST_PTR, numLightColors * sizeof(cl_float3),(void *) lightColors, &status);
