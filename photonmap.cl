@@ -44,6 +44,28 @@ float3 getDiffuseSkyRandomRay(ulong *rng_state, float3 ndir, float3 udir, float3
 
 }
 
+int getTileIdAt(__constant const Rectangle *rect, const float3 p, const float TILE_SIZE)
+{
+    float3 pDir = p - rect->pos; //vector from rectangle origin (its lower left corner) to current point
+    
+    float hLength = length(rect->width);
+    float vLength = length(rect->height);
+    
+    float dx = dot( rect->width / hLength, pDir);
+    float dy = dot( rect->height / vLength, pDir);
+
+    
+    int hNumTiles = max( (int)round(hLength / TILE_SIZE), 1);
+    int vNumTiles = max( (int)round(vLength / TILE_SIZE), 1);
+    
+    //FIXME: check whether a float->int conversion in OpenCL also is round-towards-zero
+    int tx = clamp( (int)((dx * hNumTiles) / hLength), 0, hNumTiles);
+    int ty = clamp( (int)((dy * vNumTiles) / vLength), 0, vNumTiles);
+    
+    //assert(ty * hNumTiles + tx < getNumTiles(rect));
+    return ty * hNumTiles + tx;
+}
+
 
 float intersects( __constant const Rectangle *rect, float3 ray_src, float3 ray_dir, float closestDist) 
 {
@@ -82,14 +104,17 @@ float intersects( __constant const Rectangle *rect, float3 ray_src, float3 ray_d
 
 
 __kernel void photonmap(const Rectangle window, __constant const Rectangle* rects, int numRects,
-                        __global int *hit_obj, __global float3 *hit_pos)
+                        __global float3 *lightColors, float TILE_SIZE)
 {
+    //return;
     //printf("processing %d rectangles\n", numRects);
     size_t item_id = get_global_id(0);
     ulong rng_state = item_id;
     float r = rand(&rng_state) * 40; //warm-up / decorrelate individual RNGs
     for (int i = 0; i < r; i++)
         rand(&rng_state);   
+        
+    float3 lightColor = window.color;
     
     float dx = rand(&rng_state);
     //rand(&rng_state);
@@ -99,49 +124,42 @@ __kernel void photonmap(const Rectangle window, __constant const Rectangle* rect
     float3 pos = window.pos + window.width*dx + window.height*dy;
     //float3 n   = window.n;
 
-    /*printf("rectangle position: (%f, %f, %f)\n", window.pos.s0, window.pos.s1, window.pos.s2);
-    printf("rectangle width: (%f, %f, %f)\n", window.width.s0, window.width.s1, window.width.s2);
-    printf("rectangle height: (%f, %f, %f)\n", window.height.s0, window.height.s1, window.height.s2);
-    printf("rectangle n: (%f, %f, %f)\n", window.n.s0, window.n.s1, window.n.s2);
-    printf("rectangle color: (%f, %f, %f)\n", window.color.s0, window.color.s1, window.color.s2);
-    printf("baseIdx: %d\n\n", window.lightBaseIdx);*/
-    //printf("rng: %d\n", rng_state);
     float3 ray_dir = getDiffuseSkyRandomRay(&rng_state, window.n, normalize(window.width), normalize(window.height));
 
     pos += (ray_dir* 1E-10f); //to prevent self-intersection on the light source geometry
-    //ray_src[i] = pos;
+ 
     
-    
-    //printf("item_id: %d, ray_src: (%f, %f, %f), ray_dir: (%f, %f, %f), hit_obj: %d, hit_dist: %f\n", item_id, ray_src[item_id].s0, ray_src[item_id].s1, ray_src[item_id].s2, ray_dir[item_id].s0, ray_dir[item_id].s1, ray_dir[item_id].s2, hit_obj[item_id], hit_dist[item_id]);
-//int numObjects = objects.size();
-
-    int closestObject = -1;
+    /* WARNING: OpenCL objects in the 'constant' memory area on AMD hardware have their own address space
+                The first object in this address space can have address 0x00000000, so a 'null' pointer 
+                can indeed be valid here --> comparing 'hitObj' to 0 does not return whether hitObj points
+                to a valid object */
+    constant const Rectangle* hitObj = 0;
     float dist_out = INFINITY;
     
     for ( int i = 0; i < numRects; i++)
     {
-        //printf("iteration %d\n", i);
-        /*
-        printf("rectangle position: (%f, %f, %f)\n", rects[i].pos.s0, rects[i].pos.s1, rects[i].pos.s2);
-        printf("rectangle width: (%f, %f, %f)\n", rects[i].width.s0, rects[i].width.s1, rects[i].width.s2);
-        printf("rectangle height: (%f, %f, %f)\n", rects[i].height.s0, rects[i].height.s1, rects[i].height.s2);
-        printf("rectangle n: (%f, %f, %f)\n", rects[i].n.s0, rects[i].n.s1, rects[i].n.s2);
-        printf("rectangle color: (%f, %f, %f)\n", rects[i].color.s0, rects[i].color.s1, rects[i].color.s2);
-        printf("baseIdx: %d\n\n", rects[i].lightBaseIdx);*/
 
-        float dist = intersects( &(rects[i]), pos, ray_dir, dist_out);
+        constant const Rectangle *target = &(rects[i]);
+        float dist = intersects(target , pos, ray_dir, dist_out);
         if (dist < 0)
             continue;
             
         if (dist < dist_out) {
-            closestObject = i;
+            hitObj = target;
             dist_out = dist;
         }
     }
     
-    hit_obj[get_global_id(0)] = closestObject;
-    hit_pos[get_global_id(0)] = pos + ray_dir * dist_out;
-    
-    //return closestObject;
+    if (dist_out == INFINITY)
+        return;
+    //hit_obj[get_global_id(0)] = closestObject;
+    float3 hit_pos = pos + ray_dir * dist_out;
+
+    int tile_id = getTileIdAt( hitObj, hit_pos, TILE_SIZE);
+    int light_idx = hitObj->lightBaseIdx + tile_id;
+
+    //FIXME: make this increment atomic
+    lightColors[ light_idx ] += 
+        lightColor;
 }
 

@@ -8,7 +8,7 @@ OBJ_CC = $(SRC_CC:.cc=.oo)
 OBJ    = $(OBJ_C) $(OBJ_CC)
 
 OPT_FLAGS = -O2 
-FLAGS = -g -Wall -Wextra -msse3 -DNDEBUG #$(OPT_FLAGS) -flto
+FLAGS = -g -Wall -Wextra -msse3 -DNDEBUG $(OPT_FLAGS) -flto
 
 PROFILE =
 #PROFILE = -fprofile-generate

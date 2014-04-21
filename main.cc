@@ -14,11 +14,11 @@
 using namespace std;
 
 
-Rectangle* objects;
+Rectangle* objects = NULL;
 cl_int numObjects;
 
-Vector3* lightColors;
-int numLightColors;
+Vector3* lightColors = NULL;
+cl_int numLightColors;
 
 /*
 Vector3 getDiffuseSkyRandomRay(Vector3 ndir, Vector3 udir, Vector3 vdir)
@@ -57,6 +57,7 @@ Vector3 getCosineDistributedRandomRay(Vector3 ndir, Vector3 udir, Vector3 vdir) 
 }*/
 
 //Builds an arbitrary orthogonal coordinate system, with one of its axes being 'ndir'
+/*
 void createBase(Vector3 ndir, Vector3 &c1, Vector3 &c2) {
     c1 = createVector3(0,0,1);
     if (fabs(dot(c1, ndir)) == 1) //are colinear --> cannot build coordinate base
@@ -64,7 +65,7 @@ void createBase(Vector3 ndir, Vector3 &c1, Vector3 &c2) {
         
     c2 = normalized( cross(c1,ndir));
     c1 = normalized( cross(c2,ndir));
-}
+}*/
 
 Rectangle* getClosestObject(const Vector3 &ray_src, const Vector3 &ray_dir, Rectangle *objects, int numObjects, float &dist_out)
 {
@@ -132,7 +133,13 @@ void loadGeometry()
         objects[i].lightBaseIdx = numLightColors;
         numLightColors += getNumTiles(&objects[i]);
     }
-    lightColors = (Vector3*) malloc( numLightColors * sizeof(Vector3));
+
+    if (0 != posix_memalign( (void**) &lightColors, 16, numLightColors * sizeof(Vector3)))
+    {
+        assert(false);
+        exit(0);
+    }
+    
     for (int i = 0; i < numLightColors; i++)
         lightColors[i] = createVector3(0,0,0);
 }
@@ -180,14 +187,14 @@ void initCl(cl_context *ctx, cl_device_id *device) {
 	clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_GPU, numDevices, device, NULL);
     printDeviceString( *device );
     
-    
+    /*
     cout << "CL_INVALID_DEVICE:  " << CL_INVALID_DEVICE << endl;
     cout << "CL_INVALID_VALUE:   " << CL_INVALID_VALUE << endl;
     cout << "CL_INVALID_PLATFORM:" << CL_INVALID_PLATFORM << endl;
     cout << "CL_DEVICE_NOT_AVAILABLE" << CL_DEVICE_NOT_AVAILABLE << endl;
     cout << "CL_DEVICE_NOT_FOUND" << CL_DEVICE_NOT_FOUND << endl;
     cout << "CL_OUT_OF_HOST_MEMORY" << CL_OUT_OF_HOST_MEMORY << endl;
-    cout << "CL_INVALID_DEVICE_TYPE" << CL_INVALID_DEVICE_TYPE << endl;
+    cout << "CL_INVALID_DEVICE_TYPE" << CL_INVALID_DEVICE_TYPE << endl;*/
 
     cl_context_properties properties[] = {CL_CONTEXT_PLATFORM, (cl_context_properties)platform_id, 0};
 
@@ -278,12 +285,19 @@ int main()
 
     cl_mem rectBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY |CL_MEM_COPY_HOST_PTR, numObjects * sizeof(Rectangle),(void *) objects, NULL);
     cout << "rectBuffer: " << rectBuffer << endl;
+
+    /* ================= */
+    /* SET ACCURACY HERE */
+    /* ================= */
+    static const int numSamplesPerArea = 5000;
+
     
     for ( unsigned int i = 0; i < windows.size(); i++)
     {
         Rectangle window = windows[i];
-        for (int j = 0; j < getNumTiles(&window); j++)
-            lightColors[ window.lightBaseIdx + j] = createVector3(1, 1, 1);
+        /*for (int j = 0; j < getNumTiles(&window); j++)
+            lightColors[ window.lightBaseIdx + j] = createVector3(1, 1, 1);*/
+            
             //getTile(&window, j).setLightColor(  );
 
         //Vector3 src = getOrigin(       &window);
@@ -292,69 +306,25 @@ int main()
         
         //float area = xDir.length() * yDir.length();
         float area = length(xDir) * length(yDir);
+        int numSamples = numSamplesPerArea * area;
          
         //Vector3 xNorm = normalized(xDir);
         //Vector3 yNorm = normalized(yDir);
         
-        /* ================= */
-        /* SET ACCURACY HERE */
-        /* ================= */
-        static const int numSamplesPerArea = 500;
-        int numSamples = numSamplesPerArea * area;
-
         cout << "Photon-Mapping window " << (i+1) << "/" << windows.size() << " with " << numSamples << " samples" << endl;
-        //Vector3 *ray_src, *ray_dir;
-        //if (0 != posix_memalign((void**)&ray_src, 16, numSamples * sizeof(Vector3))) return -1;
-        //if (0 != posix_memalign((void**)&ray_dir, 16, numSamples * sizeof(Vector3))) return -1;
 
-        int     *hit_obj;
-        if (0 != posix_memalign((void**)&hit_obj, 16, numSamples * sizeof(int) )) return -1;
-
-        Vector3 *hit_pos;
-        if (0 != posix_memalign((void**)&hit_pos,16, numSamples * sizeof(Vector3) )) return -1;
-        
-        cout << "hit_pos array is " << numSamples * sizeof(Vector3) << " bytes" << endl;
-        
-        /*
-        for (int i = 0; i < numSamples; i++)
-        {
-            
-
-            float dx = rand() / (float)RAND_MAX;
-            float dy = rand() / (float)RAND_MAX;
-
-            //Vector3 pos = src + xDir*dx + yDir*dy;
-            Vector3 pos = add( src, add(mul(xDir, dx), mul(yDir, dy)));
-            Vector3 n   = window.n;
-
-            ray_dir[i] = getDiffuseSkyRandomRay(n, xNorm, yNorm);
-            hit_obj[i] = -1;
-            hit_dist[i] = INFINITY;
-
-            pos = add(pos, mul(ray_dir[i], 1E-10f)); //to prevent self-intersection on the light source geometry
-            ray_src[i] = pos;
-        }*/
-
-	    //cl_mem rayDirBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY |CL_MEM_COPY_HOST_PTR, numSamples * sizeof(Vector3),(void *) ray_dir, NULL);
-	    //cl_mem raySrcBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY |CL_MEM_COPY_HOST_PTR, numSamples * sizeof(Vector3),(void *) ray_src, NULL);
         cl_int status = 0;
-	    cl_mem hitObjBuffer = clCreateBuffer(ctx, CL_MEM_WRITE_ONLY|CL_MEM_COPY_HOST_PTR, numSamples * sizeof(cl_int),(void *) hit_obj, &status);
-        cout << "clCreateBuffer: " << status << endl;
-	    cl_mem hitPosBuffer= clCreateBuffer(ctx, CL_MEM_WRITE_ONLY|CL_MEM_COPY_HOST_PTR, numSamples * sizeof(cl_float3),(void *) hit_pos, &status);
+	    cl_mem lightColorsBuffer = clCreateBuffer(ctx, CL_MEM_WRITE_ONLY|CL_MEM_COPY_HOST_PTR, numLightColors * sizeof(cl_float3),(void *) lightColors, &status);
         cout << "clCreateBuffer: " << status << endl;
 
         cl_kernel kernel = clCreateKernel(prog,"photonmap", &status);
         cout << "clCreateKernel: " << status << endl;
 
         status = clSetKernelArg(kernel, 0, sizeof(Rectangle), (void *)&window);
-        cout << "clSetKernelArg: " << status << endl;
-        status = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&rectBuffer);
-        cout << "clSetKernelArg: " << status << endl;
-        status = clSetKernelArg(kernel, 2, sizeof(cl_int), (void *)&numObjects);
-        cout << "clSetKernelArg: " << status << endl;
-        status = clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&hitObjBuffer);
-        cout << "clSetKernelArg: " << status << endl;
-        status = clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&hitPosBuffer);
+        status |= clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&rectBuffer);
+        status |= clSetKernelArg(kernel, 2, sizeof(cl_int), (void *)&numObjects);
+        status |= clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&lightColorsBuffer);
+        status |= clSetKernelArg(kernel, 4, sizeof(cl_float), (void *)&TILE_SIZE);
         cout << "clSetKernelArg: " << status << endl;
 
         size_t workSize = numSamples;
@@ -365,30 +335,9 @@ int main()
         
 	    //cout << "kernel processing complete, exiting ..." << endl;
 
-        clEnqueueReadBuffer(queue, hitObjBuffer, CL_TRUE, 0, numSamples * sizeof(cl_int),  (void *) hit_obj, 0, NULL, NULL);
-        clEnqueueReadBuffer(queue, hitPosBuffer, CL_TRUE, 0, numSamples * sizeof(cl_float3),  (void *) hit_pos, 0, NULL, NULL);
+        clEnqueueReadBuffer(queue, lightColorsBuffer, CL_TRUE, 0, numLightColors * sizeof(cl_float3),  (void *) lightColors, 0, NULL, NULL);
+        clReleaseMemObject(lightColorsBuffer);
         
-        clReleaseMemObject(hitObjBuffer);
-        clReleaseMemObject(hitPosBuffer);
-
-        for (int i = 0; i < numSamples; i++)
-        {
-            Vector3 lightCol = window.color;
-            //cout << "hit_obj[" << i << "] = " << hit_obj[i] << endl;
-            if (hit_obj[i] == -1) continue;
-            
-            Rectangle *hit = &objects[ hit_obj[i]];
-            Vector3 hitPos = hit_pos[i];//add(ray_src[i], mul(ray_dir[i], hit_dist[i]));
-
-            Vector3 tileCol = hit->color;
-            if (tileCol.s[0] > 1 || tileCol.s[1] > 1 || tileCol.s[2] > 1)    //hit a light source
-                continue;
-
-            lightColors[ hit->lightBaseIdx + getTileIdAt(hit, hitPos)] = 
-                add(lightColors[ hit->lightBaseIdx + getTileIdAt(hit, hitPos)],
-                    mul(lightCol, (1 / (TILE_SIZE*TILE_SIZE*numSamplesPerArea*2))));
-            
-        }
 	    //exit(0);  
 
             //Vector3 lightCol = window.color;
@@ -426,8 +375,19 @@ int main()
             #endif
         //}
     }
-
     clReleaseMemObject(rectBuffer);
+
+    //FIXME: normalize lightColors by actual tile size (which varies from rect to rect)
+    for ( int i = 0; i < numLightColors; i++)
+        lightColors[i] = div_vec3(lightColors[i], (TILE_SIZE*TILE_SIZE*2*numSamplesPerArea));
+
+    for ( unsigned int i = 0; i < windows.size(); i++)
+    {
+        Rectangle window = windows[i];
+        for (int j = 0; j < getNumTiles(&window); j++)
+            lightColors[ window.lightBaseIdx + j] = createVector3(1, 1, 1);
+    }
+
 
     char num[50];
     for ( int i = 0; i < numObjects; i++)
