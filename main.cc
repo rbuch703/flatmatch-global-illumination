@@ -317,10 +317,13 @@ int main()
 	    cl_mem lightColorsBuffer = clCreateBuffer(ctx, CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR, numLightColors * sizeof(cl_float3),(void *) lightColors, &status);
         cout << "clCreateBuffer: " << status << endl;
 
+	    cl_mem windowBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY| CL_MEM_USE_HOST_PTR , sizeof(Rectangle),(void *)&window, &status );
+        cout << "clCreateBuffer: " << status << endl;
+
         cl_kernel kernel = clCreateKernel(prog,"photonmap", &status);
         cout << "clCreateKernel: " << status << endl;
 
-        status = clSetKernelArg(kernel, 0, sizeof(Rectangle), (void *)&window);
+        status = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&windowBuffer);
         status |= clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&rectBuffer);
         status |= clSetKernelArg(kernel, 2, sizeof(cl_int), (void *)&numObjects);
         status |= clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&lightColorsBuffer);
@@ -334,6 +337,7 @@ int main()
         clFinish(queue);
         clReleaseKernel(kernel);
         clReleaseMemObject(lightColorsBuffer);
+        clReleaseMemObject(windowBuffer);
     }
     clReleaseMemObject(rectBuffer);
 

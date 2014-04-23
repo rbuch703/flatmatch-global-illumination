@@ -14,7 +14,7 @@ float rand(ulong *rng_state)
     return (*rng_state >> 32) / (float)0xFFFFFFFF;
 }
 
-float3 getDiffuseSkyRandomRay(ulong *rng_state, float3 ndir, float3 udir, float3 vdir)
+float3 getDiffuseSkyRandomRay(ulong *rng_state, const float3 ndir/*, const float3 udir, const float3 vdir*/)
 {
     //HACK: computes a lambertian quarter-sphere (lower half of hemisphere)
     
@@ -30,11 +30,18 @@ float3 getDiffuseSkyRandomRay(ulong *rng_state, float3 ndir, float3 udir, float3
     if (v > 0)  //project to lower quadsphere (no light from below the horizon)
         v = -v;
 
+    float3 udir = (float3)(0,0,1);
+    if (fabs( dot(udir, ndir)) == 1) //are colinear --> cannot build coordinate base
+        udir = (float3)(0,1,0);
+
+    float3 vdir = normalize( cross(udir,ndir));
+    udir = normalize( cross(vdir,ndir));
+
     //# Convert to a direction on the hemisphere defined by the normal
     return udir*u + vdir*v + ndir*n;
 }
 
-float3 getCosineDistributedRandomRay(ulong *rng_state, float3 ndir, float3 udir, float3 vdir) {
+float3 getCosineDistributedRandomRay(ulong *rng_state, const float3 ndir) {
     // Step 1:Compute a uniformly distributed point on the unit disk
     float r = sqrt(rand(rng_state));
     float phi = 2 * 3.141592f * rand(rng_state);
@@ -44,12 +51,21 @@ float3 getCosineDistributedRandomRay(ulong *rng_state, float3 ndir, float3 udir,
     float v = r * sin(phi);
     float n = sqrt(1 - r*r);
 
+    float3 udir = (float3)(0,0,1);
+    if (fabs( dot(udir, ndir)) == 1) //are colinear --> cannot build coordinate base
+        udir = (float3)(0,1,0);
+
+    float3 vdir = normalize( cross(udir,ndir));
+    udir = normalize( cross(vdir,ndir));
+
+
     //# Convert to a direction on the hemisphere defined by the normal
     return udir*u + vdir*v + ndir*n;
 }
 
+#if 0
 //Builds an arbitrary orthogonal coordinate system, with one of its axes being 'ndir'
-void createBase( float3 ndir, float3 *c1, float3 *c2) {
+void createBase( const float3 ndir, float3 *c1, float3 *c2) {
     *c1 = (float3)(0,0,1);
     //printf("c1: (%f, %f, %f)\n", (*c1).s0, (*c1).s1, (*c1).s2);
     if (fabs( dot(*c1, ndir)) == 1) //are colinear --> cannot build coordinate base
@@ -63,6 +79,7 @@ void createBase( float3 ndir, float3 *c1, float3 *c2) {
     printf("c1: (%f, %f, %f)\n", (*c1).s0, (*c1).s1, (*c1).s2);
     printf("c2: (%f, %f, %f)\n", (*c2).s0, (*c2).s1, (*c2).s2);*/
 }
+#endif
 
 
 int getTileIdAt(__constant const Rectangle *rect, const float3 p, const float TILE_SIZE)
@@ -88,7 +105,7 @@ int getTileIdAt(__constant const Rectangle *rect, const float3 p, const float TI
 }
 
 
-float intersects( __constant const Rectangle *rect, float3 ray_src, float3 ray_dir, float closestDist) 
+float intersects( __constant const Rectangle *rect, const float3 ray_src, const float3 ray_dir, const float closestDist) 
 {
     //if (dot(ray_dir,n) > 0) return -1; //backface culling
     float denom = dot(rect->n, ray_dir);
@@ -107,37 +124,39 @@ float intersects( __constant const Rectangle *rect, float3 ray_src, float3 ray_d
     if (closestDist * closestDist < dot(ray, ray) )
         return -1;
     
-    float3 p = ray_src + ray;
-    float3 pDir = p - rect->pos;
-    
-    /*float width_len  = length(rect->width);
-    float height_len = length(rect->height);*/
+    float3 pDir = (ray_src + ray) - rect->pos;
     
     float widthLength = length(rect->width);
+    float dx = dot( rect->width / widthLength,  pDir);
+    if (dx < 0 || dx > widthLength)
+        return -1;
+        
     float heightLength= length(rect->height);
-    
-    float dx = dot( normalize(rect->width),  pDir);
-    float dy = dot( normalize(rect->height), pDir);
-    
-    if (dx < 0 || dy < 0|| dx > widthLength || dy > heightLength ) return -1;
+    float dy = dot( rect->height/ heightLength, pDir);
+    if  ( dy < 0 || dy > heightLength )
+        return -1;
+        
     return fac;
+
+    //return select(-1.0f, fac,dx == clamp(dx, 0.0f, widthLength) && dy == clamp(dy, 0.0f, heightLength));
+
 }
 
 
-void tracePhoton(ulong *rng_state, const Rectangle window, __constant const Rectangle* rects, int numRects,
-                        __global float3 *lightColors, float TILE_SIZE)
+void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constant const Rectangle* rects, const int numRects,
+                        __global float3 *lightColors, const float TILE_SIZE)
 {
 
-    float3 lightColor = window.color;
+    float3 lightColor = window->color;
 
     const int MAX_DEPTH = 4;
 
     float dx = rand(rng_state);
     float dy = rand(rng_state);
 
-    float3 pos = window.pos + window.width*dx + window.height*dy;
-    float3 ray_dir = getDiffuseSkyRandomRay(rng_state, window.n, normalize(window.width), normalize(window.height));
-    pos += (ray_dir* 1E-7f); //to prevent self-intersection on the light source geometry
+    float3 ray_dir = getDiffuseSkyRandomRay(rng_state, window->n);//, normalize(window.width), normalize(window.height));
+    //move slightly in direction of ray_dir to prevent self-intersection on the light source geometry
+    float3 pos = window->pos + window->width*dx + window->height*dy + (ray_dir* 1E-5f);
     
     for (int depth = 0; depth < MAX_DEPTH; depth++)
     {
@@ -145,7 +164,7 @@ void tracePhoton(ulong *rng_state, const Rectangle window, __constant const Rect
                     The first object in this address space can have address 0x00000000, so a 'null' pointer 
                     can indeed be valid here --> comparing 'hitObj' to 0 does not return whether hitObj points
                     to a valid object */
-        constant const Rectangle* hitObj = 0;
+        const constant Rectangle* hitObj = 0;
         float dist_out = INFINITY;
 
         //printf("work_item %d, pos (%f,%f,%f), dir (%f,%f,%f) \n", get_global_id(0), pos.s0, pos.s1, pos.s2, ray_dir.s0, ray_dir.s1, ray_dir.s2);
@@ -185,12 +204,12 @@ void tracePhoton(ulong *rng_state, const Rectangle window, __constant const Rect
         //printf ("lightColor %d/%d is (%f, %f, %f)\n", get_global_id(0), depth, lightColor.x, lightColor.y, lightColor.z);
         
         pos = hit_pos;
-        float3 udir, vdir;
-        createBase(hitObj->n, &udir, &vdir);
+        //float3 udir, vdir;
+        //createBase(hitObj->n, &udir, &vdir);
         //printf("work_item %d, base1 (%f,%f,%f), base2 (%f,%f,%f) \n", get_global_id(0), udir.s0, udir.s1, udir.s2, vdir.s0, vdir.s1, vdir.s2);
         //printf("work_item %d, hit_pos (%f,%f,%f), new_dir (%f,%f,%f) \n", get_global_id(0), pos.s0, pos.s1, pos.s2, ray_dir.s0, ray_dir.s1, ray_dir.s2);
-        ray_dir = getCosineDistributedRandomRay(rng_state, hitObj->n, udir, vdir);
-        //ray_dir = getCosineDistributedRandomRay(&rng_state, hitObj->n, normalize(hitObj->width), normalize(hitObj->height));
+        ray_dir = getCosineDistributedRandomRay(rng_state, hitObj->n);//, udir, vdir);
+        //ray_dir = getCosineDistributedRandomRay(rng_state, hitObj->n, normalize(hitObj->width), normalize(hitObj->height));
         pos += (ray_dir* 1E-5f); //to prevent self-intersection on the light source geometry
             
     }
@@ -198,7 +217,7 @@ void tracePhoton(ulong *rng_state, const Rectangle window, __constant const Rect
 
 
 
-__kernel void photonmap(const Rectangle window, __constant const Rectangle* rects, int numRects,
+__kernel void photonmap(__constant const Rectangle *window, __constant const Rectangle* rects, int numRects,
                         __global float3 *lightColors, float TILE_SIZE)
 {
 
