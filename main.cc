@@ -289,7 +289,7 @@ int main()
     /* ================= */
     /* SET ACCURACY HERE */
     /* ================= */
-    static const int numSamplesPerArea = 5000;
+    static const int numSamplesPerArea = 1000;
 
     
     for ( unsigned int i = 0; i < windows.size(); i++)
@@ -306,15 +306,15 @@ int main()
         
         //float area = xDir.length() * yDir.length();
         float area = length(xDir) * length(yDir);
-        int numSamples = numSamplesPerArea * area;
+        int numSamples = numSamplesPerArea * area/ 1000; //  the OpenCL kernel does 1000 iterations per call)
          
         //Vector3 xNorm = normalized(xDir);
         //Vector3 yNorm = normalized(yDir);
         
-        cout << "Photon-Mapping window " << (i+1) << "/" << windows.size() << " with " << (int)(numSamples/1000000) << "M samples" << endl;
+        cout << "Photon-Mapping window " << (i+1) << "/" << windows.size() << " with " << (int)(numSamples/1000) << "M samples" << endl;
 
         cl_int status = 0;
-	    cl_mem lightColorsBuffer = clCreateBuffer(ctx, CL_MEM_WRITE_ONLY|CL_MEM_COPY_HOST_PTR, numLightColors * sizeof(cl_float3),(void *) lightColors, &status);
+	    cl_mem lightColorsBuffer = clCreateBuffer(ctx, CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR, numLightColors * sizeof(cl_float3),(void *) lightColors, &status);
         cout << "clCreateBuffer: " << status << endl;
 
         cl_kernel kernel = clCreateKernel(prog,"photonmap", &status);
@@ -330,50 +330,10 @@ int main()
         size_t workSize = numSamples;
     	status = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &workSize, NULL, 0, NULL, NULL);
     	cout << "clEnqueueNDRangeKernel: " << status << endl;
+        clEnqueueReadBuffer(queue, lightColorsBuffer, CL_TRUE, 0, numLightColors * sizeof(cl_float3),  (void *) lightColors, 0, NULL, NULL);
         clFinish(queue);
         clReleaseKernel(kernel);
-        
-	    //cout << "kernel processing complete, exiting ..." << endl;
-
-        clEnqueueReadBuffer(queue, lightColorsBuffer, CL_TRUE, 0, numLightColors * sizeof(cl_float3),  (void *) lightColors, 0, NULL, NULL);
         clReleaseMemObject(lightColorsBuffer);
-        
-	    //exit(0);  
-
-            //Vector3 lightCol = window.color;
-            #if 0
-            for (int depth = 0; depth < 1; depth++)
-            {
-                
-                float dist;
-                Rectangle *hit = getClosestObject(pos, ray_dir, objects, numObjects, dist);
-                if (!hit) continue;
-                
-                Vector3 hitPos = add(pos, mul(ray_dir, dist));
-                //Tile& tile = getTileAt(hit, hitPos);
-                Vector3 tileCol = hit->color;
-                if (tileCol.s[0] > 1 || tileCol.s[1] > 1 || tileCol.s[2] > 1)    //hit a light source
-                    continue;
-                
-                //Normalize light transfer by tile area and number of rays per area of the light source
-                //the constant 2.0 is an experimentally-determined factor
-                lightColors[ hit->lightBaseIdx + getTileIdAt(hit, hitPos)] = 
-                    add(lightColors[ hit->lightBaseIdx + getTileIdAt(hit, hitPos)],
-                        mul(lightCol, (1 / (TILE_SIZE*TILE_SIZE*numSamplesPerArea*2))));
-                //Color3 light = tile.getLightColor() + lightCol* (1 / (TILE_SIZE*TILE_SIZE*numSamplesPerArea*2));
-                //tile.setLightColor(light);
-                
-                lightCol.s[0] *= 0.9 * hit->color.s[0];// = Vector3( lightCol * ;//tile.getColor();
-                lightCol.s[1] *= 0.9 * hit->color.s[1];
-                lightCol.s[2] *= 0.9 * hit->color.s[2];
-                // prepare next (diffuse reflective) ray
-                Vector3 u,v;
-                createBase(hit->n, /*out*/u, /*out*/v);
-                ray_dir = getCosineDistributedRandomRay(hit->n, u, v);
-                pos = hitPos;
-            }
-            #endif
-        //}
     }
     clReleaseMemObject(rectBuffer);
 
@@ -408,41 +368,27 @@ int main()
     //std::cout << "cam_right: " << cam_right << endl;
     //std::cout << "cam_up: " << cam_up << endl;
     //std::cout << "cam_dir: " << cam_dir << endl;
+    /*
     static const int img_width = 800;
     static const int img_height= 600;
 
     uint8_t* pixel_buffer = new uint8_t[3*img_width*img_height];
     memset(pixel_buffer, 0, 3*img_width*img_height);
+
     
     for (int y = 0; y < img_height; y++) 
     {
-        /*if (y % 30 == 0)
-        {
-            cout << (y*100 / img_height) << "%" << endl;
-            write_png_file( "out.png", img_width, img_height, PNG_COLOR_TYPE_RGB, pixel_buffer);
-        }*/
         for (int x = 0; x < img_width; x++) {
-            /*Vector3 ray_dir = normalized( cam_dir + 
-                                          cam_right* (1.25*(x-(img_width/2))/(double)img_width) + 
-                                          cam_up*    (1.25*(img_height/(double)img_width)*(y-(img_height/2))/(double)img_height) );*/
             
             Vector3 rd_x = mul( cam_right,(1.25*(x-(img_width/2))/(float)img_width));
             Vector3 rd_y = mul( cam_up,   (1.25*(img_height/(float)img_width)*(y-(img_height/2))/(float)img_height));
             Vector3 ray_dir = normalized( add(cam_dir, add(rd_x, rd_y)));
             
             Vector3 col = getColor(cam_pos, ray_dir, objects, numObjects);
-            /*col.r = sqrt(col.r);
-            col.g = sqrt(col.g);
-            col.b = sqrt(col.b);*/
-            /*col.r = log(1+col.r) / log(2);  // conversion from light intensity to perceived brightness
-            col.g = log(1+col.g) / log(2);
-            col.b = log(1+col.b) / log(2);*/
             
             col.s[0] = 1 - exp(-col.s[0]);
             col.s[1] = 1 - exp(-col.s[1]);
             col.s[2] = 1 - exp(-col.s[2]);
-
-          
           
             pixel_buffer[(y*img_width+x)*3 + 0] = min(col.s[0]*255, 255.0f);
             pixel_buffer[(y*img_width+x)*3 + 1] = min(col.s[1]*255, 255.0f);
@@ -453,6 +399,7 @@ int main()
     write_png_file( "out.png", img_width, img_height, PNG_COLOR_TYPE_RGB, pixel_buffer);
     
     delete [] pixel_buffer;
+    */
     //for ( int i = 0; i < numObjects; i++)
     //    delete objects[i].tiles;
     free( objects);

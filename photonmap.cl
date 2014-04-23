@@ -20,7 +20,7 @@ float3 getDiffuseSkyRandomRay(ulong *rng_state, float3 ndir, float3 udir, float3
     
     // Step 1:Compute a uniformly distributed point on the unit disk
     float r = sqrt(rand(rng_state));
-    float phi = 2 * 3.141592 * rand(rng_state);
+    float phi = 2 * 3.141592f * rand(rng_state);
 
     // Step 2: Project point onto unit hemisphere
     float u = r * cos(phi);
@@ -37,7 +37,7 @@ float3 getDiffuseSkyRandomRay(ulong *rng_state, float3 ndir, float3 udir, float3
 float3 getCosineDistributedRandomRay(ulong *rng_state, float3 ndir, float3 udir, float3 vdir) {
     // Step 1:Compute a uniformly distributed point on the unit disk
     float r = sqrt(rand(rng_state));
-    float phi = 2 * 3.141592 * rand(rng_state);
+    float phi = 2 * 3.141592f * rand(rng_state);
 
     // Step 2: Project point onto unit hemisphere
     float u = r * cos(phi);
@@ -124,25 +124,19 @@ float intersects( __constant const Rectangle *rect, float3 ray_src, float3 ray_d
 }
 
 
-__kernel void photonmap(const Rectangle window, __constant const Rectangle* rects, int numRects,
+void tracePhoton(ulong *rng_state, const Rectangle window, __constant const Rectangle* rects, int numRects,
                         __global float3 *lightColors, float TILE_SIZE)
 {
 
-    size_t item_id = get_global_id(0);
-    ulong rng_state = item_id;
-    float r = rand(&rng_state) * 40; //warm-up / decorrelate individual RNGs
-    for (int i = 0; i < r; i++)
-        rand(&rng_state);   
-        
     float3 lightColor = window.color;
 
     const int MAX_DEPTH = 4;
 
-    float dx = rand(&rng_state);
-    float dy = rand(&rng_state);
+    float dx = rand(rng_state);
+    float dy = rand(rng_state);
 
     float3 pos = window.pos + window.width*dx + window.height*dy;
-    float3 ray_dir = getDiffuseSkyRandomRay(&rng_state, window.n, normalize(window.width), normalize(window.height));
+    float3 ray_dir = getDiffuseSkyRandomRay(rng_state, window.n, normalize(window.width), normalize(window.height));
     pos += (ray_dir* 1E-7f); //to prevent self-intersection on the light source geometry
     
     for (int depth = 0; depth < MAX_DEPTH; depth++)
@@ -173,7 +167,7 @@ __kernel void photonmap(const Rectangle window, __constant const Rectangle* rect
         if (dist_out == INFINITY)
             return;
             
-        if ( hitObj->color.x > 1.0 || hitObj->color.y > 1.0 || hitObj->color.z > 1.0)
+        if ( hitObj->color.x > 1.0f || hitObj->color.y > 1.0f || hitObj->color.z > 1.0f)
             return; //hit a light source;
             
         //hit_obj[get_global_id(0)] = closestObject;
@@ -187,7 +181,7 @@ __kernel void photonmap(const Rectangle window, __constant const Rectangle* rect
         lightColors[ light_idx ] += 
             lightColor;
             
-        lightColor *= (hitObj->color*0.9);
+        lightColor *= (hitObj->color*0.9f);
         //printf ("lightColor %d/%d is (%f, %f, %f)\n", get_global_id(0), depth, lightColor.x, lightColor.y, lightColor.z);
         
         pos = hit_pos;
@@ -195,10 +189,26 @@ __kernel void photonmap(const Rectangle window, __constant const Rectangle* rect
         createBase(hitObj->n, &udir, &vdir);
         //printf("work_item %d, base1 (%f,%f,%f), base2 (%f,%f,%f) \n", get_global_id(0), udir.s0, udir.s1, udir.s2, vdir.s0, vdir.s1, vdir.s2);
         //printf("work_item %d, hit_pos (%f,%f,%f), new_dir (%f,%f,%f) \n", get_global_id(0), pos.s0, pos.s1, pos.s2, ray_dir.s0, ray_dir.s1, ray_dir.s2);
-        ray_dir = getCosineDistributedRandomRay(&rng_state, hitObj->n, udir, vdir);
+        ray_dir = getCosineDistributedRandomRay(rng_state, hitObj->n, udir, vdir);
         //ray_dir = getCosineDistributedRandomRay(&rng_state, hitObj->n, normalize(hitObj->width), normalize(hitObj->height));
         pos += (ray_dir* 1E-5f); //to prevent self-intersection on the light source geometry
             
     }
+}
+
+
+
+__kernel void photonmap(const Rectangle window, __constant const Rectangle* rects, int numRects,
+                        __global float3 *lightColors, float TILE_SIZE)
+{
+
+    size_t item_id = get_global_id(0);
+    ulong rng_state = item_id;
+    float r = rand(&rng_state) * 40; //warm-up / decorrelate individual RNGs
+    for (int i = 0; i < r; i++)
+        rand(&rng_state);   
+    
+    for (int i = 0; i < 1000; i++)
+        tracePhoton(&rng_state, window, rects, numRects, lightColors, TILE_SIZE);
 }
 
