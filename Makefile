@@ -19,7 +19,7 @@ CCFLAGS = $(FLAGS) $(PROFILE) -std=c++11
 LD_FLAGS = $(PROFILE) -lm -lOpenCL -flto $(OPT_FLAGS) 
 .PHONY: all clean
 
-all: make.dep radiosity
+all: make.dep radiosity tiles
 #	 @echo [ALL] $<
 
 radiosity: $(OBJ_C) $(OBJ_CC)
@@ -30,7 +30,10 @@ radiosity: $(OBJ_C) $(OBJ_CC)
 	@echo [CC] $<
 	@gcc $(CFLAGS) $< -c -o $@
 
-	
+tiles:
+	@echo [MKDIR] tiles
+	@mkdir tiles
+    
 %.oo: %.cc
 	@echo [CP] $<
 	@g++ $(CCFLAGS) $< -c -o $@
