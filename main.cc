@@ -116,7 +116,7 @@ void loadGeometry()
 {
     static const Vector3 wallColor = createVector3(0.8, 0.8, 0.8);
     
-    vector<Rectangle> rects = parseLayout("layout.png");
+    vector<Rectangle> rects = parseLayout("out.png", 1.0);
     numObjects = 2 + rects.size();
     if (0 != posix_memalign((void**)&objects, 16, numObjects * sizeof(Rectangle))) return;
     //objects = (Rectangle*)malloc( numObjects * sizeof(Rectangle));
@@ -144,10 +144,10 @@ void loadGeometry()
         lightColors[i] = createVector3(0,0,0);
 }
 
-void printDeviceString(cl_device_id dev_id)
+string getDeviceString(cl_device_id dev_id)
 {
     size_t res_size;
-    cout << "device " << dev_id << endl;
+    //cout << "device " << dev_id << endl;
 
     clGetDeviceInfo( dev_id,   CL_DEVICE_NAME , 0, NULL, &res_size);
     //cout << "\t result size is " << res_size << " bytes" << endl;
@@ -161,9 +161,11 @@ void printDeviceString(cl_device_id dev_id)
         clGetDeviceInfo( dev_id,   CL_DEVICE_NAME  , res_size, res, NULL);
     assert(status == CL_SUCCESS);
     
+    string name(res);
     //cout << "\t status code is " << status << endl;
-  	cout << "\t has name '" << res << "'" << endl;
+  	//cout << "\t has name '" << res << "'" << endl;
   	delete [] res;
+  	return name;
 }
 
 void clErrorFunc ( const char *errinfo, const void * /*private_info*/, size_t /*cb*/, void * /*user_data*/)
@@ -171,21 +173,55 @@ void clErrorFunc ( const char *errinfo, const void * /*private_info*/, size_t /*
     cout << errinfo << endl;
 }
 
-void initCl(cl_context *ctx, cl_device_id *device) {
-    
-	cl_uint numPlatforms = 0;	//the NO. of platforms
+
+list<pair<cl_platform_id, cl_device_id>> getEnvironments()
+{
+    list<pair<cl_platform_id, cl_device_id>> environments;
+    cl_uint numPlatforms = 0;	//the NO. of platforms
     clGetPlatformIDs(0, NULL, &numPlatforms);
     assert( numPlatforms == 1);
-    cout << "OpenCl found " << numPlatforms << " platforms" << endl;
-	cl_platform_id platform_id;// = (cl_platform_id* )malloc(numPlatforms* sizeof(cl_platform_id));
-	clGetPlatformIDs(numPlatforms, &platform_id, NULL);
+    
+	cl_platform_id *platforms = (cl_platform_id* )malloc(numPlatforms* sizeof(cl_platform_id));
+	clGetPlatformIDs(numPlatforms, platforms, NULL);
+	for (cl_uint i = 0; i < numPlatforms; i++)
+	{
+        cl_uint numDevices = 0;
+	    clGetDeviceIDs(platforms[i],  CL_DEVICE_TYPE_ALL , 0, NULL, &numDevices);
+	    
+	    cl_device_id* devices = (cl_device_id*) malloc(numDevices * sizeof(cl_device_id));
+        clGetDeviceIDs(platforms[i],  CL_DEVICE_TYPE_ALL, numDevices, devices, NULL);
+	    for (cl_uint j = 0; j < numDevices; j++)
+	        environments.push_back( pair<cl_platform_id, cl_device_id>(platforms[i], devices[j]));
 
-    cl_uint numDevices = 0;
-	clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_GPU, 0, NULL, &numDevices);
-	assert(numDevices == 1);
-	//cl_device_id device_id = 0;
-	clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_GPU, numDevices, device, NULL);
-    printDeviceString( *device );
+        free(devices);
+	}
+    free(platforms);
+    return environments;
+}
+
+
+/* heuristic: find a platform/device - combination that is GPU-based
+ *            if none exists, fall back to a CPU-based one
+ */ 
+void getFittingEnvironment( cl_platform_id /*out*/*platform_id, cl_device_id /*out*/*device_id)
+{
+    list<pair<cl_platform_id, cl_device_id>> environments = getEnvironments();
+
+     cout << "found " << environments.size() << " CL compute environments:" << endl;
+    for (list<pair<cl_platform_id, cl_device_id>>::const_iterator env = environments.begin(); env != environments.end(); env++)
+    {
+        cout << "\tplatform " << env->first << ", device " << env->second << ": '" << getDeviceString(env->second) << "'" << endl;
+    }
+    
+    assert (environments.size() == 1 && "Heuristic for environment selection not implemented");
+    
+    *platform_id = environments.front().first;
+    *device_id   = environments.front().second;
+    
+}
+
+void initCl(cl_context *ctx, cl_device_id *device_id) {
+    
     
     /*
     cout << "CL_INVALID_DEVICE:  " << CL_INVALID_DEVICE << endl;
@@ -196,10 +232,14 @@ void initCl(cl_context *ctx, cl_device_id *device) {
     cout << "CL_OUT_OF_HOST_MEMORY" << CL_OUT_OF_HOST_MEMORY << endl;
     cout << "CL_INVALID_DEVICE_TYPE" << CL_INVALID_DEVICE_TYPE << endl;*/
 
+    cl_platform_id platform_id;
+    getFittingEnvironment( &platform_id, device_id);
+    #warning debug-exit
+    exit(0);
     cl_context_properties properties[] = {CL_CONTEXT_PLATFORM, (cl_context_properties)platform_id, 0};
 
     cl_int status;
-    *ctx = clCreateContext(properties, numDevices, device, clErrorFunc,NULL,&status);
+    *ctx = clCreateContext(properties, 1/*numDevices*/, device_id, clErrorFunc,NULL,&status);
     assert(status == CL_SUCCESS);
 
 }
