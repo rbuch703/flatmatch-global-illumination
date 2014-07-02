@@ -82,6 +82,12 @@ int getNumTiles(const Rectangle *rect)
     return hNumTiles * vNumTiles;
 }
 
+
+float getArea(const Rectangle *rect)
+{
+    return length(rect->width) * length(rect->height);
+}
+
 int getTileIdAt(const Rectangle *rect, const Vector3 p)
 {
     Vector3 pDir = sub(p,rect->pos); //vector from rectangle origin (its lower left corner) to current point

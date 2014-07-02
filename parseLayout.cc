@@ -71,7 +71,7 @@ vector<Rectangle> parseLayout(const char* const filename, const float ) {
             
             if (pxAbove == BLACK && pxHere == WHITE) //transition from wall to inside area
                 segments.push_back(createRectangleWithColor( createVector3(startX,y,0),  
-                                                             createVector3(endX - startX,0,0), 
+                                                             createVector3(endX - startX,0,0),
                                                              createVector3(0,0,HEIGHT), wallColor));
             else if (pxAbove == WHITE && pxHere == BLACK) // transition from inside area to wall
                 segments.push_back(createRectangleWithColor( createVector3(endX,y,0),  
@@ -95,7 +95,7 @@ vector<Rectangle> parseLayout(const char* const filename, const float ) {
                                                              createVector3(startX - endX,0,0), 
                                                              createVector3(0,0,WINDOW_LOW), wallColor ));
                 segments.push_back(createRectangleWithColor( createVector3(endX,y,WINDOW_LOW), 
-                                                             createVector3(startX - endX,0,0), 
+                                                             createVector3(startX - endX,0,0),
                                                              createVector3(0,0,WINDOW_HEIGHT), windowColor));
                 segments.push_back(createRectangleWithColor( createVector3(endX,y,WINDOW_HIGH),
                                                              createVector3(startX - endX,0,0), 
@@ -193,7 +193,9 @@ vector<Rectangle> parseLayout(const char* const filename, const float ) {
         
     }
 
+    cout << "floor/ceiling size is: (" << min_x << ", " << min_y << "), " << (max_x - min_x) << "x" << (max_y - min_y) << endl;
 
+    
     segments.push_front( createRectangleWithColor( createVector3(min_x,min_y,HEIGHT), 
                                                    createVector3(max_x - min_x, 0, 0), 
                                                    createVector3(0, max_y - min_y, 0), wallColor));  // ceiling

@@ -25,6 +25,7 @@ Rectangle createRectangle( const Vector3 _pos, const Vector3 _width, const Vecto
 Rectangle createRectangleWithColor( const Vector3 _pos, const Vector3 _width, const Vector3 _height, const Vector3 col);
 float intersects( const Rectangle *rect, Vector3 ray_src, Vector3 ray_dir, float closestDist);
 int getNumTiles(const Rectangle *rect);
+float getArea(const Rectangle *rect);
 int getTileIdAt(const Rectangle *rect, const Vector3 p);
 Vector3 getDiffuseColor(const Rectangle *rect, const Vector3 pos);
 Vector3 getOrigin(const Rectangle *rect);

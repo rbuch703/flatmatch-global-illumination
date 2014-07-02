@@ -27,11 +27,11 @@ float3 getDiffuseSkyRandomRay(ulong *rng_state, const float3 ndir/*, const float
     float v = r * sin(phi);
     float n = sqrt(1 - r*r);
 
-    if (v > 0)  //project to lower quadsphere (no light from below the horizon)
-        v = -v;
+    if (u < 0)  //project to lower quadsphere (no light from below the horizon)
+        u = -u;
 
     float3 udir = (float3)(0,0,1);
-    if (fabs( dot(udir, ndir)) == 1) //are colinear --> cannot build coordinate base
+    if (fabs( dot(udir, ndir)) >= 0.999999) //are (nearly) colinear --> cannot build coordinate base
         udir = (float3)(0,1,0);
 
     float3 vdir = normalize( cross(udir,ndir));
@@ -51,13 +51,13 @@ float3 getCosineDistributedRandomRay(ulong *rng_state, const float3 ndir) {
     float v = r * sin(phi);
     float n = sqrt(1 - r*r);
 
+    
     float3 udir = (float3)(0,0,1);
-    if (fabs( dot(udir, ndir)) == 1) //are colinear --> cannot build coordinate base
+    if (fabs( dot(udir, ndir)) >= 0.999999) //are (nearly) colinear --> cannot build coordinate base
         udir = (float3)(0,1,0);
 
     float3 vdir = normalize( cross(udir,ndir));
     udir = normalize( cross(vdir,ndir));
-
 
     //# Convert to a direction on the hemisphere defined by the normal
     return udir*u + vdir*v + ndir*n;
@@ -97,8 +97,8 @@ int getTileIdAt(__constant const Rectangle *rect, const float3 p, const float TI
     int vNumTiles = max( (int)round(vLength / TILE_SIZE), 1);
     
     //FIXME: check whether a float->int conversion in OpenCL also is round-towards-zero
-    int tx = clamp( (int)((dx * hNumTiles) / hLength), 0, hNumTiles);
-    int ty = clamp( (int)((dy * vNumTiles) / vLength), 0, vNumTiles);
+    int tx = clamp( (int)((dx * hNumTiles) / hLength), 0, hNumTiles-1);
+    int ty = clamp( (int)((dy * vNumTiles) / vLength), 0, vNumTiles-1);
     
     //assert(ty * hNumTiles + tx < getNumTiles(rect));
     return ty * hNumTiles + tx;
@@ -149,7 +149,7 @@ void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constan
 
     float3 lightColor = window->color;
 
-    const int MAX_DEPTH = 4;
+    const int MAX_DEPTH = 8;
 
     float dx = rand(rng_state);
     float dy = rand(rng_state);
@@ -226,6 +226,8 @@ __kernel void photonmap(__constant const Rectangle *window, __constant const Rec
     float r = rand(&rng_state) * 40; //warm-up / decorrelate individual RNGs
     for (int i = 0; i < r; i++)
         rand(&rng_state);   
+    
+    //printf("kernel supplied with %d rectangles\n", numRects);
     
     for (int i = 0; i < 1000; i++)
         tracePhoton(&rng_state, window, rects, numRects, lightColors, TILE_SIZE);

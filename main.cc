@@ -114,18 +114,19 @@ Vector3 getColor(Vector3 ray_src, Vector3 ray_dir, Rectangle* objects, int numOb
 
 void loadGeometry()
 {
-    static const Vector3 wallColor = createVector3(0.8, 0.8, 0.8);
     
     vector<Rectangle> rects = parseLayout("out.png", 1.0);
-    numObjects = 2 + rects.size();
+    numObjects = rects.size();
+    //are to be passed to openCL --> have to be aligned to 16byte boundary
     if (0 != posix_memalign((void**)&objects, 16, numObjects * sizeof(Rectangle))) return;
-    //objects = (Rectangle*)malloc( numObjects * sizeof(Rectangle));
-    objects[0] = createRectangleWithColor( createVector3(0,0,0), createVector3(0, 1000, 0), createVector3(1000, 0, 0), wallColor);    // floor
-    objects[1] = createRectangleWithColor( createVector3(0,0,200), createVector3(1000, 0, 0), createVector3(0, 1000, 0), wallColor);  // ceiling
 
-    int idx = 2;    
+    int idx = 0;
     for ( vector<Rectangle>::const_iterator it = rects.begin(); it != rects.end(); it++)
+    {
+        //cout << "rectangle has " << getArea(&(*it)) / getNumTiles(&(*it)) << "cm²/tile" << endl;
+    
         objects[idx++] = *it;
+    }
 
     numLightColors = 0;
     for ( int i = 0; i < numObjects; i++)
@@ -133,6 +134,8 @@ void loadGeometry()
         objects[i].lightBaseIdx = numLightColors;
         numLightColors += getNumTiles(&objects[i]);
     }
+
+    cout << "total of " << numLightColors << " individual light texels" << endl;
 
     if (0 != posix_memalign( (void**) &lightColors, 16, numLightColors * sizeof(Vector3)))
     {
@@ -207,7 +210,7 @@ void getFittingEnvironment( cl_platform_id /*out*/*platform_id, cl_device_id /*o
 {
     list<pair<cl_platform_id, cl_device_id>> environments = getEnvironments();
 
-     cout << "found " << environments.size() << " CL compute environments:" << endl;
+     cout << "found " << environments.size() << " CL compute environment(s):" << endl;
     for (list<pair<cl_platform_id, cl_device_id>>::const_iterator env = environments.begin(); env != environments.end(); env++)
     {
         cout << "\tplatform " << env->first << ", device " << env->second << ": '" << getDeviceString(env->second) << "'" << endl;
@@ -234,8 +237,6 @@ void initCl(cl_context *ctx, cl_device_id *device_id) {
 
     cl_platform_id platform_id;
     getFittingEnvironment( &platform_id, device_id);
-    #warning debug-exit
-    exit(0);
     cl_context_properties properties[] = {CL_CONTEXT_PLATFORM, (cl_context_properties)platform_id, 0};
 
     cl_int status;
@@ -324,7 +325,7 @@ int main()
 
 
     cl_mem rectBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY |CL_MEM_COPY_HOST_PTR, numObjects * sizeof(Rectangle),(void *) objects, NULL);
-    cout << "rectBuffer: " << rectBuffer << endl;
+    //cout << "rectBuffer: " << rectBuffer << endl;
 
     /* ================= */
     /* SET ACCURACY HERE */
@@ -353,26 +354,31 @@ int main()
         
         cout << "Photon-Mapping window " << (i+1) << "/" << windows.size() << " with " << (int)(numSamples/1000) << "M samples" << endl;
 
+        cl_int st = 0;
         cl_int status = 0;
-	    cl_mem lightColorsBuffer = clCreateBuffer(ctx, CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR, numLightColors * sizeof(cl_float3),(void *) lightColors, &status);
-        cout << "clCreateBuffer: " << status << endl;
+	    cl_mem lightColorsBuffer = clCreateBuffer(ctx, CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR, numLightColors * sizeof(cl_float3),(void *) lightColors, &st);
+	    status |= st;
+        //cout << "clCreateBuffer: " << status << endl;
 
-	    cl_mem windowBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY| CL_MEM_USE_HOST_PTR , sizeof(Rectangle),(void *)&window, &status );
-        cout << "clCreateBuffer: " << status << endl;
+	    cl_mem windowBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY| CL_MEM_USE_HOST_PTR , sizeof(Rectangle),(void *)&window, &st );
+	    status |= st;
+        //cout << "clCreateBuffer: " << status << endl;
 
-        cl_kernel kernel = clCreateKernel(prog,"photonmap", &status);
-        cout << "clCreateKernel: " << status << endl;
+        cl_kernel kernel = clCreateKernel(prog,"photonmap", &st);
+	    status |= st;
+        //cout << "clCreateKernel: " << status << endl;
 
         status = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&windowBuffer);
         status |= clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&rectBuffer);
         status |= clSetKernelArg(kernel, 2, sizeof(cl_int), (void *)&numObjects);
         status |= clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&lightColorsBuffer);
         status |= clSetKernelArg(kernel, 4, sizeof(cl_float), (void *)&TILE_SIZE);
-        cout << "clSetKernelArg: " << status << endl;
 
         size_t workSize = numSamples;
-    	status = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &workSize, NULL, 0, NULL, NULL);
-    	cout << "clEnqueueNDRangeKernel: " << status << endl;
+    	status |= clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &workSize, NULL, 0, NULL, NULL);
+    	if (status)
+        	cout << "preparation errors: " << status << endl;
+        	
         clEnqueueReadBuffer(queue, lightColorsBuffer, CL_TRUE, 0, numLightColors * sizeof(cl_float3),  (void *) lightColors, 0, NULL, NULL);
         clFinish(queue);
         clReleaseKernel(kernel);
@@ -403,12 +409,12 @@ int main()
     
 
     //Vector3 light_pos(1,1,1);
-    Vector3 cam_pos = createVector3(420,882,120);
+    /*Vector3 cam_pos = createVector3(420,882,120);
     Vector3 cam_dir = normalized( sub( createVector3(320, 205, 120), cam_pos));
     Vector3 cam_up  = createVector3(0,0,1);
 
     Vector3 cam_right = normalized( cross(cam_up,cam_dir) );
-    cam_up   = normalized( cross(cam_right, cam_dir) );
+    cam_up   = normalized( cross(cam_right, cam_dir) );*/
     //std::cout << "cam_right: " << cam_right << endl;
     //std::cout << "cam_up: " << cam_up << endl;
     //std::cout << "cam_dir: " << cam_dir << endl;
