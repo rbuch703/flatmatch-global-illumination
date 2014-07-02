@@ -115,7 +115,7 @@ Vector3 getColor(Vector3 ray_src, Vector3 ray_dir, Rectangle* objects, int numOb
 void loadGeometry()
 {
     
-    vector<Rectangle> rects = parseLayout("out.png", 1.0);
+    vector<Rectangle> rects = parseLayout("out.png", 1000.0/720); //720px ^= 1000cm --> 1000/720 cm/px
     numObjects = rects.size();
     //are to be passed to openCL --> have to be aligned to 16byte boundary
     if (0 != posix_memalign((void**)&objects, 16, numObjects * sizeof(Rectangle))) return;
