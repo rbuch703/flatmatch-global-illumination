@@ -8,7 +8,7 @@ extern "C" {
 #ifdef __APPLE__
     #include <OpenCL/cl.h>
 #else
-    #include <cl.h>
+    #include <CL/cl.h>
 #endif
 
 typedef cl_float3 Vector3;

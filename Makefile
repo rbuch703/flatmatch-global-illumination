@@ -7,15 +7,17 @@ OBJ_C  = $(SRC_C:.c=.o)
 OBJ_CC = $(SRC_CC:.cc=.oo)
 OBJ    = $(OBJ_C) $(OBJ_CC)
 
-OPT_FLAGS = #-O2 
-FLAGS = -g -Wall -Wextra -msse3 -I /usr/local/include -framework OpenCL
+OPT_FLAGS = -O0
+OSX_INCLUDES = -I /usr/local/include -framework OpenCL
+OSX_LIBS = #-L /usr/local/lib -framework OpenCL
+FLAGS = -g -Wall -Wextra -msse3 $(OPT_FLAGS)
 PROFILE = 
 #PROFILE = -fprofile-generate
 #PROFILE = -fprofile-use
 
-CFLAGS = $(FLAGS) $(PROFILE) -std=c99
-CCFLAGS = $(FLAGS) $(PROFILE) -std=c++11
-LD_FLAGS = $(PROFILE) -L /usr/local/lib -framework OpenCL -lm -flto $(OPT_FLAGS) 
+CFLAGS = $(FLAGS) $(PROFILE) -std=c99 #$(OSX_INCLUDES)
+CCFLAGS = $(FLAGS) $(PROFILE) -std=c++11 #$(OSX_INCLUDES)
+LD_FLAGS = $(PROFILE) $(OSX_LIBS) -lOpenCL -lm -flto $(OPT_FLAGS) 
 .PHONY: all clean
 
 all: make.dep radiosity tiles

@@ -147,29 +147,34 @@ void loadGeometry()
         lightColors[i] = createVector3(0,0,0);
 }
 
-string getDeviceString(cl_device_id dev_id)
+const char* getDeviceString(cl_device_id dev_id)
 {
-    size_t res_size;
-    //cout << "device " << dev_id << endl;
-
-    clGetDeviceInfo( dev_id,   CL_DEVICE_NAME , 0, NULL, &res_size);
-    //cout << "\t result size is " << res_size << " bytes" << endl;
-    
-    char * res = new char[res_size];
-    res[0] = 0;
+    static char deviceString[1000];
+    deviceString[0] = 0;
     
     #ifndef NDEBUG
     cl_int status =
     #endif
-        clGetDeviceInfo( dev_id,   CL_DEVICE_NAME  , res_size, res, NULL);
+        clGetDeviceInfo( dev_id,   CL_DEVICE_NAME  , 1000, deviceString, NULL);
     assert(status == CL_SUCCESS);
     
-    string name(res);
-    //cout << "\t status code is " << status << endl;
-  	//cout << "\t has name '" << res << "'" << endl;
-  	delete [] res;
-  	return name;
+  	return deviceString;
 }
+
+const char* getPlatformString(cl_platform_id platform_id)
+{
+    static char str[1000];
+    str[0] = 0;
+    
+    #ifndef NDEBUG
+    cl_int status =
+    #endif
+        clGetPlatformInfo( platform_id, CL_PLATFORM_NAME, 1000, str, NULL);
+    assert(status == CL_SUCCESS);
+    
+  	return str;
+}
+
 
 void clErrorFunc ( const char *errinfo, const void * /*private_info*/, size_t /*cb*/, void * /*user_data*/)
 {
@@ -182,7 +187,6 @@ list<pair<cl_platform_id, cl_device_id>> getEnvironments()
     list<pair<cl_platform_id, cl_device_id>> environments;
     cl_uint numPlatforms = 0;	//the NO. of platforms
     clGetPlatformIDs(0, NULL, &numPlatforms);
-    assert( numPlatforms == 1);
     
 	cl_platform_id *platforms = (cl_platform_id* )malloc(numPlatforms* sizeof(cl_platform_id));
 	clGetPlatformIDs(numPlatforms, platforms, NULL);
@@ -213,7 +217,7 @@ void getFittingEnvironment( cl_platform_id /*out*/*platform_id, cl_device_id /*o
     cout << "found " << environments.size() << " CL compute environment(s):" << endl;
     for (list<pair<cl_platform_id, cl_device_id>>::const_iterator env = environments.begin(); env != environments.end(); env++)
     {
-        cout << "device '" << getDeviceString(env->second) << "' (" << env->second << ")" << endl;
+        cout << "platform '" << getPlatformString(env->first) << "', device '" << getDeviceString(env->second) << "' (" << env->second << ")" << endl;
     }
     
     // traverse the list from end to start. This heuristic helps to select a non-primary GPU as the device (if present)
@@ -235,13 +239,20 @@ void getFittingEnvironment( cl_platform_id /*out*/*platform_id, cl_device_id /*o
     
     //2nd pass: no GPU or dedicated accelerator found --> fall back to CPU or default implementations
     assert (environments.size() >= 1 && "No suitable OpenCL-capable device found");
-
-    *platform_id = environments.front().first;
-    *device_id = environments.front().second;
+    list<pair<cl_platform_id, cl_device_id>>::const_iterator env = environments.begin();
+    
+    *platform_id = env->first;
+    *device_id = env->second;
+    
+    env++;
+    //test code: (arbitrarily) select the second platform
+    /*if (env != environments.end())
+    {
+        *platform_id = env->first;
+        *device_id = env->second;
+    }*/
     return;
     
-    //*platform_id = -1;
-    //*device_id = -1;	
 }
 
 void initCl(cl_context *ctx, cl_device_id *device_id) {
@@ -258,6 +269,7 @@ void initCl(cl_context *ctx, cl_device_id *device_id) {
 
     cl_platform_id platform_id;
     getFittingEnvironment( &platform_id, device_id);
+    cout << "selected platform " << (platform_id) << ", device " << (*device_id) << endl;
     cl_context_properties properties[] = {CL_CONTEXT_PLATFORM, (cl_context_properties)platform_id, 0};
 
     cl_int status;
@@ -298,7 +310,8 @@ cl_program createProgram(cl_context ctx, cl_device_id device, const char* src)
 	assert(status == CL_SUCCESS);
 
 	//status = clBuildProgram(program, 1,&device,"-g -cl-opt-disable",NULL,NULL);
-	status = clBuildProgram(program, 1,&device,NULL,NULL,NULL);
+	//status = clBuildProgram(program, 1,&device,NULL,NULL,NULL);
+	status = clBuildProgram(program, 1,&device,"-cl-fast-relaxed-math",NULL,NULL);
     cout << "clBuildProgram: " << status << endl;
 	assert(status == CL_SUCCESS);
     //if (status != CL_SUCCESS)
@@ -351,7 +364,7 @@ int main()
     /* ================= */
     /* SET ACCURACY HERE */
     /* ================= */
-    static const int numSamplesPerArea = 100000;
+    static const int numSamplesPerArea = 100;
 
     cl_int st = 0;
     cl_int status = 0;
@@ -396,12 +409,14 @@ int main()
         	if (status)
             	cout << "preparation errors: " << status << endl;
 
-        //FIXME: rewrite this code to 
+        //FIXME: rewrite this code to be able to always have two kernels enqueued at the same time to maximize 
+        //       performance (but not more than two kernels as this stresses GPUs too much
+        
         while (numSamples)
         {
             cout << "\rPhoton-Mapping window " << (i+1) << "/" << windows.size() << " with " << (int)(numSamples*100/1000000) << "M samples   " << flush;
             
-            size_t workSize = numSamples < 100000 ? numSamples : 100000;  //openCL becomes unstable on ATI GPUs with work sizes > 40000 items
+            size_t workSize = numSamples < 40000 ? numSamples : 40000;  //openCL becomes unstable on ATI GPUs with work sizes > 40000 items
             numSamples -=workSize;
 
             	status |= clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &workSize, NULL, 0, NULL, NULL);
@@ -415,10 +430,11 @@ int main()
         clReleaseKernel(kernel);
         clReleaseMemObject(windowBuffer);
     }
-    clReleaseMemObject(rectBuffer);
-
-    clEnqueueReadBuffer(queue, lightColorsBuffer, CL_TRUE, 0, numLightColors * sizeof(cl_float3),  (void *) lightColors, 0, NULL, NULL);
     clFinish(queue);
+    clEnqueueReadBuffer(queue, lightColorsBuffer, CL_TRUE, 0, numLightColors * sizeof(cl_float3),  (void *) lightColors, 0, NULL, NULL);
+
+    clFinish(queue);
+    clReleaseMemObject(rectBuffer);
     clReleaseMemObject(lightColorsBuffer);
 
     //FIXME: normalize lightColors by actual tile size (which varies from rect to rect)
