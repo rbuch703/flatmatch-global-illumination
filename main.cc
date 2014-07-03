@@ -210,17 +210,38 @@ void getFittingEnvironment( cl_platform_id /*out*/*platform_id, cl_device_id /*o
 {
     list<pair<cl_platform_id, cl_device_id>> environments = getEnvironments();
 
-     cout << "found " << environments.size() << " CL compute environment(s):" << endl;
+    cout << "found " << environments.size() << " CL compute environment(s):" << endl;
     for (list<pair<cl_platform_id, cl_device_id>>::const_iterator env = environments.begin(); env != environments.end(); env++)
     {
-        cout << "\tplatform " << env->first << ", device " << env->second << ": '" << getDeviceString(env->second) << "'" << endl;
+        cout << "device '" << getDeviceString(env->second) << "' (" << env->second << ")" << endl;
     }
     
-    assert (environments.size() == 1 && "Heuristic for environment selection not implemented");
+    // traverse the list from end to start. This heuristic helps to select a non-primary GPU as the device (if present)
+    // Since the non-primary GPU is usually not concerned with screen rendering, using it with OpenCL should not impact
+    // computer usage, while using the primary GPU may result in screen freezes during heavy OpenCL load
+    for (list<pair<cl_platform_id, cl_device_id>>::reverse_iterator env = environments.rbegin(); env != environments.rend(); env++)
+    {
+        cl_device_type device_type = 0;
+        	cl_int res = clGetDeviceInfo (env->second, CL_DEVICE_TYPE, sizeof(cl_device_type), &device_type, NULL);
+        	assert(res == CL_SUCCESS);
+        
+        if ( device_type == CL_DEVICE_TYPE_ACCELERATOR || device_type == CL_DEVICE_TYPE_GPU)
+        {
+            *platform_id = env->first;
+            *device_id = env->second;
+            return;
+        }
+    }
     
+    //2nd pass: no GPU or dedicated accelerator found --> fall back to CPU or default implementations
+    assert (environments.size() >= 1 && "No suitable OpenCL-capable device found");
+
     *platform_id = environments.front().first;
-    *device_id   = environments.front().second;
+    *device_id = environments.front().second;
+    return;
     
+    //*platform_id = -1;
+    //*device_id = -1;	
 }
 
 void initCl(cl_context *ctx, cl_device_id *device_id) {
@@ -330,8 +351,13 @@ int main()
     /* ================= */
     /* SET ACCURACY HERE */
     /* ================= */
-    static const int numSamplesPerArea = 1000;
+    static const int numSamplesPerArea = 100000;
 
+    cl_int st = 0;
+    cl_int status = 0;
+
+    cl_mem lightColorsBuffer = clCreateBuffer(ctx, CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR, numLightColors * sizeof(cl_float3),(void *) lightColors, &st);
+    status |= st;
     
     for ( unsigned int i = 0; i < windows.size(); i++)
     {
@@ -347,17 +373,11 @@ int main()
         
         //float area = xDir.length() * yDir.length();
         float area = length(xDir) * length(yDir);
-        int numSamples = numSamplesPerArea * area/ 1000; //  the OpenCL kernel does 1000 iterations per call)
+        int64_t numSamples = numSamplesPerArea * area/ 100; //  the OpenCL kernel does 10000 iterations per call)
          
         //Vector3 xNorm = normalized(xDir);
         //Vector3 yNorm = normalized(yDir);
         
-        cout << "Photon-Mapping window " << (i+1) << "/" << windows.size() << " with " << (int)(numSamples/1000) << "M samples" << endl;
-
-        cl_int st = 0;
-        cl_int status = 0;
-	    cl_mem lightColorsBuffer = clCreateBuffer(ctx, CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR, numLightColors * sizeof(cl_float3),(void *) lightColors, &st);
-	    status |= st;
         //cout << "clCreateBuffer: " << status << endl;
 
 	    cl_mem windowBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY| CL_MEM_USE_HOST_PTR , sizeof(Rectangle),(void *)&window, &st );
@@ -373,19 +393,33 @@ int main()
         status |= clSetKernelArg(kernel, 2, sizeof(cl_int), (void *)&numObjects);
         status |= clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&lightColorsBuffer);
         status |= clSetKernelArg(kernel, 4, sizeof(cl_float), (void *)&TILE_SIZE);
+        	if (status)
+            	cout << "preparation errors: " << status << endl;
 
-        size_t workSize = numSamples;
-    	status |= clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &workSize, NULL, 0, NULL, NULL);
-    	if (status)
-        	cout << "preparation errors: " << status << endl;
+        //FIXME: rewrite this code to 
+        while (numSamples)
+        {
+            cout << "\rPhoton-Mapping window " << (i+1) << "/" << windows.size() << " with " << (int)(numSamples*100/1000000) << "M samples   " << flush;
+            
+            size_t workSize = numSamples < 100000 ? numSamples : 100000;  //openCL becomes unstable on ATI GPUs with work sizes > 40000 items
+            numSamples -=workSize;
+
+            	status |= clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &workSize, NULL, 0, NULL, NULL);
+            //clFinish(queue);
+            	if (status)
+                	cout << "preparation errors: " << status << endl;
+            clFinish(queue);
+    	    }
+    	    cout << endl;
         	
-        clEnqueueReadBuffer(queue, lightColorsBuffer, CL_TRUE, 0, numLightColors * sizeof(cl_float3),  (void *) lightColors, 0, NULL, NULL);
-        clFinish(queue);
         clReleaseKernel(kernel);
-        clReleaseMemObject(lightColorsBuffer);
         clReleaseMemObject(windowBuffer);
     }
     clReleaseMemObject(rectBuffer);
+
+    clEnqueueReadBuffer(queue, lightColorsBuffer, CL_TRUE, 0, numLightColors * sizeof(cl_float3),  (void *) lightColors, 0, NULL, NULL);
+    clFinish(queue);
+    clReleaseMemObject(lightColorsBuffer);
 
     //FIXME: normalize lightColors by actual tile size (which varies from rect to rect)
     for ( int i = 0; i < numLightColors; i++)

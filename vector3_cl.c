@@ -3,7 +3,7 @@
 
 #include <math.h>
 
-typedef cl_float3 Vector3;
+//typedef cl_float3 Vector3;
 
 
 Vector3 add(Vector3 a, Vector3 b) { Vector3 res = { s: {a.s[0]+b.s[0], a.s[1]+b.s[1], a.s[2]+b.s[2]} }; return res;}

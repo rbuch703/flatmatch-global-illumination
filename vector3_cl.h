@@ -5,9 +5,11 @@
 extern "C" {
 #endif
 
-/* the vector3 class is a performance hotspot. It should therefore stay in a 
-header file in order to allow for more agressive inlining by the compiler*/
-#include <CL/cl.h>
+#ifdef __APPLE__
+    #include <OpenCL/cl.h>
+#else
+    #include <cl.h>
+#endif
 
 typedef cl_float3 Vector3;
 

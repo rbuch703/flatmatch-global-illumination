@@ -7,6 +7,15 @@ typedef struct __attribute__ ((aligned(16))) Rectangle{
     int lightBaseIdx;
 } Rectangle;
 
+float rand(ulong *rng_state);
+float3 getDiffuseSkyRandomRay(ulong *rng_state, const float3 ndir/*, const float3 udir, const float3 vdir*/);
+float3 getCosineDistributedRandomRay(ulong *rng_state, const float3 ndir);
+int getTileIdAt(__constant const Rectangle *rect, const float3 p, const float TILE_SIZE);
+float intersects( __constant const Rectangle *rect, const float3 ray_src, const float3 ray_dir, const float closestDist);
+void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constant const Rectangle* rects, const int numRects, __global float3 *lightColors, const float TILE_SIZE);
+
+
+
 //generates float random numbers in the interval [0..1]
 float rand(ulong *rng_state)
 {
@@ -229,7 +238,7 @@ __kernel void photonmap(__constant const Rectangle *window, __constant const Rec
     
     //printf("kernel supplied with %d rectangles\n", numRects);
     
-    for (int i = 0; i < 1000; i++)
+    for (int i = 0; i < 100; i++)
         tracePhoton(&rng_state, window, rects, numRects, lightColors, TILE_SIZE);
 }
 
