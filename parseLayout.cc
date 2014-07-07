@@ -24,7 +24,7 @@ string getColorName(uint32_t col)
 }
 
 static const Vector3 wallColor = createVector3(0.8, 0.8, 0.8);
-static const Vector3 windowColor = createVector3(15, 14, 12);
+static const Vector3 windowColor = createVector3(18, 16, 12);
 
 static const uint32_t BLACK = 0xFF000000;
 static const uint32_t WHITE = 0xFFFFFFFF;
@@ -45,15 +45,15 @@ void addWindowedWall(float startX, float startY, float dx, float dy, float scali
     dx *= scaling;
     dy *= scaling;
     
-    segments.push_back(createRectangleWithColor( createVector3(startX,startY,0),  
+    segments.push_back(createRectangle( createVector3(startX,startY,0),  
                                                  createVector3(dx, dy, 0), 
-                                                 createVector3(0, 0, WINDOW_LOW), wallColor ));
-    segments.push_back(createRectangleWithColor( createVector3(startX,startY,WINDOW_LOW), 
+                                                 createVector3(0, 0, WINDOW_LOW)));
+    segments.push_back(createRectangle( createVector3(startX,startY,WINDOW_LOW), 
                                                  createVector3(dx, dy, 0), 
-                                                 createVector3(0, 0, WINDOW_HEIGHT), windowColor));
-    segments.push_back(createRectangleWithColor( createVector3(startX,startY,WINDOW_HIGH), 
+                                                 createVector3(0, 0, WINDOW_HEIGHT)));
+    segments.push_back(createRectangle( createVector3(startX,startY,WINDOW_HIGH), 
                                                  createVector3(dx, dy, 0), 
-                                                 createVector3(0, 0, TOP_WALL_HEIGHT), wallColor));
+                                                 createVector3(0, 0, TOP_WALL_HEIGHT)));
 }
 
 void addWall(float startX, float startY, float dx, float dy, float scaling, /*ref*/ list<Rectangle> &segments)
@@ -63,9 +63,9 @@ void addWall(float startX, float startY, float dx, float dy, float scaling, /*re
     dx *= scaling;
     dy *= scaling;
 
-    segments.push_back(createRectangleWithColor( createVector3(startX,startY,0),
+    segments.push_back(createRectangle( createVector3(startX,startY,0),
                                                  createVector3(dx,dy,0),
-                                                 createVector3(0,0,HEIGHT), wallColor));
+                                                 createVector3(0,0,HEIGHT)));
 }
 
 
@@ -171,12 +171,12 @@ vector<Rectangle> parseLayout(const char* const filename, const float scaling) {
     cout << "floor/ceiling size is: (" << min_x << ", " << min_y << "), " << (max_x - min_x) << "x" << (max_y - min_y) << endl;
 
   
-    segments.push_front( createRectangleWithColor( createVector3(min_x,min_y,HEIGHT), 
-                                                   createVector3(max_x - min_x, 0, 0), 
-                                                   createVector3(0, max_y - min_y, 0), wallColor));  // ceiling
-    segments.push_front( createRectangleWithColor( createVector3(min_x,min_y,0), 
-                                                   createVector3(0, max_y-min_y, 0), 
-                                                   createVector3(max_x-min_x, 0, 0), wallColor));    // floor
+    segments.push_front( createRectangle( createVector3(min_x,min_y,HEIGHT), 
+                                          createVector3(max_x - min_x, 0, 0), 
+                                          createVector3(0, max_y - min_y, 0)));  // ceiling
+    segments.push_front( createRectangle( createVector3(min_x,min_y,0), 
+                                          createVector3(0, max_y-min_y, 0), 
+                                          createVector3(max_x-min_x, 0, 0)));    // floor
     
     cout << "registered " << segments.size() << " wall segments" << endl;
     return vector<Rectangle>(segments.begin(), segments.end());

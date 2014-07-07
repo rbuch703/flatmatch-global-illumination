@@ -3,8 +3,9 @@ typedef struct __attribute__ ((aligned(16))) Rectangle{
     float3 pos;
     float3 width, height;
     float3 n;
-    float3 color;
+//    float3 color;
     int lightBaseIdx;
+    int lightNumTiles;
 } Rectangle;
 
 float rand(ulong *rng_state);
@@ -12,7 +13,7 @@ float3 getDiffuseSkyRandomRay(ulong *rng_state, const float3 ndir/*, const float
 float3 getCosineDistributedRandomRay(ulong *rng_state, const float3 ndir);
 int getTileIdAt(__constant const Rectangle *rect, const float3 p, const float TILE_SIZE);
 float intersects( __constant const Rectangle *rect, const float3 ray_src, const float3 ray_dir, const float closestDist);
-void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constant const Rectangle* rects, const int numRects, __global float3 *lightColors, const float TILE_SIZE);
+void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constant const Rectangle* rects, const int numRects, __global float3 *lightColors, /*const int numLightColors,*/ const float TILE_SIZE);
 
 
 
@@ -102,13 +103,18 @@ int getTileIdAt(__constant const Rectangle *rect, const float3 p, const float TI
     float dy = dot( rect->height / vLength, pDir);
 
     
-    int hNumTiles = max( (int)round(hLength / TILE_SIZE), 1);
-    int vNumTiles = max( (int)round(vLength / TILE_SIZE), 1);
-    
+    int hNumTiles = max( (int)ceil(hLength / TILE_SIZE), 1);
+    int vNumTiles = max( (int)ceil(vLength / TILE_SIZE), 1);
+    //printf("rectangle has %dx%d tiles\n", hNumTiles, vNumTiles);
     //FIXME: check whether a float->int conversion in OpenCL also is round-towards-zero
-    int tx = clamp( (int)((dx * hNumTiles) / hLength), 0, hNumTiles-1);
-    int ty = clamp( (int)((dy * vNumTiles) / vLength), 0, vNumTiles-1);
+    int tx = clamp( (int)(dx * hNumTiles / hLength), 0, hNumTiles-1);
+    int ty = clamp( (int)(dy * vNumTiles / vLength), 0, vNumTiles-1);
     
+    /*if (ty * hNumTiles + tx >= rect->lightNumTiles)
+    {
+        printf("Invalid tile index %d in rect %#x\n", ty * hNumTiles + tx, rect);
+        return 0;
+    }*/
     //assert(ty * hNumTiles + tx < getNumTiles(rect));
     return ty * hNumTiles + tx;
 }
@@ -153,10 +159,10 @@ float intersects( __constant const Rectangle *rect, const float3 ray_src, const 
 
 
 void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constant const Rectangle* rects, const int numRects,
-                        __global float3 *lightColors, const float TILE_SIZE)
+                        __global float3 *lightColors, /*const int numLightColors,*/ const float TILE_SIZE)
 {
 
-    float3 lightColor = window->color;
+    float3 lightColor = (float3)(18, 16, 12);//window->color;
 
     const int MAX_DEPTH = 8;
 
@@ -195,21 +201,26 @@ void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constan
         if (dist_out == INFINITY)
             return;
             
-        if ( hitObj->color.x > 1.0f || hitObj->color.y > 1.0f || hitObj->color.z > 1.0f)
-            return; //hit a light source;
+        //if ( hitObj->color.x > 1.0f || hitObj->color.y > 1.0f || hitObj->color.z > 1.0f)
+        //    return; //hit a light source;
             
         //hit_obj[get_global_id(0)] = closestObject;
         float3 hit_pos = pos + ray_dir * dist_out;
         
-
         int tile_id = getTileIdAt( hitObj, hit_pos, TILE_SIZE);
         int light_idx = hitObj->lightBaseIdx + tile_id;
-
+        
+        /*if (light_idx >= numLightColors)
+        {
+            printf("invalid light index %d\n", light_idx);
+            return;
+        }*/
+    
         //FIXME: make this increment atomic
         lightColors[ light_idx ] += 
             lightColor;
             
-        lightColor *= (hitObj->color*0.9f);
+        lightColor *= /*(hitObj->color**/0.9f;
         //printf ("lightColor %d/%d is (%f, %f, %f)\n", get_global_id(0), depth, lightColor.x, lightColor.y, lightColor.z);
         
         pos = hit_pos;
@@ -227,11 +238,9 @@ void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constan
 
 
 __kernel void photonmap(__constant const Rectangle *window, __constant const Rectangle* rects, int numRects,
-                        __global float3 *lightColors, float TILE_SIZE)
+                        __global float3 *lightColors/*, const int numLightColors*/, float TILE_SIZE, int rng_offset)
 {
-
-    size_t item_id = get_global_id(0);
-    ulong rng_state = item_id;
+    ulong rng_state = get_global_id(0) + rng_offset;
     float r = rand(&rng_state) * 40; //warm-up / decorrelate individual RNGs
     for (int i = 0; i < r; i++)
         rand(&rng_state);   
@@ -239,6 +248,6 @@ __kernel void photonmap(__constant const Rectangle *window, __constant const Rec
     //printf("kernel supplied with %d rectangles\n", numRects);
     
     for (int i = 0; i < 100; i++)
-        tracePhoton(&rng_state, window, rects, numRects, lightColors, TILE_SIZE);
+        tracePhoton(&rng_state, window, rects, numRects, lightColors/*, numLightColors*/, TILE_SIZE);
 }
 

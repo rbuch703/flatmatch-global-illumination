@@ -88,6 +88,7 @@ Rectangle* getClosestObject(const Vector3 &ray_src, const Vector3 &ray_dir, Rect
     return closestObject;
 }
 
+/*
 Vector3 getObjectColorAt(Rectangle* rect, Vector3 pos)
 {
     
@@ -95,8 +96,9 @@ Vector3 getObjectColorAt(Rectangle* rect, Vector3 pos)
     return createVector3( light.s[0] * rect->color.s[0],
                           light.s[1] * rect->color.s[1],
                           light.s[2] * rect->color.s[2]);
-}
+}*/
 
+#if 0
 Vector3 getColor(Vector3 ray_src, Vector3 ray_dir, Rectangle* objects, int numObjects/*, int depth = 0*/)
 {
 
@@ -110,7 +112,7 @@ Vector3 getColor(Vector3 ray_src, Vector3 ray_dir, Rectangle* objects, int numOb
     Vector3 intersect_pos = add(ray_src, mul(ray_dir, hitDist));
     return getObjectColorAt(hitObject, intersect_pos);
 }
-
+#endif
 
 void loadGeometry()
 {
@@ -132,6 +134,7 @@ void loadGeometry()
     for ( int i = 0; i < numObjects; i++)
     {
         objects[i].lightBaseIdx = numLightColors;
+        objects[i].lightNumTiles = getNumTiles(&objects[i]);
         numLightColors += getNumTiles(&objects[i]);
     }
 
@@ -230,6 +233,7 @@ void getFittingEnvironment( cl_platform_id /*out*/*platform_id, cl_device_id /*o
         	assert(res == CL_SUCCESS);
         
         if ( device_type == CL_DEVICE_TYPE_ACCELERATOR || device_type == CL_DEVICE_TYPE_GPU)
+        //if ( device_type == CL_DEVICE_TYPE_CPU)
         {
             *platform_id = env->first;
             *device_id = env->second;
@@ -313,8 +317,8 @@ cl_program createProgram(cl_context ctx, cl_device_id device, const char* src)
 	//status = clBuildProgram(program, 1,&device,NULL,NULL,NULL);
 	status = clBuildProgram(program, 1,&device,"-cl-fast-relaxed-math",NULL,NULL);
     cout << "clBuildProgram: " << status << endl;
-	assert(status == CL_SUCCESS);
-    //if (status != CL_SUCCESS)
+	//assert(status == CL_SUCCESS);
+    if (status != CL_SUCCESS)
     {
         size_t size = 0;
         clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, NULL, &size);
@@ -322,8 +326,8 @@ cl_program createProgram(cl_context ctx, cl_device_id device, const char* src)
         clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, size, msg, NULL);
         cout << msg << endl;
         free(msg);
-        //cout << "Compilation errors found, exiting ..." << endl;
-        //exit(0);
+        cout << "Compilation errors found, exiting ..." << endl;
+        exit(0);
         //return 0;   
     }
     return program;
@@ -339,8 +343,9 @@ int main()
     for ( int i = 0; i < numObjects; i++)
     {
         //Color3 col = (*it)->getColor( (*it)->getTileCenter(0) );
-        Vector3 col = objects[i].color;
-        if (col.s[0] > 1 || col.s[1] > 1 || col.s[2] > 1)
+        if (objects[i].pos.s[2] == 0.90 * 100)
+        //Vector3 col = objects[i].color;
+        //if (col.s[0] > 1 || col.s[1] > 1 || col.s[2] > 1)
             windows.push_back( objects[i]);
     }
     cout << "Registered " << windows.size() << " windows" << endl;
@@ -364,7 +369,7 @@ int main()
     /* ================= */
     /* SET ACCURACY HERE */
     /* ================= */
-    static const int numSamplesPerArea = 100;
+    static const int numSamplesPerArea = 10000;
 
     cl_int st = 0;
     cl_int status = 0;
@@ -372,42 +377,38 @@ int main()
     cl_mem lightColorsBuffer = clCreateBuffer(ctx, CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR, numLightColors * sizeof(cl_float3),(void *) lightColors, &st);
     status |= st;
     
+    size_t maxWorkGroupSize = 0;
+    clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(maxWorkGroupSize), &maxWorkGroupSize, NULL);
+    cout << "Maximum workgroup size for this device is " << maxWorkGroupSize << endl;
+
     for ( unsigned int i = 0; i < windows.size(); i++)
     {
         Rectangle window = windows[i];
-        /*for (int j = 0; j < getNumTiles(&window); j++)
-            lightColors[ window.lightBaseIdx + j] = createVector3(1, 1, 1);*/
-            
-            //getTile(&window, j).setLightColor(  );
 
-        //Vector3 src = getOrigin(       &window);
         Vector3 xDir= getWidthVector(  &window);
         Vector3 yDir= getHeightVector( &window);
         
         //float area = xDir.length() * yDir.length();
         float area = length(xDir) * length(yDir);
-        int64_t numSamples = numSamplesPerArea * area/ 100; //  the OpenCL kernel does 10000 iterations per call)
+        uint64_t numSamples = numSamplesPerArea * area/ 100; //  the OpenCL kernel does 100 iterations per call)
+        numSamples = (numSamples / maxWorkGroupSize) * maxWorkGroupSize;    //must be a multiple of the local work size
          
-        //Vector3 xNorm = normalized(xDir);
-        //Vector3 yNorm = normalized(yDir);
-        
-        //cout << "clCreateBuffer: " << status << endl;
-
 	    cl_mem windowBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY| CL_MEM_USE_HOST_PTR , sizeof(Rectangle),(void *)&window, &st );
 	    status |= st;
-        //cout << "clCreateBuffer: " << status << endl;
+    	if (status)
+        	cout << "preparation errors: " << status << endl;
 
         cl_kernel kernel = clCreateKernel(prog,"photonmap", &st);
 	    status |= st;
-        //cout << "clCreateKernel: " << status << endl;
 
         status = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&windowBuffer);
         status |= clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&rectBuffer);
         status |= clSetKernelArg(kernel, 2, sizeof(cl_int), (void *)&numObjects);
         status |= clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&lightColorsBuffer);
+        //status |= clSetKernelArg(kernel, 4, sizeof(cl_int), (void *)&numLightColors);
         status |= clSetKernelArg(kernel, 4, sizeof(cl_float), (void *)&TILE_SIZE);
-        	if (status)
-            	cout << "preparation errors: " << status << endl;
+    	if (status)
+        	cout << "preparation errors: " << status << endl;
 
         //FIXME: rewrite this code to be able to always have two kernels enqueued at the same time to maximize 
         //       performance (but not more than two kernels as this stresses GPUs too much
@@ -416,13 +417,16 @@ int main()
         {
             cout << "\rPhoton-Mapping window " << (i+1) << "/" << windows.size() << " with " << (int)(numSamples*100/1000000) << "M samples   " << flush;
             
-            size_t workSize = numSamples < 40000 ? numSamples : 40000;  //openCL becomes unstable on ATI GPUs with work sizes > 40000 items
+            cl_int idx = rand();
+            status |= clSetKernelArg(kernel, 5, sizeof(cl_int), (void *)&idx);
+            
+            size_t workSize = numSamples < maxWorkGroupSize*40 ? numSamples : maxWorkGroupSize*40;  //openCL becomes unstable on ATI GPUs with work sizes > 40000 items
             numSamples -=workSize;
 
-            	status |= clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &workSize, NULL, 0, NULL, NULL);
+            	st = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &workSize, &maxWorkGroupSize, 0, NULL, NULL);
             //clFinish(queue);
-            	if (status)
-                	cout << "preparation errors: " << status << endl;
+            	if (st)
+                	cout << "Kernel execution error: " << st << endl;
             clFinish(queue);
     	    }
     	    cout << endl;
@@ -439,7 +443,7 @@ int main()
 
     //FIXME: normalize lightColors by actual tile size (which varies from rect to rect)
     for ( int i = 0; i < numLightColors; i++)
-        lightColors[i] = div_vec3(lightColors[i], (TILE_SIZE*TILE_SIZE*2*numSamplesPerArea));
+        lightColors[i] = div_vec3(lightColors[i], (TILE_SIZE*TILE_SIZE * 4 * numSamplesPerArea));
 
     for ( unsigned int i = 0; i < windows.size(); i++)
     {

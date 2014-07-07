@@ -12,17 +12,19 @@ extern "C" {
 #include "assert.h"
 
 
-static const float TILE_SIZE = 2;
+static const float TILE_SIZE = 1;
 
 typedef struct __attribute__ ((aligned(16))) Rectangle{
     Vector3 pos, width, height, n;
-    Vector3 color;
+//    Vector3 color;
     int lightBaseIdx;
+    int lightNumTiles;
+//    int hNumTiles, vNumTiles;
+//    float 
 } Rectangle;
 
 
 Rectangle createRectangle( const Vector3 _pos, const Vector3 _width, const Vector3 _height);
-Rectangle createRectangleWithColor( const Vector3 _pos, const Vector3 _width, const Vector3 _height, const Vector3 col);
 float intersects( const Rectangle *rect, Vector3 ray_src, Vector3 ray_dir, float closestDist);
 int getNumTiles(const Rectangle *rect);
 float getArea(const Rectangle *rect);

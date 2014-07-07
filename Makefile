@@ -7,7 +7,7 @@ OBJ_C  = $(SRC_C:.c=.o)
 OBJ_CC = $(SRC_CC:.cc=.oo)
 OBJ    = $(OBJ_C) $(OBJ_CC)
 
-OPT_FLAGS = -O0
+OPT_FLAGS = -O2
 OSX_INCLUDES = -I /usr/local/include -framework OpenCL
 OSX_LIBS = #-L /usr/local/lib -framework OpenCL
 FLAGS = -g -Wall -Wextra -msse3 $(OPT_FLAGS)

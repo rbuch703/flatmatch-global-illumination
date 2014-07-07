@@ -30,15 +30,6 @@ Rectangle createRectangle( const Vector3 _pos, const Vector3 _width, const Vecto
 }
 
 
-Rectangle createRectangleWithColor( const Vector3 _pos, const Vector3 _width, const Vector3 _height, const Vector3 col)
-{
-    Rectangle res = createRectangle(_pos, _width, _height);
-
-    res.color = col;
-        
-    return res;
-}
-
 float intersects( const Rectangle *rect, Vector3 ray_src, Vector3 ray_dir, float closestDist) 
 {
     //if (dot(ray_dir,n) > 0) return -1; //backface culling
@@ -76,8 +67,9 @@ float intersects( const Rectangle *rect, Vector3 ray_src, Vector3 ray_dir, float
 
 int getNumTiles(const Rectangle *rect)
 {
-    int hNumTiles = max( round(length(rect->width) / TILE_SIZE), 1);
-    int vNumTiles = max( round(length(rect->height)/ TILE_SIZE), 1);
+    
+    int hNumTiles = max( ceil(length(rect->width) / TILE_SIZE), 1);
+    int vNumTiles = max( ceil(length(rect->height)/ TILE_SIZE), 1);
 
     return hNumTiles * vNumTiles;
 }
@@ -102,8 +94,8 @@ int getTileIdAt(const Rectangle *rect, const Vector3 p)
     float hLength = length(rect->width);
     float vLength = length(rect->height);
     
-    int hNumTiles = max( round(hLength / TILE_SIZE), 1);
-    int vNumTiles = max( round(vLength / TILE_SIZE), 1);
+    int hNumTiles = max( ceil(hLength / TILE_SIZE), 1);
+    int vNumTiles = max( ceil(vLength / TILE_SIZE), 1);
     
     int tx = (dx * hNumTiles) / hLength;
     int ty = (dy * vNumTiles) / vLength;
@@ -131,8 +123,8 @@ float convert(float color)
 
 void saveAs(const Rectangle *rect, const char *filename, Vector3 *lights)
 {
-    int hNumTiles = max( round(length(rect->width) / TILE_SIZE), 1);
-    int vNumTiles = max( round(length(rect->height)/ TILE_SIZE), 1);
+    int hNumTiles = max( ceil(length(rect->width) / TILE_SIZE), 1);
+    int vNumTiles = max( ceil(length(rect->height)/ TILE_SIZE), 1);
 
     uint8_t *data = (uint8_t*) malloc( hNumTiles * vNumTiles * 3 * sizeof(uint8_t));
     for (int i = 0; i < hNumTiles * vNumTiles; i++)
@@ -141,9 +133,9 @@ void saveAs(const Rectangle *rect, const char *filename, Vector3 *lights)
             col.g = 1 - exp(-col.g);
             col.b = 1 - exp(-col.b);*/
         
-        data[i*3+0] = clamp( convert(rect->color.s[0] * lights[rect->lightBaseIdx + i].s[0])*255);
-        data[i*3+1] = clamp( convert(rect->color.s[1] * lights[rect->lightBaseIdx + i].s[1])*255);
-        data[i*3+2] = clamp( convert(rect->color.s[2] * lights[rect->lightBaseIdx + i].s[2])*255);
+        data[i*3+0] = clamp( convert(lights[rect->lightBaseIdx + i].s[0])*255);
+        data[i*3+1] = clamp( convert(lights[rect->lightBaseIdx + i].s[1])*255);
+        data[i*3+2] = clamp( convert(lights[rect->lightBaseIdx + i].s[2])*255);
     }
     
     write_png_file(filename, hNumTiles, vNumTiles, PNG_COLOR_TYPE_RGB, data);
