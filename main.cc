@@ -369,7 +369,7 @@ int main()
     /* ================= */
     /* SET ACCURACY HERE */
     /* ================= */
-    static const int numSamplesPerArea = 10000;
+    static const int numSamplesPerArea = 1000;
 
     cl_int st = 0;
     cl_int status = 0;
@@ -443,7 +443,7 @@ int main()
 
     //FIXME: normalize lightColors by actual tile size (which varies from rect to rect)
     for ( int i = 0; i < numLightColors; i++)
-        lightColors[i] = div_vec3(lightColors[i], (TILE_SIZE*TILE_SIZE * 4 * numSamplesPerArea));
+        lightColors[i] = div_vec3(lightColors[i], (TILE_SIZE*TILE_SIZE * 3 * numSamplesPerArea));
 
     for ( unsigned int i = 0; i < windows.size(); i++)
     {

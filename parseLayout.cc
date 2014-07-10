@@ -99,6 +99,20 @@ vector<Rectangle> parseLayout(const char* const filename, const float scaling) {
     uint32_t *pixel_buffer;
     read_png_file(filename, &width, &height, &color_type, (uint8_t**)&pixel_buffer );
     cout << "read image of size " << width << "x" << height << " with color_type " << color_type << endl;
+
+    if (color_type == PNG_COLOR_TYPE_RGB)
+    {
+        uint8_t *src = (uint8_t*)pixel_buffer;
+        pixel_buffer = (uint32_t*)malloc( width*height*sizeof(uint32_t));
+        
+        for (int i = 0; i < width*height; i++)
+            pixel_buffer[i] =
+                0xFF000000 | src[i*3] | (src[i*3+1] << 8) | (src[i*3+2] << 16);
+        
+        free(src);
+        color_type = PNG_COLOR_TYPE_RGBA;
+    }
+  
     assert (color_type == PNG_COLOR_TYPE_RGBA);
     
     //segments.push_back(WallSegment( 0, 0, 2, 2));

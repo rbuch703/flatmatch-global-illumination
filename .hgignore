@@ -7,6 +7,6 @@ syntax:glob
 
 *.png
 callgrind.*
-
+*.DS_Store
 radiosity
 make.dep
