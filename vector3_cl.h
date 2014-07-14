@@ -11,7 +11,7 @@ extern "C" {
     #include <CL/cl.h>
 #endif
 
-typedef cl_float3 Vector3;
+typedef cl_float4 Vector3;
 
 Vector3 add(const Vector3 a, const Vector3 b);
 Vector3 sub(const Vector3 a, const Vector3 b);

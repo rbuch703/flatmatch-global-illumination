@@ -6,8 +6,8 @@
 //typedef cl_float3 Vector3;
 
 
-Vector3 add(Vector3 a, Vector3 b) { Vector3 res = { s: {a.s[0]+b.s[0], a.s[1]+b.s[1], a.s[2]+b.s[2]} }; return res;}
-Vector3 sub(Vector3 a, Vector3 b) { Vector3 res = { s: {a.s[0]-b.s[0], a.s[1]-b.s[1], a.s[2]-b.s[2]} }; return res;}
+Vector3 add(Vector3 a, Vector3 b) { Vector3 res = { .s = {a.s[0]+b.s[0], a.s[1]+b.s[1], a.s[2]+b.s[2]} }; return res;}
+Vector3 sub(Vector3 a, Vector3 b) { Vector3 res = { .s = {a.s[0]-b.s[0], a.s[1]-b.s[1], a.s[2]-b.s[2]} }; return res;}
 
 /*inline Vector3 mul(float a, const Vector3 b) { 
     __m128 tmp = _mm_load1_ps(&a);
@@ -15,17 +15,17 @@ Vector3 sub(Vector3 a, Vector3 b) { Vector3 res = { s: {a.s[0]-b.s[0], a.s[1]-b.
 }*/
 
 Vector3 mul(const Vector3 b, float a) { 
-    Vector3 res = {s: {b.s[0]*a, 
-                       b.s[1]*a, 
-                       b.s[2]*a} }; 
+    Vector3 res = {.s = {b.s[0]*a, 
+                         b.s[1]*a, 
+                         b.s[2]*a} }; 
     return res;
 }
 
 Vector3 div_vec3(const Vector3 a, float b) { 
     float rec = 1.0f/b;
-    Vector3 res = {s: {a.s[0]*rec, 
-                       a.s[1]*rec,
-                       a.s[2]*rec} }; 
+    Vector3 res = {.s = {a.s[0]*rec, 
+                         a.s[1]*rec,
+                         a.s[2]*rec} }; 
     return res;
 }
 
@@ -39,7 +39,7 @@ Vector3 createVector3(float _x, float _y, float _z)
 {
     //__attribute__ ((aligned (16))) float tmp[4] = {x,y,z,0.0};
     //return _mm_load_ps(tmp);
-    Vector3 res = {s: {_x, _y, _z} };
+    Vector3 res = {.s = {_x, _y, _z} };
     return res;
 }
 
@@ -50,9 +50,9 @@ float dot(const Vector3 a, const Vector3 b)     //copied from the internet, not 
 
 Vector3 cross(const Vector3 a, const Vector3 b)      //copied from the internet, not verified
 {
-    Vector3 res = {s: { a.s[1]*b.s[2] - a.s[2]*b.s[1], 
-                        a.s[2]*b.s[0] - a.s[0]*b.s[2], 
-                        a.s[0]*b.s[1] - a.s[1]*b.s[0]} };
+    Vector3 res = {.s = { a.s[1]*b.s[2] - a.s[2]*b.s[1], 
+                          a.s[2]*b.s[0] - a.s[0]*b.s[2], 
+                          a.s[0]*b.s[1] - a.s[1]*b.s[0]} };
   return res;
 }
 
@@ -65,9 +65,9 @@ float length(const Vector3 a) { return sqrtf( dot(a,a) ); }
 
 Vector3 normalized(const Vector3 a) {
     float fac = 1.0f / length(a);
-    Vector3 res = {s: {a.s[0] * fac, 
-                       a.s[1] * fac, 
-                       a.s[2] * fac } };
+    Vector3 res = {.s = {a.s[0] * fac, 
+                         a.s[1] * fac, 
+                         a.s[2] * fac } };
     return res;
 }
 

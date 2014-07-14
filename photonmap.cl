@@ -1,5 +1,5 @@
 
-typedef struct __attribute__ ((aligned(16))) Rectangle{
+typedef struct __attribute__ ((aligned(16))) Rectangle {
     float3 pos;
     float3 width, height;
     float3 n;

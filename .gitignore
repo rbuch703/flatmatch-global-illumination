@@ -8,5 +8,5 @@ syntax:glob
 *.png
 callgrind.*
 *.DS_Store
-radiosity
+globalIllumination
 make.dep
