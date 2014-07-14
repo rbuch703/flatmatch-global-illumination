@@ -114,10 +114,10 @@ Vector3 getColor(Vector3 ray_src, Vector3 ray_dir, Rectangle* objects, int numOb
 }
 #endif
 
-void loadGeometry()
+void loadGeometry(string filename, float scale)
 {
     
-    vector<Rectangle> rects = parseLayout("out.png", 1000.0/720); //720px ^= 1000cm --> 1000/720 cm/px
+    vector<Rectangle> rects = parseLayout(filename.c_str(), scale); //720px ^= 1000cm --> 1000/720 cm/px
     numObjects = rects.size();
     //are to be passed to openCL --> have to be aligned to 16byte boundary
     if (0 != posix_memalign((void**)&objects, 16, numObjects * sizeof(Rectangle))) return;
@@ -134,7 +134,7 @@ void loadGeometry()
     for ( int i = 0; i < numObjects; i++)
     {
         objects[i].lightBaseIdx = numLightColors;
-        objects[i].lightNumTiles = getNumTiles(&objects[i]);
+        //objects[i].lightNumTiles = getNumTiles(&objects[i]);
         numLightColors += getNumTiles(&objects[i]);
     }
 
@@ -333,11 +333,13 @@ cl_program createProgram(cl_context ctx, cl_device_id device, const char* src)
     return program;
 }
 
-int main()
+int main(int argc, const char** argv)
 {
     cout << "Rectangle size is " << sizeof(Rectangle) << " bytes" << endl;
 
-    loadGeometry();
+    string filename = (argc >= 1) ? argv[1] : "out.png" ;
+    
+    loadGeometry(filename, 1000.0/720);
 
     vector<Rectangle> windows;
     for ( int i = 0; i < numObjects; i++)
@@ -378,8 +380,10 @@ int main()
     status |= st;
     
     size_t maxWorkGroupSize = 0;
-    clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(maxWorkGroupSize), &maxWorkGroupSize, NULL);
-    cout << "Maximum workgroup size for this device is " << maxWorkGroupSize << endl;
+    cl_kernel kernel = clCreateKernel(prog,"photonmap", &st);
+    clGetKernelWorkGroupInfo(kernel, device,  CL_KERNEL_WORK_GROUP_SIZE , sizeof(maxWorkGroupSize), &maxWorkGroupSize, NULL);
+    //clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(maxWorkGroupSize), &maxWorkGroupSize, NULL);
+    cout << "Maximum workgroup size for this kernel on this device is " << maxWorkGroupSize << endl;
 
     for ( unsigned int i = 0; i < windows.size(); i++)
     {
@@ -398,7 +402,6 @@ int main()
     	if (status)
         	cout << "preparation errors: " << status << endl;
 
-        cl_kernel kernel = clCreateKernel(prog,"photonmap", &st);
 	    status |= st;
 
         status = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&windowBuffer);
@@ -431,13 +434,13 @@ int main()
     	    }
     	    cout << endl;
         	
-        clReleaseKernel(kernel);
         clReleaseMemObject(windowBuffer);
     }
     clFinish(queue);
     clEnqueueReadBuffer(queue, lightColorsBuffer, CL_TRUE, 0, numLightColors * sizeof(cl_float3),  (void *) lightColors, 0, NULL, NULL);
 
     clFinish(queue);
+    clReleaseKernel(kernel);
     clReleaseMemObject(rectBuffer);
     clReleaseMemObject(lightColorsBuffer);
 

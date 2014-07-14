@@ -5,7 +5,7 @@ typedef struct __attribute__ ((aligned(16))) Rectangle{
     float3 n;
 //    float3 color;
     int lightBaseIdx;
-    int lightNumTiles;
+//    int lightNumTiles;
 } Rectangle;
 
 float rand(ulong *rng_state);
@@ -13,7 +13,7 @@ float3 getDiffuseSkyRandomRay(ulong *rng_state, const float3 ndir/*, const float
 float3 getCosineDistributedRandomRay(ulong *rng_state, const float3 ndir);
 int getTileIdAt(__constant const Rectangle *rect, const float3 p, const float TILE_SIZE);
 float intersects( __constant const Rectangle *rect, const float3 ray_src, const float3 ray_dir, const float closestDist);
-void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constant const Rectangle* rects, const int numRects, __global float3 *lightColors, /*const int numLightColors,*/ const float TILE_SIZE);
+//void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constant const Rectangle* rects, const int numRects, __global float3 *lightColors, /*const int numLightColors,*/ const float TILE_SIZE);
 
 
 
@@ -237,7 +237,7 @@ void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constan
 
 
 
-__kernel void photonmap(__constant const Rectangle *window, __constant const Rectangle* rects, int numRects,
+__kernel void photonmap(__constant const Rectangle * restrict window, __constant const Rectangle* restrict rects, int numRects,
                         __global float3 *lightColors/*, const int numLightColors*/, float TILE_SIZE, int rng_offset)
 {
     ulong rng_state = get_global_id(0) + rng_offset;

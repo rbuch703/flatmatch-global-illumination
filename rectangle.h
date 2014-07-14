@@ -18,7 +18,7 @@ typedef struct __attribute__ ((aligned(16))) Rectangle{
     Vector3 pos, width, height, n;
 //    Vector3 color;
     int lightBaseIdx;
-    int lightNumTiles;
+//    int lightNumTiles;
 //    int hNumTiles, vNumTiles;
 //    float 
 } Rectangle;

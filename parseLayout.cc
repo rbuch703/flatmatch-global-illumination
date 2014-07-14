@@ -98,8 +98,10 @@ vector<Rectangle> parseLayout(const char* const filename, const float scaling) {
     int width, height, color_type;
     uint32_t *pixel_buffer;
     read_png_file(filename, &width, &height, &color_type, (uint8_t**)&pixel_buffer );
-    cout << "read image of size " << width << "x" << height << " with color_type " << color_type << endl;
+    cout << "read image '" << filename << "' of size " << width << "x" << height << " with color_type " << color_type << endl;
 
+    cout << "colorType: " << color_type << endl;
+    
     if (color_type == PNG_COLOR_TYPE_RGB)
     {
         uint8_t *src = (uint8_t*)pixel_buffer;
