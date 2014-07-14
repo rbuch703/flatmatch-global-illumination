@@ -4,14 +4,14 @@ typedef struct __attribute__ ((aligned(16))) Rectangle {
     float3 width, height;
     float3 n;
 //    float3 color;
-    int lightBaseIdx;
+    int3 lightmapSetup;
 //    int lightNumTiles;
 } Rectangle;
 
 float rand(ulong *rng_state);
 float3 getDiffuseSkyRandomRay(ulong *rng_state, const float3 ndir/*, const float3 udir, const float3 vdir*/);
 float3 getCosineDistributedRandomRay(ulong *rng_state, const float3 ndir);
-int getTileIdAt(__constant const Rectangle *rect, const float3 p, const float TILE_SIZE);
+int getTileIdAt(__constant const Rectangle *rect, const float3 p);
 float intersects( __constant const Rectangle *rect, const float3 ray_src, const float3 ray_dir, const float closestDist);
 //void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constant const Rectangle* rects, const int numRects, __global float3 *lightColors, /*const int numLightColors,*/ const float TILE_SIZE);
 
@@ -41,7 +41,7 @@ float3 getDiffuseSkyRandomRay(ulong *rng_state, const float3 ndir/*, const float
         u = -u;
 
     float3 udir = (float3)(0,0,1);
-    if (fabs( dot(udir, ndir)) >= 0.999999) //are (nearly) colinear --> cannot build coordinate base
+    if (fabs( dot(udir, ndir)) >= 0.999999f) //are (nearly) colinear --> cannot build coordinate base
         udir = (float3)(0,1,0);
 
     float3 vdir = normalize( cross(udir,ndir));
@@ -63,7 +63,7 @@ float3 getCosineDistributedRandomRay(ulong *rng_state, const float3 ndir) {
 
     
     float3 udir = (float3)(0,0,1);
-    if (fabs( dot(udir, ndir)) >= 0.999999) //are (nearly) colinear --> cannot build coordinate base
+    if (fabs( dot(udir, ndir)) >= 0.999999f) //are (nearly) colinear --> cannot build coordinate base
         udir = (float3)(0,1,0);
 
     float3 vdir = normalize( cross(udir,ndir));
@@ -92,7 +92,7 @@ void createBase( const float3 ndir, float3 *c1, float3 *c2) {
 #endif
 
 
-int getTileIdAt(__constant const Rectangle *rect, const float3 p, const float TILE_SIZE)
+int getTileIdAt(__constant const Rectangle *rect, const float3 p)
 {
     float3 pDir = p - rect->pos; //vector from rectangle origin (its lower left corner) to current point
     
@@ -103,8 +103,8 @@ int getTileIdAt(__constant const Rectangle *rect, const float3 p, const float TI
     float dy = dot( rect->height / vLength, pDir);
 
     
-    int hNumTiles = max( (int)ceil(hLength / TILE_SIZE), 1);
-    int vNumTiles = max( (int)ceil(vLength / TILE_SIZE), 1);
+    int hNumTiles = rect->lightmapSetup.s1;//max( (int)ceil(hLength / TILE_SIZE), 1);
+    int vNumTiles = rect->lightmapSetup.s2;//max( (int)ceil(vLength / TILE_SIZE), 1);
     //printf("rectangle has %dx%d tiles\n", hNumTiles, vNumTiles);
     //FIXME: check whether a float->int conversion in OpenCL also is round-towards-zero
     int tx = clamp( (int)(dx * hNumTiles / hLength), 0, hNumTiles-1);
@@ -159,7 +159,7 @@ float intersects( __constant const Rectangle *rect, const float3 ray_src, const 
 
 
 void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constant const Rectangle* rects, const int numRects,
-                        __global float3 *lightColors, /*const int numLightColors,*/ const float TILE_SIZE)
+                        __global float3 *lightColors)
 {
 
     float3 lightColor = (float3)(18, 16, 12);//window->color;
@@ -207,8 +207,8 @@ void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constan
         //hit_obj[get_global_id(0)] = closestObject;
         float3 hit_pos = pos + ray_dir * dist_out;
         
-        int tile_id = getTileIdAt( hitObj, hit_pos, TILE_SIZE);
-        int light_idx = hitObj->lightBaseIdx + tile_id;
+        int tile_id = getTileIdAt( hitObj, hit_pos);
+        int light_idx = hitObj->lightmapSetup.s0 + tile_id;
         
         /*if (light_idx >= numLightColors)
         {
@@ -238,7 +238,7 @@ void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constan
 
 
 __kernel void photonmap(__constant const Rectangle * restrict window, __constant const Rectangle* restrict rects, int numRects,
-                        __global float3 *lightColors/*, const int numLightColors*/, float TILE_SIZE, int rng_offset)
+                        __global float3 *lightColors/*, const int numLightColors*/, int rng_offset)
 {
     ulong rng_state = get_global_id(0) + rng_offset;
     float r = rand(&rng_state) * 40; //warm-up / decorrelate individual RNGs
@@ -248,6 +248,6 @@ __kernel void photonmap(__constant const Rectangle * restrict window, __constant
     //printf("kernel supplied with %d rectangles\n", numRects);
     
     for (int i = 0; i < 100; i++)
-        tracePhoton(&rng_state, window, rects, numRects, lightColors/*, numLightColors*/, TILE_SIZE);
+        tracePhoton(&rng_state, window, rects, numRects, lightColors);
 }
 

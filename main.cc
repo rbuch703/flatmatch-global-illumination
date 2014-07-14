@@ -133,7 +133,7 @@ void loadGeometry(string filename, float scale)
     numLightColors = 0;
     for ( int i = 0; i < numObjects; i++)
     {
-        objects[i].lightBaseIdx = numLightColors;
+        objects[i].lightmapSetup.s[0] = numLightColors;
         //objects[i].lightNumTiles = getNumTiles(&objects[i]);
         numLightColors += getNumTiles(&objects[i]);
     }
@@ -345,7 +345,7 @@ int main(int argc, const char** argv)
     for ( int i = 0; i < numObjects; i++)
     {
         //Color3 col = (*it)->getColor( (*it)->getTileCenter(0) );
-        if (objects[i].pos.s[2] == 0.90 * 100)
+        if (objects[i].pos.s[2] == 0.90 * 100)  //HACK: select windows, which start at 90cm height
         //Vector3 col = objects[i].color;
         //if (col.s[0] > 1 || col.s[1] > 1 || col.s[2] > 1)
             windows.push_back( objects[i]);
@@ -371,7 +371,7 @@ int main(int argc, const char** argv)
     /* ================= */
     /* SET ACCURACY HERE */
     /* ================= */
-    static const int numSamplesPerArea = 1000;
+    static const int numSamplesPerArea = 10000;
 
     cl_int st = 0;
     cl_int status = 0;
@@ -400,7 +400,7 @@ int main(int argc, const char** argv)
 	    cl_mem windowBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY| CL_MEM_USE_HOST_PTR , sizeof(Rectangle),(void *)&window, &st );
 	    status |= st;
     	if (status)
-        	cout << "preparation errors: " << status << endl;
+        	cout << "buffer creation preparation errors: " << status << endl;
 
 	    status |= st;
 
@@ -409,9 +409,9 @@ int main(int argc, const char** argv)
         status |= clSetKernelArg(kernel, 2, sizeof(cl_int), (void *)&numObjects);
         status |= clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&lightColorsBuffer);
         //status |= clSetKernelArg(kernel, 4, sizeof(cl_int), (void *)&numLightColors);
-        status |= clSetKernelArg(kernel, 4, sizeof(cl_float), (void *)&TILE_SIZE);
+        //status |= clSetKernelArg(kernel, 4, sizeof(cl_float), (void *)&TILE_SIZE);
     	if (status)
-        	cout << "preparation errors: " << status << endl;
+        	cout << "Kernel Arg preparation errors: " << status << endl;
 
         //FIXME: rewrite this code to be able to always have two kernels enqueued at the same time to maximize 
         //       performance (but not more than two kernels as this stresses GPUs too much
@@ -421,15 +421,19 @@ int main(int argc, const char** argv)
             cout << "\rPhoton-Mapping window " << (i+1) << "/" << windows.size() << " with " << (int)(numSamples*100/1000000) << "M samples   " << flush;
             
             cl_int idx = rand();
-            status |= clSetKernelArg(kernel, 5, sizeof(cl_int), (void *)&idx);
-            
+            status |= clSetKernelArg(kernel, 4, sizeof(cl_int), (void *)&idx);
+            if (status)
+                exit(-1);
             size_t workSize = numSamples < maxWorkGroupSize*40 ? numSamples : maxWorkGroupSize*40;  //openCL becomes unstable on ATI GPUs with work sizes > 40000 items
             numSamples -=workSize;
 
             	st = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &workSize, &maxWorkGroupSize, 0, NULL, NULL);
             //clFinish(queue);
             	if (st)
+            	{
                 	cout << "Kernel execution error: " << st << endl;
+            	    exit(-1);
+            	}
             clFinish(queue);
     	    }
     	    cout << endl;
@@ -445,14 +449,30 @@ int main(int argc, const char** argv)
     clReleaseMemObject(lightColorsBuffer);
 
     //FIXME: normalize lightColors by actual tile size (which varies from rect to rect)
-    for ( int i = 0; i < numLightColors; i++)
-        lightColors[i] = div_vec3(lightColors[i], (TILE_SIZE*TILE_SIZE * 3 * numSamplesPerArea));
+    for ( int i = 0; i < numObjects; i++)
+    {
+        Rectangle &obj = objects[i];
+        //cout << "area: " << getArea(&obj) << "cm², numTiles: " << getNumTiles(&obj) << ", samples/cm²: " << numSamplesPerArea << endl;
+        float areaPerTile = getArea(&obj) / getNumTiles(&obj); // in cm²
+        float tilesPerSample = 1 / (areaPerTile*numSamplesPerArea);  
+        //cout << "areaPerTile = " << areaPerTile << "cm²; c = " << tilesPerSample << endl;
+        //float scalingFactor = 
+        for (int j = 0; j < getNumTiles(&obj); j++)
+        {
+            lightColors[obj.lightmapSetup.s[0] + j] = //getArea(obj)/ getNumTiles(
+                mul(lightColors[obj.lightmapSetup.s[0] +j], 0.3 * tilesPerSample);
+            //1/(2*2*3*1000)
+                //div_vec3(lightColors[obj.lightmapSetup.s[0] +j], (TILE_SIZE*TILE_SIZE * 3 * numSamplesPerArea));
+        }
+    }    
+    //for ( int i = 0; i < numLightColors; i++)
+    //    lightColors[i] = div_vec3(lightColors[i], (TILE_SIZE*TILE_SIZE * 3 * numSamplesPerArea));
 
     for ( unsigned int i = 0; i < windows.size(); i++)
     {
         Rectangle window = windows[i];
         for (int j = 0; j < getNumTiles(&window); j++)
-            lightColors[ window.lightBaseIdx + j] = createVector3(1, 1, 1);
+            lightColors[ window.lightmapSetup.s[0] + j] = createVector3(10, 10, 10);
     }
 
 

@@ -18,6 +18,27 @@ Rectangle createRectangle( const Vector3 _pos, const Vector3 _width, const Vecto
     res.width= _width;
     res.height= _height;
     res.n = normalized(cross(res.height,res.width));
+    res.lightmapSetup.s[0] = 0;    //invalidated, should be set through main()
+    res.lightmapSetup.s[1] = 1;   // texture width
+    res.lightmapSetup.s[2] = 1;   // texture height;
+    res.lightmapSetup.s[3] = 0; //unused
+    
+    float width = length(_width);
+    float height = length(_height);
+    float tile_size = (res.lightmapSetup.s[1] * res.lightmapSetup.s[2]) / (width*height);
+    while (tile_size < TILE_SIZE) 
+    {
+        float width_res = res.lightmapSetup.s[1] / width;
+        float height_res= res.lightmapSetup.s[2] / height;
+        
+        if (width_res < height_res)
+            res.lightmapSetup.s[1] *= 2;
+        else 
+            res.lightmapSetup.s[2] *= 2;
+
+        tile_size = (res.lightmapSetup.s[1] * res.lightmapSetup.s[2]) / (width*height);
+    }
+    
     //HACK: cl_float3 is actually a float[4] to ensure 16 bytes alignment
     //      use the extraneous float to store the vector length
     //      (in effect this make the vector a unit vector in homogenous coordinates)
@@ -68,10 +89,10 @@ float intersects( const Rectangle *rect, Vector3 ray_src, Vector3 ray_dir, float
 int getNumTiles(const Rectangle *rect)
 {
     
-    int hNumTiles = max( ceil(length(rect->width) / TILE_SIZE), 1);
-    int vNumTiles = max( ceil(length(rect->height)/ TILE_SIZE), 1);
+    //int hNumTiles = max( ceil(length(rect->width) / TILE_SIZE), 1);
+    //int vNumTiles = max( ceil(length(rect->height)/ TILE_SIZE), 1);
 
-    return hNumTiles * vNumTiles;
+    return rect->lightmapSetup.s[1] * rect->lightmapSetup.s[2];//hNumTiles * vNumTiles;
 }
 
 
@@ -80,6 +101,7 @@ float getArea(const Rectangle *rect)
     return length(rect->width) * length(rect->height);
 }
 
+/*
 int getTileIdAt(const Rectangle *rect, const Vector3 p)
 {
     Vector3 pDir = sub(p,rect->pos); //vector from rectangle origin (its lower left corner) to current point
@@ -107,7 +129,7 @@ int getTileIdAt(const Rectangle *rect, const Vector3 p)
     assert(ty * hNumTiles + tx < getNumTiles(rect));
     return ty * hNumTiles + tx;
 }
-
+*/
 static uint8_t clamp(float d)
 {
     if (d < 0) d = 0;
@@ -123,8 +145,9 @@ float convert(float color)
 
 void saveAs(const Rectangle *rect, const char *filename, Vector3 *lights)
 {
-    int hNumTiles = max( ceil(length(rect->width) / TILE_SIZE), 1);
-    int vNumTiles = max( ceil(length(rect->height)/ TILE_SIZE), 1);
+    int baseIdx = rect->lightmapSetup.s[0];
+    int hNumTiles = rect->lightmapSetup.s[1];//max( ceil(length(rect->width) / TILE_SIZE), 1);
+    int vNumTiles = rect->lightmapSetup.s[2];//max( ceil(length(rect->height)/ TILE_SIZE), 1);
 
     uint8_t *data = (uint8_t*) malloc( hNumTiles * vNumTiles * 3 * sizeof(uint8_t));
     for (int i = 0; i < hNumTiles * vNumTiles; i++)
@@ -133,9 +156,9 @@ void saveAs(const Rectangle *rect, const char *filename, Vector3 *lights)
             col.g = 1 - exp(-col.g);
             col.b = 1 - exp(-col.b);*/
         
-        data[i*3+0] = clamp( convert(lights[rect->lightBaseIdx + i].s[0])*255);
-        data[i*3+1] = clamp( convert(lights[rect->lightBaseIdx + i].s[1])*255);
-        data[i*3+2] = clamp( convert(lights[rect->lightBaseIdx + i].s[2])*255);
+        data[i*3+0] = clamp( convert(lights[baseIdx + i].s[0])*255);
+        data[i*3+1] = clamp( convert(lights[baseIdx + i].s[1])*255);
+        data[i*3+2] = clamp( convert(lights[baseIdx + i].s[2])*255);
     }
     
     write_png_file(filename, hNumTiles, vNumTiles, PNG_COLOR_TYPE_RGB, data);
