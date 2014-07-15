@@ -67,6 +67,7 @@ void createBase(Vector3 ndir, Vector3 &c1, Vector3 &c2) {
     c1 = normalized( cross(c2,ndir));
 }*/
 
+/*
 Rectangle* getClosestObject(const Vector3 &ray_src, const Vector3 &ray_dir, Rectangle *objects, int numObjects, float &dist_out)
 {
     Rectangle *closestObject = NULL;
@@ -86,7 +87,7 @@ Rectangle* getClosestObject(const Vector3 &ray_src, const Vector3 &ray_dir, Rect
         }
     }
     return closestObject;
-}
+}*/
 
 /*
 Vector3 getObjectColorAt(Rectangle* rect, Vector3 pos)
@@ -371,7 +372,7 @@ int main(int argc, const char** argv)
     /* ================= */
     /* SET ACCURACY HERE */
     /* ================= */
-    static const int numSamplesPerArea = 10000;
+    static const int numSamplesPerArea = 1000;
 
     cl_int st = 0;
     cl_int status = 0;

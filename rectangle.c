@@ -4,6 +4,9 @@
 //#include <math.h>
 #include "png_helper.h"
 
+#include "imageProcessing.h"
+
+
 int max(int a, int b)
 {
     return a > b ? a : b;
@@ -38,6 +41,10 @@ Rectangle createRectangle( const Vector3 _pos, const Vector3 _width, const Vecto
 
         tile_size = (res.lightmapSetup.s[1] * res.lightmapSetup.s[2]) / (width*height);
     }
+    
+    res.lightmapSetup.s[1] *= SUPER_SAMPLING;
+    res.lightmapSetup.s[2] *= SUPER_SAMPLING;
+    
     
     //HACK: cl_float3 is actually a float[4] to ensure 16 bytes alignment
     //      use the extraneous float to store the vector length
@@ -130,26 +137,24 @@ int getTileIdAt(const Rectangle *rect, const Vector3 p)
     return ty * hNumTiles + tx;
 }
 */
-static uint8_t clamp(float d)
-{
-    if (d < 0) d = 0;
-    if (d > 255) d = 255;
-    return d;
-}
 
-//convert light energy to perceived brightness
-float convert(float color)
-{
-    return 1 - exp(-color);
-}
 
 void saveAs(const Rectangle *rect, const char *filename, Vector3 *lights)
 {
     int baseIdx = rect->lightmapSetup.s[0];
     int hNumTiles = rect->lightmapSetup.s[1];//max( ceil(length(rect->width) / TILE_SIZE), 1);
     int vNumTiles = rect->lightmapSetup.s[2];//max( ceil(length(rect->height)/ TILE_SIZE), 1);
+    assert( hNumTiles % SUPER_SAMPLING == 0);
+    assert( vNumTiles % SUPER_SAMPLING == 0);
+    hNumTiles /= SUPER_SAMPLING;
+    vNumTiles /= SUPER_SAMPLING;
 
     uint8_t *data = (uint8_t*) malloc( hNumTiles * vNumTiles * 3 * sizeof(uint8_t));
+    
+    subsampleAndConvertToPerceptive( lights+baseIdx, data, hNumTiles, vNumTiles);
+    selectiveDilate(data, hNumTiles, vNumTiles);
+
+#if 0    
     for (int i = 0; i < hNumTiles * vNumTiles; i++)
     {
             /*col.r = 1 - exp(-col.r);
@@ -160,7 +165,7 @@ void saveAs(const Rectangle *rect, const char *filename, Vector3 *lights)
         data[i*3+1] = clamp( convert(lights[baseIdx + i].s[1])*255);
         data[i*3+2] = clamp( convert(lights[baseIdx + i].s[2])*255);
     }
-    
+#endif
     write_png_file(filename, hNumTiles, vNumTiles, PNG_COLOR_TYPE_RGB, data);
     free (data);
 }

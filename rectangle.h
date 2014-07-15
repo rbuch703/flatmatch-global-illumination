@@ -8,11 +8,11 @@ extern "C" {
 
 #include "vector3_cl.h"
 //#include "color3.h"
-#include <math.h>
 #include "assert.h"
 
 
-static const float TILE_SIZE = 0.25;   //lightmap texels per cm²
+static const float TILE_SIZE = 1/20.0f;   //lightmap texels per cm²
+static const int   SUPER_SAMPLING = 4;
 
 typedef struct __attribute__ ((aligned(16))) Rectangle{
     Vector3 pos, width, height, n;
