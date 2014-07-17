@@ -162,7 +162,7 @@ void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constan
                         __global float3 *lightColors)
 {
 
-    float3 lightColor = (float3)(18, 16, 12);//window->color;
+    float3 lightColor = (float3)(18, 17, 15);//window->color;
 
     const int MAX_DEPTH = 8;
 

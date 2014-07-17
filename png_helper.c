@@ -23,10 +23,16 @@ void read_png_file(const char* file_name, int *width, int *height, int *color_ty
     /* open file and test for it being a png */
     FILE *fp = fopen(file_name, "rb");
     if (!fp) 
-        return;
+    {
+        printf("File '%s' could not be opened, exiting ...\n", file_name);
+        exit(0);
+    }
 
     if (8 !=fread(header, 1, 8, fp))
+    {
+        printf("Error reading file header, exiting ...\n");
         return;
+    }
         
     if (png_sig_cmp(header, 0, 8))
         return;

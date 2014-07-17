@@ -98,10 +98,8 @@ vector<Rectangle> parseLayout(const char* const filename, const float scaling) {
     int width, height, color_type;
     uint32_t *pixel_buffer;
     read_png_file(filename, &width, &height, &color_type, (uint8_t**)&pixel_buffer );
-    cout << "read image '" << filename << "' of size " << width << "x" << height << " with color_type " << color_type << endl;
+    //cout << "read image '" << filename << "' of size " << width << "x" << height << " with color_type " << color_type << endl;
 
-    cout << "colorType: " << color_type << endl;
-    
     if (color_type == PNG_COLOR_TYPE_RGB)
     {
         uint8_t *src = (uint8_t*)pixel_buffer;
@@ -183,8 +181,10 @@ vector<Rectangle> parseLayout(const char* const filename, const float scaling) {
     //find AABB of apartment, as this is a conservative estimate for the floor and ceiling extents
     float min_x, max_x, min_y, max_y;
     getAABB( segments, min_x, max_x, min_y, max_y);
+    
+    cout << "[INF] Geometry extents are " << (max_x - min_x)/100 << "m x " << (max_y - min_y)/100 << "m" << endl;
 
-    cout << "floor/ceiling size is: (" << min_x << ", " << min_y << "), " << (max_x - min_x) << "x" << (max_y - min_y) << endl;
+    //cout << "floor/ceiling size is: (" << min_x << ", " << min_y << "), " << (max_x - min_x) << "x" << (max_y - min_y) << endl;
 
   
     segments.push_front( createRectangle( createVector3(min_x,min_y,HEIGHT), 
@@ -194,7 +194,6 @@ vector<Rectangle> parseLayout(const char* const filename, const float scaling) {
                                           createVector3(0, max_y-min_y, 0), 
                                           createVector3(max_x-min_x, 0, 0)));    // floor
     
-    cout << "registered " << segments.size() << " wall segments" << endl;
     return vector<Rectangle>(segments.begin(), segments.end());
 }
 
