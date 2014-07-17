@@ -38,25 +38,27 @@ static const float WINDOW_HEIGHT = WINDOW_HIGH - WINDOW_LOW;
 static const float TOP_WALL_HEIGHT = HEIGHT - WINDOW_HIGH;
 
 
-void addWindowedWall(float startX, float startY, float dx, float dy, float scaling, /*ref*/ list<Rectangle> &segments)
+void addWindowedWall(float startX, float startY, float dx, float dy, float scaling, /*ref*/ vector<Rectangle> &wallsRef, vector<Rectangle> &windowsRef)
 {
     startX *= scaling;
     startY *= scaling;
     dx *= scaling;
     dy *= scaling;
     
-    segments.push_back(createRectangle( createVector3(startX,startY,0),  
-                                                 createVector3(dx, dy, 0), 
-                                                 createVector3(0, 0, WINDOW_LOW)));
-    segments.push_back(createRectangle( createVector3(startX,startY,WINDOW_LOW), 
-                                                 createVector3(dx, dy, 0), 
-                                                 createVector3(0, 0, WINDOW_HEIGHT)));
-    segments.push_back(createRectangle( createVector3(startX,startY,WINDOW_HIGH), 
-                                                 createVector3(dx, dy, 0), 
-                                                 createVector3(0, 0, TOP_WALL_HEIGHT)));
+    wallsRef.push_back(createRectangle(  createVector3(startX,startY,0),
+                                         createVector3(dx, dy, 0),
+                                         createVector3(0, 0, WINDOW_LOW)));
+                                         
+    windowsRef.push_back(createRectangle(createVector3(startX,startY,WINDOW_LOW),
+                                         createVector3(dx, dy, 0),
+                                         createVector3(0, 0, WINDOW_HEIGHT)));
+                                         
+    wallsRef.push_back(createRectangle(  createVector3(startX,startY,WINDOW_HIGH),
+                                         createVector3(dx, dy, 0),
+                                         createVector3(0, 0, TOP_WALL_HEIGHT)));
 }
 
-void addWall(float startX, float startY, float dx, float dy, float scaling, /*ref*/ list<Rectangle> &segments)
+void addWall(float startX, float startY, float dx, float dy, float scaling, /*ref*/ vector<Rectangle> &segments)
 {
     startX *= scaling;
     startY *= scaling;
@@ -64,18 +66,22 @@ void addWall(float startX, float startY, float dx, float dy, float scaling, /*re
     dy *= scaling;
 
     segments.push_back(createRectangle( createVector3(startX,startY,0),
-                                                 createVector3(dx,dy,0),
-                                                 createVector3(0,0,HEIGHT)));
+                                        createVector3(dx,dy,0),
+                                        createVector3(0,0,HEIGHT)));
 }
 
 
-void getAABB( const list<Rectangle> &segments, float &min_x, float &max_x, float &min_y, float &max_y)
+void getAABB( const vector<Rectangle> &walls, const vector<Rectangle> &windows, float &min_x, float &max_x, float &min_y, float &max_y)
 {
+    vector<Rectangle> segments;
+    segments.insert(segments.end(), walls.begin(), walls.end());
+    segments.insert(segments.end(), windows.begin(), windows.end());
+    
     min_x = segments.begin()->pos.s[0];
     max_x = segments.begin()->pos.s[0];
     min_y = segments.begin()->pos.s[1];
     max_y = segments.begin()->pos.s[1];
-    for (list<Rectangle>::const_iterator seg = segments.begin(); seg != segments.end(); seg++)
+    for (vector<Rectangle>::const_iterator seg = segments.begin(); seg != segments.end(); seg++)
     {
         max_x = max(max_x, seg->pos.s[0]);
         min_x = min(min_x, seg->pos.s[0]);
@@ -93,8 +99,11 @@ void getAABB( const list<Rectangle> &segments, float &min_x, float &max_x, float
 }
 
 //#error continuehere: add scaling factor, scale height, use real height values
-vector<Rectangle> parseLayout(const char* const filename, const float scaling) {
-    list<Rectangle> segments;
+void parseLayout(const char* const filename, const float scaling, vector<Rectangle> &wallsOut, vector<Rectangle> &windowsOut)
+{
+    wallsOut.clear();
+    windowsOut.clear();
+    
     int width, height, color_type;
     uint32_t *pixel_buffer;
     read_png_file(filename, &width, &height, &color_type, (uint8_t**)&pixel_buffer );
@@ -141,10 +150,10 @@ vector<Rectangle> parseLayout(const char* const filename, const float scaling) {
 
             int endX = x;
             
-            if      (pxAbove == BLACK && pxHere == WHITE) addWall(startX, y, endX - startX, 0, scaling, segments); //transition from wall to inside area
-            else if (pxAbove == WHITE && pxHere == BLACK) addWall(endX,   y, startX - endX, 0, scaling, segments);// transition from inside area to wall
-            else if (pxAbove == GREEN && pxHere == WHITE) addWindowedWall(startX, y, endX - startX, 0, scaling, segments); //transition from window to inside area
-            else if (pxAbove == WHITE && pxHere == GREEN) addWindowedWall(endX,   y, startX - endX, 0, scaling, segments);
+            if      (pxAbove == BLACK && pxHere == WHITE) addWall(startX, y, endX - startX, 0, scaling, wallsOut); //transition from wall to inside area
+            else if (pxAbove == WHITE && pxHere == BLACK) addWall(endX,   y, startX - endX, 0, scaling, wallsOut);// transition from inside area to wall
+            else if (pxAbove == GREEN && pxHere == WHITE) addWindowedWall(startX, y, endX - startX, 0, scaling, wallsOut, windowsOut); //transition from window to inside area
+            else if (pxAbove == WHITE && pxHere == GREEN) addWindowedWall(endX,   y, startX - endX, 0, scaling, wallsOut, windowsOut);
         }
     }
     //cout << "  == End of horizontal scan, beginning vertical scan ==" << endl;
@@ -169,10 +178,10 @@ vector<Rectangle> parseLayout(const char* const filename, const float scaling) {
                 
             int endY = y;
             
-            if (pxLeft == BLACK && pxHere == WHITE)      addWall(x, endY,   0, startY - endY, scaling, segments); //transition from wall to inside area
-            else if (pxLeft == WHITE && pxHere == BLACK) addWall(x, startY, 0, endY - startY, scaling, segments);// transition from inside area to wall
-            else if (pxLeft == GREEN && pxHere == WHITE) addWindowedWall(x, endY,   0, startY - endY, scaling, segments);//transition from window to inside area
-            else if (pxLeft == WHITE && pxHere == GREEN) addWindowedWall(x, startY, 0, endY - startY, scaling, segments);
+            if (pxLeft == BLACK && pxHere == WHITE)      addWall(x, endY,   0, startY - endY, scaling, wallsOut); //transition from wall to inside area
+            else if (pxLeft == WHITE && pxHere == BLACK) addWall(x, startY, 0, endY - startY, scaling, wallsOut);// transition from inside area to wall
+            else if (pxLeft == GREEN && pxHere == WHITE) addWindowedWall(x, endY,   0, startY - endY, scaling, wallsOut, windowsOut);//transition from window to inside area
+            else if (pxLeft == WHITE && pxHere == GREEN) addWindowedWall(x, startY, 0, endY - startY, scaling, wallsOut, windowsOut);
         }
     }
 
@@ -180,20 +189,19 @@ vector<Rectangle> parseLayout(const char* const filename, const float scaling) {
 
     //find AABB of apartment, as this is a conservative estimate for the floor and ceiling extents
     float min_x, max_x, min_y, max_y;
-    getAABB( segments, min_x, max_x, min_y, max_y);
+    getAABB( wallsOut, windowsOut, min_x, max_x, min_y, max_y);
     
     cout << "[INF] Geometry extents are " << (max_x - min_x)/100 << "m x " << (max_y - min_y)/100 << "m" << endl;
 
     //cout << "floor/ceiling size is: (" << min_x << ", " << min_y << "), " << (max_x - min_x) << "x" << (max_y - min_y) << endl;
 
-  
-    segments.push_front( createRectangle( createVector3(min_x,min_y,HEIGHT), 
-                                          createVector3(max_x - min_x, 0, 0), 
-                                          createVector3(0, max_y - min_y, 0)));  // ceiling
-    segments.push_front( createRectangle( createVector3(min_x,min_y,0), 
-                                          createVector3(0, max_y-min_y, 0), 
-                                          createVector3(max_x-min_x, 0, 0)));    // floor
+    wallsOut.push_back( createRectangle( createVector3(min_x,min_y,HEIGHT), 
+                                         createVector3(max_x - min_x, 0, 0), 
+                                         createVector3(0, max_y - min_y, 0)));  // ceiling
+    wallsOut.push_back( createRectangle( createVector3(min_x,min_y,0), 
+                                         createVector3(0, max_y-min_y, 0), 
+                                         createVector3(max_x-min_x, 0, 0)));    // floor
     
-    return vector<Rectangle>(segments.begin(), segments.end());
+    //return vector<ExtendedRectangle>(segments.begin(), segments.end());
 }
 

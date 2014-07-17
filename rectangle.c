@@ -13,6 +13,16 @@ int max(int a, int b)
 }
 
 
+ExtendedRectangle createExtendedRectangle( const Vector3 _pos, const Vector3 _width, const Vector3 _height, int _isWindow)
+{
+    ExtendedRectangle res = {
+        .textureId = -1,
+        .isWindow = _isWindow,
+        .rect = createRectangle( _pos, _width, _height) };
+        
+    return res;
+}
+
 Rectangle createRectangle( const Vector3 _pos, const Vector3 _width, const Vector3 _height)
 {
 

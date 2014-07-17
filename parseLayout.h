@@ -5,7 +5,9 @@
 #include <vector>
 #include "rectangle.h"
 
-std::vector<Rectangle> parseLayout(const char* const filename, const float scaling);
+using namespace std;
+
+void parseLayout(const char* const filename, const float scaling, vector<Rectangle> &wallsOut, vector<Rectangle> &windowsOut);
 
 
 #endif

@@ -1,6 +1,4 @@
 
-syntax:glob
-
 *~
 *.o
 *.oo
@@ -10,3 +8,6 @@ callgrind.*
 *.DS_Store
 globalIllumination
 make.dep
+
+tiles
+geometry.json

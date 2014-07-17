@@ -7,6 +7,7 @@
 #include <list>
 #include <vector>
 #include <iostream>
+#include <fstream>
 #include <stdint.h>
 #include <stdlib.h> //for rand()
 //#include <string>
@@ -14,49 +15,53 @@
 using namespace std;
 
 
-Rectangle* objects = NULL;
-cl_int numObjects;
+Rectangle* walls = NULL;
+cl_int numWalls;
+
+vector<Rectangle> windows;
 
 Vector3* lightColors = NULL;
-cl_int numLightColors;
+cl_int numTexels;
 
 void loadGeometry(string filename, float scale)
 {
+    vector<Rectangle> vWalls;
+    parseLayout(filename.c_str(), scale, vWalls, windows);
     
-    vector<Rectangle> rects = parseLayout(filename.c_str(), scale); //720px ^= 1000cm --> 1000/720 cm/px
-    numObjects = rects.size();
-    //are to be passed to openCL --> have to be aligned to 16byte boundary
-    if (0 != posix_memalign((void**)&objects, 16, numObjects * sizeof(Rectangle))) return;
-
-    int idx = 0;
-    for ( vector<Rectangle>::const_iterator it = rects.begin(); it != rects.end(); it++)
+    //the set of walls will be uploaded to OpenCL, and thus needs to be converted to a suitable structure (array of structs)
+    //the windows are only uploaded only one by one, so no conversion is necessary here
+    numWalls = vWalls.size();
+    //are to be passed to OpenCL --> have to be aligned to 16byte boundary
+    if (0 != posix_memalign((void**)&walls, 16, numWalls * sizeof(Rectangle))) 
     {
-        //cout << "rectangle has " << getArea(&(*it)) / getNumTiles(&(*it)) << "cm²/tile" << endl;
-    
-        objects[idx++] = *it;
+        cout << "[Err] aligned memory allocation failed, exiting ..." << endl;
+        exit(0);
     }
 
-    numLightColors = 0;
-    for ( int i = 0; i < numObjects; i++)
+    for (unsigned int i = 0; i < vWalls.size(); i++)
+        walls[i] = vWalls[i];
+
+    numTexels = 0;
+    for ( int i = 0; i < numWalls; i++)
     {
-        objects[i].lightmapSetup.s[0] = numLightColors;
+        walls[i].lightmapSetup.s[0] = numTexels;
         //objects[i].lightNumTiles = getNumTiles(&objects[i]);
-        numLightColors += getNumTiles(&objects[i]);
+        numTexels += getNumTiles(&walls[i]);
     }
 
-    cout << "[DBG] allocating " << (numLightColors*sizeof(Vector3)/1000000) << "MB for texels" << endl;
-    if (numLightColors * sizeof(Vector3) > 1000*1000*1000)
+    cout << "[DBG] allocating " << (numTexels * sizeof(Vector3)/1000000) << "MB for texels" << endl;
+    if (numTexels * sizeof(Vector3) > 1000*1000*1000)
     {
-        cout << "[Err] Will not allocate more than 1GB for texels, this would crash most GPUs. Exiting ..." << endl;
+        cout << "[Err] Refusing to allocate more than 1GB for texels, this would crash most GPUs. Exiting ..." << endl;
     }
 
-    if (0 != posix_memalign( (void**) &lightColors, 16, numLightColors * sizeof(Vector3)))
+    if (0 != posix_memalign( (void**) &lightColors, 16, numTexels * sizeof(Vector3)))
     {
-        assert(false);
+        cout << "[Err] aligned memory allocation failed, exiting ..." << endl;
         exit(0);
     }
     
-    for (int i = 0; i < numLightColors; i++)
+    for (int i = 0; i < numTexels; i++)
         lightColors[i] = createVector3(0,0,0);
 }
 
@@ -245,12 +250,12 @@ void performGlobalIllumination(cl_context ctx, cl_device_id device, const vector
     free(program_str);
 
 
-    cl_mem rectBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY |CL_MEM_COPY_HOST_PTR, numObjects * sizeof(Rectangle),(void *) objects, NULL);
+    cl_mem rectBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY |CL_MEM_COPY_HOST_PTR, numWalls * sizeof(Rectangle),(void *) walls, NULL);
 
     cl_int st = 0;
     cl_int status = 0;
 
-    cl_mem lightColorsBuffer = clCreateBuffer(ctx, CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR, numLightColors * sizeof(cl_float3),(void *) lightColors, &st);
+    cl_mem lightColorsBuffer = clCreateBuffer(ctx, CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR, numTexels * sizeof(cl_float3),(void *) lightColors, &st);
     status |= st;
     
     size_t maxWorkGroupSize = 0;
@@ -279,7 +284,7 @@ void performGlobalIllumination(cl_context ctx, cl_device_id device, const vector
 
         status = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&windowBuffer);
         status |= clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&rectBuffer);
-        status |= clSetKernelArg(kernel, 2, sizeof(cl_int), (void *)&numObjects);
+        status |= clSetKernelArg(kernel, 2, sizeof(cl_int), (void *)&numWalls);
         status |= clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&lightColorsBuffer);
     	if (status)
         	cout << "Kernel Arg preparation errors: " << status << endl;
@@ -312,7 +317,7 @@ void performGlobalIllumination(cl_context ctx, cl_device_id device, const vector
         clReleaseMemObject(windowBuffer);
     }
     clFinish(queue);
-    clEnqueueReadBuffer(queue, lightColorsBuffer, CL_TRUE, 0, numLightColors * sizeof(cl_float3),  (void *) lightColors, 0, NULL, NULL);
+    clEnqueueReadBuffer(queue, lightColorsBuffer, CL_TRUE, 0, numTexels * sizeof(cl_float3),  (void *) lightColors, 0, NULL, NULL);
 
     clFinish(queue);
     clReleaseKernel(kernel);
@@ -320,6 +325,17 @@ void performGlobalIllumination(cl_context ctx, cl_device_id device, const vector
     clReleaseMemObject(lightColorsBuffer);
 
 }
+
+
+ostream& operator<<(ostream &os, const Vector3 &vec)
+{
+    os <<  "[" << vec.s[0] << ", " << vec.s[1] << ", " << vec.s[2] << "]";
+    return os;
+}
+
+/*void toJson(const Vector3 &vec, stringstream &ss)
+{
+}*/
 
 int main(int argc, const char** argv)
 {
@@ -344,13 +360,13 @@ int main(int argc, const char** argv)
     //scale is passed in the more human-readable pixel/m, but the geometry loader needs it in cm/pixel
     loadGeometry(argv[1], 100/scale);   
 
-    vector<Rectangle> windows;
-    for ( int i = 0; i < numObjects; i++)
+    /*vector<Rectangle> windows;
+    for ( int i = 0; i < numWalls; i++)
     {
         if (objects[i].pos.s[2] == 0.90 * 100)  //HACK: select windows, which start at 90cm height
             windows.push_back( objects[i]);
-    }
-    cout << "[INF] Layout consists of " << numObjects << " walls (" << numLightColors << " texels) and " << windows.size() << " windows" << endl;
+    }*/
+    cout << "[INF] Layout consists of " << numWalls << " walls (" << numTexels/1000000.0 << "M texels) and " << windows.size() << " windows" << endl;
     //cout << "total of " << numLightColors << " individual light texels" << endl;
 
 
@@ -361,9 +377,9 @@ int main(int argc, const char** argv)
     int numSamplesPerArea = 100;
     performGlobalIllumination(ctx, device, windows, numSamplesPerArea);
     
-    for ( int i = 0; i < numObjects; i++)
+    for ( int i = 0; i < numWalls; i++)
     {
-        Rectangle &obj = objects[i];
+        Rectangle &obj = walls[i];
         float tilesPerSample = getNumTiles(&obj) / (getArea(&obj) * numSamplesPerArea);  
         int baseIdx = obj.lightmapSetup.s[0];
 
@@ -371,24 +387,39 @@ int main(int argc, const char** argv)
             lightColors[baseIdx + j] = mul(lightColors[baseIdx +j], 0.3 * tilesPerSample);
     }    
 
+    /*
     for ( unsigned int i = 0; i < windows.size(); i++)
     {
         Rectangle window = windows[i];
         for (int j = 0; j < getNumTiles(&window); j++)
             lightColors[ window.lightmapSetup.s[0] + j] = createVector3(10, 10, 10);
-    }
+    }*/
 
 
+    
+    ofstream jsonGeometry("geometry.json");
+    jsonGeometry << "[" << endl;
     char num[50];
-    for ( int i = 0; i < numObjects; i++)
+    for ( int i = 0; i < numWalls; i++)
     {
         snprintf(num, 49, "%d", i);
         string filename = string("tiles/tile_") + num + ".png";
-        saveAs( &objects[i], filename.c_str(), lightColors);
+        saveAs( &walls[i], filename.c_str(), lightColors);
+        
+            //{ pos: [1,2,3], width: [4,5,6], height: [7,8,9], texture_id: 10, isWindow: false};
+
+        jsonGeometry << "  { \"pos\": " << walls[i].pos <<
+                        ", \"width\": " << walls[i].width << 
+                        ", \"height\": "<< walls[i].height <<
+                        ", \"textureId\": " << i << "}," << endl;
+        
     }
+
+    jsonGeometry << "]" << endl;
     
-    free( objects);
+    free( walls);
     free( lightColors);
+
 
     return 0;
 }
