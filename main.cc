@@ -272,8 +272,8 @@ void performGlobalIllumination(cl_context ctx, cl_device_id device, const vector
         Vector3 yDir= getHeightVector( &window);
         
         float area = length(xDir) * length(yDir);
-        uint64_t numSamples = numSamplesPerArea * area/ 100; //  the OpenCL kernel does 100 iterations per call)
-        numSamples = (numSamples / maxWorkGroupSize) * maxWorkGroupSize;    //must be a multiple of the local work size
+        uint64_t numSamples = (numSamplesPerArea * area) / 100; //  the OpenCL kernel does 100 iterations per call)
+        numSamples = (numSamples / maxWorkGroupSize + 1) * maxWorkGroupSize;    //must be a multiple of the local work size
          
 	    cl_mem windowBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY| CL_MEM_USE_HOST_PTR , sizeof(Rectangle),(void *)&window, &st );
 	    status |= st;
@@ -282,7 +282,7 @@ void performGlobalIllumination(cl_context ctx, cl_device_id device, const vector
 
 	    status |= st;
 
-        status = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&windowBuffer);
+        status |= clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&windowBuffer);
         status |= clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&rectBuffer);
         status |= clSetKernelArg(kernel, 2, sizeof(cl_int), (void *)&numWalls);
         status |= clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&lightColorsBuffer);
@@ -291,7 +291,6 @@ void performGlobalIllumination(cl_context ctx, cl_device_id device, const vector
 
         //FIXME: rewrite this code to be able to always have two kernels enqueued at the same time to maximize 
         //       performance (but not more than two kernels as this stresses GPUs too much
-        
         while (numSamples)
         {
             cout << "\rPhoton-Mapping window " << (i+1) << "/" << windows.size() << " with " << (int)(numSamples*100/1000000) << "M samples   " << flush;
@@ -374,7 +373,7 @@ int main(int argc, const char** argv)
     cl_device_id device;
 	initCl(&ctx, &device);
 
-    int numSamplesPerArea = 100;
+    int numSamplesPerArea = 10;
     performGlobalIllumination(ctx, device, windows, numSamplesPerArea);
     
     for ( int i = 0; i < numWalls; i++)
@@ -411,7 +410,10 @@ int main(int argc, const char** argv)
         jsonGeometry << "  { \"pos\": " << walls[i].pos <<
                         ", \"width\": " << walls[i].width << 
                         ", \"height\": "<< walls[i].height <<
-                        ", \"textureId\": " << i << "}," << endl;
+                        ", \"textureId\": " << i << "}";
+        if (i+1 < numWalls)
+        jsonGeometry << ", ";
+        jsonGeometry << endl;
         
     }
 
