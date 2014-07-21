@@ -103,6 +103,35 @@ void getAABB( const vector<Rectangle> &walls, const vector<Rectangle> &windows, 
     }
 }
 
+
+void registerWall( vector<Rectangle> &walls, vector<Rectangle> &windows, 
+                   uint32_t col0, uint32_t col1, float x0, float y0, float x1, float y1)
+{
+
+    if      (col0 == BLACK && col1 == WHITE) addWall(walls, x0, y1, x1 - x0, y0 - y1); //transition from wall to inside area
+    else if (col0 == WHITE && col1 == BLACK) addWall(walls, x1, y0, x0 - x1, y1 - y0);// transition from inside area to wall
+
+    else if (col0 == BLACK && col1 == LGRAY) addWall(walls, x0, y1, x1 - x0, y0 - y1, 0, DOOR_HEIGHT); //transition from wall to door frame
+    else if (col0 == LGRAY && col1 == BLACK) addWall(walls, x1, y0, x0 - x1, y1 - y0, 0, DOOR_HEIGHT);// 
+
+    else if (col0 == BLACK && col1 == GREEN) addWall(walls, x0, y1, x1 - x0, y0 - y1, WINDOW_LOW, WINDOW_HIGH); //transition from wall to window (frame)
+    else if (col0 == GREEN && col1 == BLACK) addWall(walls, x1, y0, x0 - x1, y1 - y0, WINDOW_LOW, WINDOW_HIGH); //transition from wall to window (frame)
+
+    else if (col0 == GRAY  && col1 == WHITE) addWall(walls, x0, y1, x1 - x0, y0 - y1); //transition from entrace to inside area
+    else if (col0 == WHITE && col1 == GRAY ) addWall(walls, x1, y0, x0 - x1, y1 - y0);// transition from entrace to inside area
+
+    else if (col0 == GRAY  && col1 == GREEN) addWall(windows, x0, y1, x1 - x0, y0 - y1, WINDOW_LOW, WINDOW_HIGH);
+    else if (col0 == GREEN && col1 == GRAY)  addWall(windows, x1, y0, x0 - x1, y1 - y0, WINDOW_LOW, WINDOW_HIGH);
+
+    else if (col0 == LGRAY && col1 == WHITE) addWall(walls, x0, y1, x1 - x0, y0 - y1, DOOR_HEIGHT, HEIGHT); //transition from door frame to inside area
+    else if (col0 == WHITE && col1 == LGRAY) addWall(walls, x1, y0, x0 - x1, y1 - y0, DOOR_HEIGHT, HEIGHT);// transition from door frame to inside area
+
+    else if (col0 == GREEN && col1 == WHITE) addWindowedWall(x0, y1, x1 - x0, y0 - y1, walls, NULL); //transition from window to inside area
+    else if (col0 == WHITE && col1 == GREEN) addWindowedWall(x1, y0, x0 - x1, y1 - y0, walls, NULL);
+
+
+}
+
 void parseLayout(const char* const filename, const float scaling, vector<Rectangle> &wallsOut, vector<Rectangle> &windowsOut)
 {
     wallsOut.clear();
@@ -154,39 +183,7 @@ void parseLayout(const char* const filename, const float scaling, vector<Rectang
                 
             float endX = x;
             
-            startX *= scaling;
-            endX *= scaling;
-            float sy  = y * scaling;
-            
-            
-            if      (pxAbove == BLACK && pxHere == WHITE) addWall(wallsOut, startX, sy, endX - startX, 0); //transition from wall to inside area
-            else if (pxAbove == WHITE && pxHere == BLACK) addWall(wallsOut, endX,   sy, startX - endX, 0);// transition from inside area to wall
-
-            if      (pxAbove == BLACK && pxHere == LGRAY) addWall(wallsOut, startX, sy, endX - startX, 0, 0, DOOR_HEIGHT); //transition from wall to door frame
-            else if (pxAbove == LGRAY && pxHere == BLACK) addWall(wallsOut, endX,   sy, startX - endX, 0, 0, DOOR_HEIGHT);// 
-
-
-            else if (pxAbove == GRAY  && pxHere == WHITE) addWall(wallsOut, startX, sy, endX - startX, 0); //transition from entrace to inside area
-            else if (pxAbove == WHITE && pxHere == GRAY ) addWall(wallsOut, endX,   sy, startX - endX, 0);// transition from entrace to inside area
-
-            if      (pxAbove == LGRAY && pxHere == WHITE) addWall(wallsOut, startX, sy, endX - startX, 0, DOOR_HEIGHT, HEIGHT); //transition from door frame to inside area
-            else if (pxAbove == WHITE && pxHere == LGRAY) addWall(wallsOut, endX,   sy, startX - endX, 0, DOOR_HEIGHT, HEIGHT);// transition from door frame to inside area
-
-
-            else if (pxAbove == BLACK && pxHere == GREEN) addWall(wallsOut, startX, sy, endX - startX, 0, WINDOW_LOW, WINDOW_HIGH); //transition from wall to window (frame)
-            else if (pxAbove == GREEN && pxHere == BLACK) addWall(wallsOut, endX, sy, startX - endX,   0, WINDOW_LOW, WINDOW_HIGH); //transition from wall to window (frame)
-
-
-            else if (pxAbove == GREEN && pxHere == WHITE) addWindowedWall(startX, sy, endX - startX, 0, wallsOut, NULL); //transition from window to inside area
-            else if (pxAbove == WHITE && pxHere == GREEN) addWindowedWall(endX,   sy, startX - endX, 0, wallsOut, NULL);
-
-            else if (pxAbove == GRAY  && pxHere == GREEN) addWall(windowsOut, startX, sy, endX - startX, 0, WINDOW_LOW, WINDOW_HIGH);
-            else if (pxAbove == GREEN && pxHere == GRAY)  addWall(windowsOut, endX, sy, startX - endX, 0, WINDOW_LOW, WINDOW_HIGH);
-
-            //else
-            //    cout << "unknown transition " << hex << pxAbove << "/" << pxHere << dec << endl;
-
-
+            registerWall(wallsOut, windowsOut, pxAbove, pxHere, startX*scaling, y*scaling, endX*scaling, y*scaling);
         }
     }
     //cout << "  == End of horizontal scan, beginning vertical scan ==" << endl;
@@ -211,33 +208,7 @@ void parseLayout(const char* const filename, const float scaling, vector<Rectang
                 
             float endY = y;
             
-            startY *= scaling;
-            endY *= scaling;
-            float sx  = x * scaling;
-            
-            
-            if      (pxLeft == BLACK && pxHere == WHITE) addWall(wallsOut, sx, endY,   0, startY - endY); //transition from wall to inside area
-            else if (pxLeft == WHITE && pxHere == BLACK) addWall(wallsOut, sx, startY, 0, endY - startY);// transition from inside area to wall
-
-            else if (pxLeft == BLACK && pxHere == LGRAY) addWall(wallsOut, sx, endY,   0, startY - endY, 0, DOOR_HEIGHT); //transition from wall to door frame
-            else if (pxLeft == LGRAY && pxHere == BLACK) addWall(wallsOut, sx, startY, 0, endY - startY, 0, DOOR_HEIGHT); // 
-
-            if      (pxLeft == LGRAY && pxHere == WHITE) addWall(wallsOut, sx, endY,   0, startY - endY, DOOR_HEIGHT, HEIGHT); //transition from wall to inside area
-            else if (pxLeft == WHITE && pxHere == LGRAY) addWall(wallsOut, sx, startY, 0, endY - startY, DOOR_HEIGHT, HEIGHT);// transition from inside area to wall
-
-
-            else if (pxLeft == GRAY  && pxHere == WHITE) addWall(wallsOut, sx, endY,   0, startY - endY); //transition from wall to inside area
-            else if (pxLeft == WHITE && pxHere == GRAY ) addWall(wallsOut, sx, startY, 0, endY - startY);// transition from inside area to wall
-
-            else if (pxLeft == BLACK && pxHere == GREEN) addWall(wallsOut, sx, endY,   0, startY - endY, WINDOW_LOW, WINDOW_HIGH); //transition from wall to window (frame)
-            else if (pxLeft == GREEN && pxHere == BLACK) addWall(wallsOut, sx, startY, 0, endY - startY, WINDOW_LOW, WINDOW_HIGH); //transition from wall to window (frame)
-
-            else if (pxLeft == GREEN && pxHere == WHITE) addWindowedWall(sx, endY,     0, startY - endY, wallsOut, NULL);//transition from window to inside area
-            else if (pxLeft == WHITE && pxHere == GREEN) addWindowedWall(sx, startY,   0, endY - startY, wallsOut, NULL);
-
-            else if (pxLeft == GRAY  && pxHere == GREEN) addWall(windowsOut, sx, endY,   0, startY - endY, WINDOW_LOW, WINDOW_HIGH);
-            else if (pxLeft == GREEN && pxHere == GRAY)  addWall(windowsOut, sx, startY, 0, endY - startY, WINDOW_LOW, WINDOW_HIGH);
-
+            registerWall(wallsOut, windowsOut, pxLeft, pxHere, x*scaling, startY*scaling, x*scaling, endY*scaling);
         }
     }
 
