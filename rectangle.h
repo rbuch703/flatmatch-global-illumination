@@ -28,18 +28,11 @@ typedef struct __attribute__ ((aligned(16))) Rectangle{
 //    float 
 } Rectangle;
 
-/* Rectangle structure extended by maintenance information 
+Rectangle createRectangleV( const Vector3 _pos, const Vector3 _width, const Vector3 _height);
+Rectangle createRectangle( float px, float py, float pz,
+                           float wx, float wy, float wz,
+                           float hx, float hy, float hz);
 
-*/
-typedef struct ExtendedRectangle {
-    int textureId;
-    int isWindow;
-    Rectangle rect;
-} ExtendedRectangle;
-
-
-ExtendedRectangle createExtendedRectangle( const Vector3 _pos, const Vector3 _width, const Vector3 _height, int _isWindow);
-Rectangle createRectangle( const Vector3 _pos, const Vector3 _width, const Vector3 _height);
 float intersects( const Rectangle *rect, Vector3 ray_src, Vector3 ray_dir, float closestDist);
 int getNumTiles(const Rectangle *rect);
 float getArea(const Rectangle *rect);

@@ -13,17 +13,7 @@ int max(int a, int b)
 }
 
 
-ExtendedRectangle createExtendedRectangle( const Vector3 _pos, const Vector3 _width, const Vector3 _height, int _isWindow)
-{
-    ExtendedRectangle res = {
-        .textureId = -1,
-        .isWindow = _isWindow,
-        .rect = createRectangle( _pos, _width, _height) };
-        
-    return res;
-}
-
-Rectangle createRectangle( const Vector3 _pos, const Vector3 _width, const Vector3 _height)
+Rectangle createRectangleV( const Vector3 _pos, const Vector3 _width, const Vector3 _height)
 {
 
     Rectangle res;
@@ -65,6 +55,13 @@ Rectangle createRectangle( const Vector3 _pos, const Vector3 _width, const Vecto
     res.height_norm = ;*/
 
     return res;
+}
+
+Rectangle createRectangle( float px, float py, float pz,
+                           float wx, float wy, float wz,
+                           float hx, float hy, float hz)
+{
+    return createRectangleV (createVector3(px, py, pz), createVector3(wx, wy, wz), createVector3(hx, hy, hz));
 }
 
 
