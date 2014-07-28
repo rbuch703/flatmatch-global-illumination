@@ -7,7 +7,8 @@
 
 using namespace std;
 
-void parseLayout(const char* const filename, const float scaling, vector<Rectangle> &wallsOut, vector<Rectangle> &windowsOut);
+void parseLayout(const char* const filename, const float scaling, vector<Rectangle> &wallsOut, 
+                 vector<Rectangle> &windowsOut, vector<Rectangle> &lightsOut, pair<float, float> &startingPositionOut);
 
 
 #endif

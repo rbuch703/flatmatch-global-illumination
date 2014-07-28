@@ -159,17 +159,24 @@ float intersects( __constant const Rectangle *rect, const float3 ray_src, const 
 
 
 void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constant const Rectangle* rects, const int numRects,
-                        __global float3 *lightColors)
+                        __global float3 *lightColors, const int isWindow)
 {
 
-    float3 lightColor = (float3)(18, 17, 15);//window->color;
+    
+    //float3 lightColor = 
+    float3 lightColor = isWindow ? 
+        (float3)(18, 17, 15):  //slightly yellow-ish for outside areas
+        (float3)(16, 16, 18);  //slightly blue-ish for artificial light
 
     const int MAX_DEPTH = 8;
 
     float dx = rand(rng_state);
     float dy = rand(rng_state);
 
-    float3 ray_dir = getDiffuseSkyRandomRay(rng_state, window->n);//, normalize(window.width), normalize(window.height));
+    //float3 ray_dir = getDiffuseSkyRandomRay(rng_state, window->n);//, normalize(window.width), normalize(window.height));
+    float3 ray_dir = isWindow ? 
+        getDiffuseSkyRandomRay(rng_state, window->n) :
+        getCosineDistributedRandomRay(rng_state, window->n);
     //move slightly in direction of ray_dir to prevent self-intersection on the light source geometry
     float3 pos = window->pos + window->width*dx + window->height*dy + (ray_dir* 1E-5f);
     
@@ -238,7 +245,7 @@ void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constan
 
 
 __kernel void photonmap(__constant const Rectangle * restrict window, __constant const Rectangle* restrict rects, int numRects,
-                        __global float3 *lightColors/*, const int numLightColors*/, int rng_offset)
+                        __global float3 *lightColors/*, const int numLightColors*/, int rng_offset, int isWindow)
 {
     ulong rng_state = get_global_id(0) + rng_offset;
     float r = rand(&rng_state) * 40; //warm-up / decorrelate individual RNGs
@@ -248,6 +255,6 @@ __kernel void photonmap(__constant const Rectangle * restrict window, __constant
     //printf("kernel supplied with %d rectangles\n", numRects);
     
     for (int i = 0; i < 100; i++)
-        tracePhoton(&rng_state, window, rects, numRects, lightColors);
+        tracePhoton(&rng_state, window, rects, numRects, lightColors, isWindow);
 }
 

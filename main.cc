@@ -18,15 +18,18 @@ using namespace std;
 Rectangle* walls = NULL;
 cl_int numWalls;
 
-vector<Rectangle> windows;
+vector<Rectangle> windows, lights;
 
 Vector3* lightColors = NULL;
 cl_int numTexels;
 
+pair<float, float> startingPos;
+
+
 void loadGeometry(string filename, float scale)
 {
     vector<Rectangle> vWalls;
-    parseLayout(filename.c_str(), scale, vWalls, windows);
+    parseLayout(filename.c_str(), scale, vWalls, windows, lights, startingPos);
     
     //the set of walls will be uploaded to OpenCL, and thus needs to be converted to a suitable structure (array of structs)
     //the windows are only uploaded only one by one, so no conversion is necessary here
@@ -239,6 +242,62 @@ cl_program createProgram(cl_context ctx, cl_device_id device, const char* src)
     return program;
 }
 
+
+void photonMapLightSource(cl_context ctx, cl_command_queue queue, cl_kernel kernel, const Rectangle &lightSource, float numSamplesPerArea, cl_int isWindow, size_t maxWorkGroupSize,
+                          cl_mem rectBuffer, cl_mem lightColorsBuffer)
+{
+    Vector3 xDir= getWidthVector(  &lightSource);
+    Vector3 yDir= getHeightVector( &lightSource);
+    
+    float area = length(xDir) * length(yDir);
+    uint64_t numSamples = (numSamplesPerArea * area) / 100; //  the OpenCL kernel does 100 iterations per call)
+    numSamples = (numSamples / maxWorkGroupSize + 1) * maxWorkGroupSize;    //must be a multiple of the local work size
+    cl_int st = 0;
+
+    cl_mem windowBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY| CL_MEM_USE_HOST_PTR , sizeof(Rectangle),(void *)&lightSource, &st );
+	if (st)
+    	cout << "buffer creation preparation errors: " << st << endl;
+
+    st |= clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&windowBuffer);
+    st |= clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&rectBuffer);
+    st |= clSetKernelArg(kernel, 2, sizeof(cl_int), (void *)&numWalls);
+    st |= clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&lightColorsBuffer);
+    st |= clSetKernelArg(kernel, 5, sizeof(cl_int), (void *)&isWindow);
+	if (st)
+	{
+    	cout << "Kernel Arg preparation errors: " << st << endl;
+    	exit(0);
+	}
+
+    //FIXME: rewrite this code to be able to always have two kernels enqueued at the same time to maximize 
+    //       performance (but not more than two kernels as this stresses GPUs too much
+    while (numSamples)
+    {
+        cout << "\rPhoton-Mapping window " << " with " << (int)(numSamples*100/1000000) << "M samples   " << flush;
+        
+        cl_int idx = rand();
+        st |= clSetKernelArg(kernel, 4, sizeof(cl_int), (void *)&idx);
+        if (st)
+            exit(-1);
+        size_t workSize = numSamples < maxWorkGroupSize * 40 ? numSamples : maxWorkGroupSize * 40;  //openCL becomes unstable on ATI GPUs with work sizes > 40000 items
+        numSamples -=workSize;
+
+    	st |= clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &workSize, &maxWorkGroupSize, 0, NULL, NULL);
+        //clFinish(queue);
+    	if (st)
+    	{
+        	cout << "Kernel execution error: " << st << endl;
+    	    exit(-1);
+    	}
+    	
+        clFinish(queue);
+	    }
+	    cout << endl;
+    	
+    clReleaseMemObject(windowBuffer);
+
+}
+
 void performGlobalIllumination(cl_context ctx, cl_device_id device, const vector<Rectangle> &windows, int numSamplesPerArea = 1000)
 {
 	cl_command_queue queue = clCreateCommandQueue(ctx, device, 0, NULL);
@@ -265,56 +324,12 @@ void performGlobalIllumination(cl_context ctx, cl_device_id device, const vector
     //cout << "Maximum workgroup size for this kernel on this device is " << maxWorkGroupSize << endl;
 
     for ( unsigned int i = 0; i < windows.size(); i++)
-    {
-        Rectangle window = windows[i];
+        photonMapLightSource(ctx, queue, kernel, windows[i], numSamplesPerArea, true, maxWorkGroupSize, rectBuffer, lightColorsBuffer);
 
-        Vector3 xDir= getWidthVector(  &window);
-        Vector3 yDir= getHeightVector( &window);
-        
-        float area = length(xDir) * length(yDir);
-        uint64_t numSamples = (numSamplesPerArea * area) / 100; //  the OpenCL kernel does 100 iterations per call)
-        numSamples = (numSamples / maxWorkGroupSize + 1) * maxWorkGroupSize;    //must be a multiple of the local work size
-         
-	    cl_mem windowBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY| CL_MEM_USE_HOST_PTR , sizeof(Rectangle),(void *)&window, &st );
-	    status |= st;
-    	if (status)
-        	cout << "buffer creation preparation errors: " << status << endl;
+    for ( unsigned int i = 0; i < lights.size(); i++)
+        photonMapLightSource(ctx, queue, kernel, lights[i], numSamplesPerArea, false, maxWorkGroupSize, rectBuffer, lightColorsBuffer);
 
-	    status |= st;
-
-        status |= clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&windowBuffer);
-        status |= clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&rectBuffer);
-        status |= clSetKernelArg(kernel, 2, sizeof(cl_int), (void *)&numWalls);
-        status |= clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&lightColorsBuffer);
-    	if (status)
-        	cout << "Kernel Arg preparation errors: " << status << endl;
-
-        //FIXME: rewrite this code to be able to always have two kernels enqueued at the same time to maximize 
-        //       performance (but not more than two kernels as this stresses GPUs too much
-        while (numSamples)
-        {
-            cout << "\rPhoton-Mapping window " << (i+1) << "/" << windows.size() << " with " << (int)(numSamples*100/1000000) << "M samples   " << flush;
-            
-            cl_int idx = rand();
-            status |= clSetKernelArg(kernel, 4, sizeof(cl_int), (void *)&idx);
-            if (status)
-                exit(-1);
-            size_t workSize = numSamples < maxWorkGroupSize * 40 ? numSamples : maxWorkGroupSize * 40;  //openCL becomes unstable on ATI GPUs with work sizes > 40000 items
-            numSamples -=workSize;
-
-            	st = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &workSize, &maxWorkGroupSize, 0, NULL, NULL);
-            //clFinish(queue);
-            	if (st)
-            	{
-                	cout << "Kernel execution error: " << st << endl;
-            	    exit(-1);
-            	}
-            clFinish(queue);
-    	    }
-    	    cout << endl;
-        	
-        clReleaseMemObject(windowBuffer);
-    }
+    
     clFinish(queue);
     clEnqueueReadBuffer(queue, lightColorsBuffer, CL_TRUE, 0, numTexels * sizeof(cl_float3),  (void *) lightColors, 0, NULL, NULL);
 
@@ -356,8 +371,8 @@ int main(int argc, const char** argv)
 
     float scale = argc < 3 ? 30 : atof(argv[2]);
     
-    //scale is passed in the more human-readable pixel/m, but the geometry loader needs it in cm/pixel
-    loadGeometry(argv[1], 100/scale);   
+    //scale is passed in the more human-readable pixel/m, but the geometry loader needs it in m/pixel
+    loadGeometry(argv[1], 1/scale);
 
     /*vector<Rectangle> windows;
     for ( int i = 0; i < numWalls; i++)
@@ -373,7 +388,7 @@ int main(int argc, const char** argv)
     cl_device_id device;
 	initCl(&ctx, &device);
 
-    int numSamplesPerArea = 10;
+    int numSamplesPerArea = 1000000 * 10;   // rays per square meter of window/light surface
     performGlobalIllumination(ctx, device, windows, numSamplesPerArea);
     
     for ( int i = 0; i < numWalls; i++)
@@ -397,7 +412,11 @@ int main(int argc, const char** argv)
 
     
     ofstream jsonGeometry("geometry.json");
-    jsonGeometry << "[" << endl;
+
+    jsonGeometry << "{" << endl;
+    jsonGeometry << "\"startingPosition\" : [" << startingPos.first << ", " << startingPos.second << "]," <<  endl;
+
+    jsonGeometry << "\"geometry\" : [" << endl;
     char num[50];
     for ( int i = 0; i < numWalls; i++)
     {
@@ -418,6 +437,7 @@ int main(int argc, const char** argv)
     }
 
     jsonGeometry << "]" << endl;
+    jsonGeometry << "}" << endl;
     
     free( walls);
     free( lightColors);

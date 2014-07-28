@@ -11,8 +11,8 @@ extern "C" {
 #include "assert.h"
 
 
-static const float TILE_SIZE = 1/20.0f;   //lightmap texels per cm²
-static const int   SUPER_SAMPLING = 4;
+static const float TILE_SIZE = 10000/20.0f;   //lightmap texels per m²
+static const int   SUPER_SAMPLING = 1;
 
 
 /* Rectangle structure to be passed to OpenCL

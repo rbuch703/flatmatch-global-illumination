@@ -5,6 +5,8 @@
 
 #include <assert.h>
 #include <string>
+#include <string.h> //for memcpy
+#include <math.h> //for sqrt()
 #include "png_helper.h"
 #include <iostream>
 
@@ -18,10 +20,10 @@ static const uint8_t DOOR = 0x4;
 static const uint8_t WINDOW = 0x5;
 
 
-static const float HEIGHT = 2.50 * 100;
-static const float DOOR_HEIGHT = 2.00 * 100;
-static const float WINDOW_LOW = 0.90 * 100;
-static const float WINDOW_HIGH= 2.20 * 100;
+static const float HEIGHT      = 2.60;
+static const float DOOR_HEIGHT = 2.00;
+static const float WINDOW_LOW  = 0.85;
+static const float WINDOW_HIGH = 2.30;
 static const float WINDOW_HEIGHT = WINDOW_HIGH - WINDOW_LOW;
 static const float TOP_WALL_HEIGHT = HEIGHT - WINDOW_HIGH;
 
@@ -71,22 +73,269 @@ void registerWall( vector<Rectangle> &walls, vector<Rectangle> &windows,
 
 }
 
-void parseLayout(const char* const filename, const float scaling, vector<Rectangle> &wallsOut, vector<Rectangle> &windowsOut)
+uint32_t getData(int x, int y, uint32_t *pixelBuffer, int width, int height)
+{
+    x = max( min(x, width-1), 0);
+    y = max( min(y, height-1), 0);
+    return pixelBuffer[y*width+x];
+}
+
+bool setData(int x, int y, uint32_t val, uint32_t *pixelBuffer, int width, int height)
+{
+    if ( x < 0) return false;
+    if ( x >= width) return false;
+    if ( y < 0) return false;
+    if ( y >= height) return false;
+    
+    pixelBuffer[y*width+x] = val;
+    return true;
+}
+
+
+
+unsigned int distanceTransform(uint32_t *data, int width, int height)
+{
+
+    vector<pair<int, int>> openList;
+    unsigned int distance = 1;
+    for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++)
+    {
+        if (getData(x,y, data, width, height) == distance)
+            openList.push_back(pair<int, int>(x,y));
+    }
+
+    while (openList.size())
+    {
+        //cout << "open list for distance " << distance << " contains " << openList.size() << " entries" << endl;
+
+        vector<pair<int, int>> newOpenList;
+        for (unsigned int i = 0; i < openList.size(); i++)
+        {
+            //int x = openList[i].first;
+            //int y = openList[i].second;
+            
+            for (int x = max(openList[i].first-1, 0); x <= min(openList[i].first + 1, width - 1); x++)
+                for (int y = max(openList[i].second - 1, 0); y <= min(openList[i].second + 1, height-1); y++)
+                {
+                    if (x == openList[i].first && y == openList[i].second)
+                        continue;
+                        
+                    if (getData(x, y, data, width, height) == 0)
+                    {
+                        setData(x, y, distance+1, data, width, height);
+                        newOpenList.push_back(pair<int, int>(x, y));
+                    }
+                }
+        }
+        
+        
+        openList = newOpenList;
+        distance += 1;
+    }
+
+    /*for (int i = 0; i < width*height; i++)
+        data[i] = data[i] * 4 | 0xFF000000;
+
+    write_png_file("distance.png", width, height, PNG_COLOR_TYPE_RGBA, (uint8_t*)data);*/
+
+    
+    //the while loop loops until the open list for a distance is completely empty,
+    //i.e. until a distance is reached for which not a single pixel exists.
+    //so the actual maximum distance returned here is one less than the distance
+    //for which the loop terminated
+    return distance - 1;
+
+}
+
+
+pair<int, int> getCentralPosition(uint32_t *pixelBuffer, int width, int height)
+{
+    uint32_t *tmpData = new uint32_t[width*height];
+    memcpy(tmpData, pixelBuffer, width*height*sizeof(uint32_t));
+    
+    for (int i = 0; i < width*height; i++)
+    {
+        switch (tmpData[i])
+        {
+            case 0xFFFFFFFF: 
+            case 0xFF00FF00: 
+            case 0xFFDFDFDF: 
+                tmpData[i] = 0;
+                break;
+                
+            default: 
+                tmpData[i] = 1; //walls, outside
+                break;
+        }
+    }
+
+    unsigned int maxDistance = distanceTransform(tmpData, width, height);
+    for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++)
+            if (tmpData[y*width+x] == maxDistance-1)
+            {
+                delete [] tmpData;
+                return pair<int, int>(x, y);
+            }
+    
+    delete [] tmpData;
+    assert(false);
+    return pair<int, int>(-1, -1);
+}
+
+void floodFill(int x, int y, uint32_t *pixelBuffer, int width, int height, uint32_t value, uint32_t background)
+{
+    if (getData(x, y, pixelBuffer, width, height) != background)
+        return;
+        
+    setData(x, y, value, pixelBuffer, width, height);
+    
+    floodFill( x-1, y-1, pixelBuffer, width, height, value, background);
+    floodFill( x-1, y  , pixelBuffer, width, height, value, background);
+    floodFill( x-1, y+1, pixelBuffer, width, height, value, background);
+
+    floodFill( x  , y-1, pixelBuffer, width, height, value, background);
+//  floodFill( x  , y  , pixelBuffer, width, height, value, background);
+    floodFill( x  , y+1, pixelBuffer, width, height, value, background);
+
+    floodFill( x+1, y-1, pixelBuffer, width, height, value, background);
+    floodFill( x+1, y  , pixelBuffer, width, height, value, background);
+    floodFill( x+1, y+1, pixelBuffer, width, height, value, background);
+}
+
+
+int traverseRoom(int x, int y, uint32_t *pixelData, int width, int height, unsigned int &maxDist, pair<int, int> &maxPos)
+{
+    uint32_t valHere = getData(x, y, pixelData, width, height);
+    //cout << "at position " << x << ", " << y << " with value " << valHere << endl;
+    assert( valHere > 1);
+
+    setData(x, y, 0, pixelData, width, height);
+    int numPixels = 1;
+    
+    if ( valHere > maxDist)
+    {
+        maxDist = valHere;
+        maxPos = pair<int, int>(x, y);
+    }
+    
+    if ( x > 0       && getData(x-1, y, pixelData, width, height) > 1) numPixels += traverseRoom(x-1, y, pixelData, width, height, maxDist, maxPos);
+    if ( x+1 < width && getData(x+1, y, pixelData, width, height) > 1) numPixels += traverseRoom(x+1, y, pixelData, width, height, maxDist, maxPos);
+    
+    if ( y > 0        && getData(x, y-1, pixelData, width, height) > 1) numPixels += traverseRoom(x, y-1, pixelData, width, height, maxDist, maxPos);
+    if ( y+1 < height && getData(x, y+1, pixelData, width, height) > 1) numPixels += traverseRoom(x, y+1, pixelData, width, height, maxDist, maxPos);
+    
+    return numPixels;
+}
+
+void createWindowInRoom(int x, int y, uint32_t *pixelData, int width, int height, float scaling, vector<Rectangle> &windowsOut)
+{
+    assert( getData(x, y, pixelData, width, height) > 1);
+    
+    unsigned int maxDist = 1;
+    pair<int, int> maxPos = pair<int, int>(x, y);
+    int numPixels = traverseRoom(x, y, pixelData, width, height, maxDist, maxPos);    
+
+    cout << "found room with center at (" << maxPos.first << ", " << maxPos.second << ") with distance " << maxDist << " and area " << numPixels << endl;
+    float edgeHalfLength = sqrt(numPixels) / 20;
+    //maxDist is the maximum distance from maxPos for which it is guaranteed that there is no wall in any direction
+    // (might be one-off though)
+    
+    if (edgeHalfLength > maxDist)
+        edgeHalfLength = maxDist;
+    
+    //cout << "scaling: " << scaling << ", x=" << maxPos.first << ", y=" << maxPos.second << endl;
+    edgeHalfLength *=scaling;
+    float px = maxPos.first  * scaling;
+    float py = maxPos.second * scaling;
+    
+    //cout << "after scaling: x=" << px << ", y=" << py << endl;
+    //cout << "edgeHalfLength is " << edgeHalfLength << endl;
+    
+    windowsOut.push_back(createRectangle( px - edgeHalfLength, py - edgeHalfLength, HEIGHT-0.001,
+                                          2*edgeHalfLength, 0, 0,
+                                          0, 2*edgeHalfLength, 0));
+/*
+    for (int i = 0; i < width*height; i++)
+        pixelData[i] |= 0xFF000000;
+
+    setData(maxPos.first, maxPos.second, 0xFF00FF00, pixelData, width, height);
+    write_png_file("lamp.png", width, height, PNG_COLOR_TYPE_RGBA, (uint8_t*)pixelData);
+    exit(0);*/
+
+}
+
+
+/* This method finds rooms (including the corridor) that have no windows (and thus will appear too dark)
+   and adds ceiling lights to them. This is done in multiple steps:
+   1. all inside areas adjacent to windows are flood-filled to exclude them
+   2. for the remaining inside areas, a distance transform is performed
+   3. for all areas with a distance transform > 1 (i.e. the remaining rooms),
+     3a. the center point is found
+     3b. the room size is calculated (pixel counting)
+     3c. a light source is created at the center point with a size proportional to the room size;
+ */
+void createLights(const uint32_t *pixelBuffer, int width, int height, float scaling, vector<Rectangle> &windowsOut)
+{
+    uint32_t *tmpData = new uint32_t[width*height];
+    memcpy(tmpData, pixelBuffer, width*height*sizeof(uint32_t));
+    
+    
+    for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++)
+    {
+        if (getData(x, y, tmpData, width, height) == 0xFF00FF00) //window
+        {
+            if (getData(x-1, y, tmpData, width, height) == 0xFFFFFFFF) floodFill(x-1, y, tmpData, width, height, 0xFF00FF00, 0xFFFFFFFF);
+            if (getData(x+1, y, tmpData, width, height) == 0xFFFFFFFF) floodFill(x+1, y, tmpData, width, height, 0xFF00FF00, 0xFFFFFFFF);
+            if (getData(x, y-1, tmpData, width, height) == 0xFFFFFFFF) floodFill(x, y-1, tmpData, width, height, 0xFF00FF00, 0xFFFFFFFF);
+            if (getData(x, y+1, tmpData, width, height) == 0xFFFFFFFF) floodFill(x, y+1, tmpData, width, height, 0xFF00FF00, 0xFFFFFFFF);
+        }
+    }
+
+    /*write_png_file( "distance.png", width, height, PNG_COLOR_TYPE_RGBA, (uint8_t*)tmpData);*/
+    for (int i = 0; i < width*height; i++)
+        tmpData[i] = (tmpData[i] == 0xFFFFFFFF) ? 0 : 1;
+
+
+    distanceTransform(tmpData, width, height);
+    
+    for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++)
+        {
+            if (getData(x, y, tmpData, width, height) > 1)
+                createWindowInRoom(x, y, tmpData, width, height, scaling, windowsOut);
+        }
+
+    /*for (int i = 0; i < width*height; i++)
+        tmpData[i] = tmpData[i] * 3 | 0xFF000000;
+
+    write_png_file( "distance.png", width, height, PNG_COLOR_TYPE_RGBA, (uint8_t*)tmpData);
+    exit(0);    */
+    
+    delete [] tmpData;
+    //assert(false);
+    //return pair<int, int>(-1, -1);
+}
+
+
+void parseLayout(const char* const filename, const float scaling, vector<Rectangle> &wallsOut, vector<Rectangle> &windowsOut, vector<Rectangle> &lightsOut, pair<float, float> &startingPositionOut)
 {
     wallsOut.clear();
     windowsOut.clear();
     
     int width, height, color_type;
-    uint32_t *pixel_buffer;
-    read_png_file(filename, &width, &height, &color_type, (uint8_t**)&pixel_buffer );
+    uint32_t *pixelBuffer;
+    read_png_file(filename, &width, &height, &color_type, (uint8_t**)&pixelBuffer );
 
     if (color_type == PNG_COLOR_TYPE_RGB)
     {
-        uint8_t *src = (uint8_t*)pixel_buffer;
-        pixel_buffer = (uint32_t*)malloc( width*height*sizeof(uint32_t));
+        uint8_t *src = (uint8_t*)pixelBuffer;
+        pixelBuffer = (uint32_t*)malloc( width*height*sizeof(uint32_t));
         
         for (int i = 0; i < width*height; i++)
-            pixel_buffer[i] =
+            pixelBuffer[i] =
                 0xFF000000 | src[i*3] | (src[i*3+1] << 8) | (src[i*3+2] << 16);
         
         free(src);
@@ -98,7 +347,7 @@ void parseLayout(const char* const filename, const float scaling, vector<Rectang
     uint8_t *pixels = new uint8_t[width*height];
     for (int i = 0; i < width*height; i++)
     {
-        switch (pixel_buffer[i])
+        switch (pixelBuffer[i])
         {
             case 0x00000000: pixels[i] = INVALIDATED; break;
             case 0xFF000000: pixels[i] = WALL; break;
@@ -108,7 +357,15 @@ void parseLayout(const char* const filename, const float scaling, vector<Rectang
             case 0xFFDFDFDF: pixels[i] = DOOR; break;
         }
     }
-    free (pixel_buffer);
+
+    pair<int, int> centralPos = getCentralPosition(pixelBuffer, width, height);
+    startingPositionOut.first  = centralPos.first * scaling;
+    startingPositionOut.second = centralPos.second * scaling;
+    
+    createLights(pixelBuffer, width, height, scaling, lightsOut);
+    
+    
+    free (pixelBuffer);
     
     for (int y = 1; y < height; y++)
     {
