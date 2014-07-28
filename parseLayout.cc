@@ -171,6 +171,8 @@ pair<int, int> getCentralPosition(uint32_t *pixelBuffer, int width, int height)
     }
 
     unsigned int maxDistance = distanceTransform(tmpData, width, height);
+    
+    
     for (int y = 0; y < height; y++)
         for (int x = 0; x < width; x++)
             if (tmpData[y*width+x] == maxDistance-1)
@@ -238,12 +240,12 @@ void createWindowInRoom(int x, int y, uint32_t *pixelData, int width, int height
     int numPixels = traverseRoom(x, y, pixelData, width, height, maxDist, maxPos);    
 
     cout << "found room with center at (" << maxPos.first << ", " << maxPos.second << ") with distance " << maxDist << " and area " << numPixels << endl;
-    float edgeHalfLength = sqrt(numPixels) / 20;
+    float edgeHalfLength = sqrt(numPixels) / 5;
     //maxDist is the maximum distance from maxPos for which it is guaranteed that there is no wall in any direction
     // (might be one-off though)
     
-    if (edgeHalfLength > maxDist)
-        edgeHalfLength = maxDist;
+    if (edgeHalfLength > maxDist-1)
+        edgeHalfLength = maxDist-1;
     
     //cout << "scaling: " << scaling << ", x=" << maxPos.first << ", y=" << maxPos.second << endl;
     edgeHalfLength *=scaling;
