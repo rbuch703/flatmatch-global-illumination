@@ -10,6 +10,12 @@ public:
     Image(const Image &other): Image(other.width, other.height, other.data)
     {
     }
+    
+    Image(int width, int height): width(width), height(height)
+    {
+        this->data = new uint32_t[width*height];
+        memset(this->data, 0, sizeof(uint32_t) * width * height);        
+    }
 
 
     Image(int width, int height, uint32_t *data): width(width), height(height)
@@ -24,7 +30,7 @@ public:
     }
     
     
-    uint32_t get(int x, int y)
+    uint32_t get(int x, int y) const
     {
         x = max( min(x, width-1), 0);
         y = max( min(y, height-1), 0);
@@ -120,7 +126,7 @@ public:
         this->floodFill( x+1, y+1, value, background);
     }
 
-    void saveAs(const char* filename) 
+    void saveAs(const char* filename) const
     {
         write_png_file( filename, width, height, PNG_COLOR_TYPE_RGBA, (uint8_t*)data);
     
