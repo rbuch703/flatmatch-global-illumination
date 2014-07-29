@@ -1,14 +1,16 @@
 
-#include <vector>
-#include <list>
-#include "parseLayout.h"
-
 #include <assert.h>
-#include <string>
 #include <string.h> //for memcpy
 #include <math.h> //for sqrt()
-#include "png_helper.h"
+
 #include <iostream>
+#include <string>
+#include <vector>
+//#include <list>
+
+#include "parseLayout.h"
+#include "png_helper.h"
+#include "image.h"
 
 using namespace std;
 
@@ -73,147 +75,58 @@ void registerWall( vector<Rectangle> &walls, vector<Rectangle> &windows,
 
 }
 
-uint32_t getData(int x, int y, uint32_t *pixelBuffer, int width, int height)
-{
-    x = max( min(x, width-1), 0);
-    y = max( min(y, height-1), 0);
-    return pixelBuffer[y*width+x];
-}
-
-bool setData(int x, int y, uint32_t val, uint32_t *pixelBuffer, int width, int height)
-{
-    if ( x < 0) return false;
-    if ( x >= width) return false;
-    if ( y < 0) return false;
-    if ( y >= height) return false;
-    
-    pixelBuffer[y*width+x] = val;
-    return true;
-}
 
 
 
-unsigned int distanceTransform(uint32_t *data, int width, int height)
-{
-
-    vector<pair<int, int>> openList;
-    unsigned int distance = 1;
-    for (int y = 0; y < height; y++)
-        for (int x = 0; x < width; x++)
-    {
-        if (getData(x,y, data, width, height) == distance)
-            openList.push_back(pair<int, int>(x,y));
-    }
-
-    while (openList.size())
-    {
-        //cout << "open list for distance " << distance << " contains " << openList.size() << " entries" << endl;
-
-        vector<pair<int, int>> newOpenList;
-        for (unsigned int i = 0; i < openList.size(); i++)
-        {
-            //int x = openList[i].first;
-            //int y = openList[i].second;
-            
-            for (int x = max(openList[i].first-1, 0); x <= min(openList[i].first + 1, width - 1); x++)
-                for (int y = max(openList[i].second - 1, 0); y <= min(openList[i].second + 1, height-1); y++)
-                {
-                    if (x == openList[i].first && y == openList[i].second)
-                        continue;
-                        
-                    if (getData(x, y, data, width, height) == 0)
-                    {
-                        setData(x, y, distance+1, data, width, height);
-                        newOpenList.push_back(pair<int, int>(x, y));
-                    }
-                }
-        }
-        
-        
-        openList = newOpenList;
-        distance += 1;
-    }
-
-    /*for (int i = 0; i < width*height; i++)
-        data[i] = data[i] * 4 | 0xFF000000;
-
-    write_png_file("distance.png", width, height, PNG_COLOR_TYPE_RGBA, (uint8_t*)data);*/
-
-    
-    //the while loop loops until the open list for a distance is completely empty,
-    //i.e. until a distance is reached for which not a single pixel exists.
-    //so the actual maximum distance returned here is one less than the distance
-    //for which the loop terminated
-    return distance - 1;
-
-}
 
 
 pair<int, int> getCentralPosition(uint32_t *pixelBuffer, int width, int height)
 {
-    uint32_t *tmpData = new uint32_t[width*height];
-    memcpy(tmpData, pixelBuffer, width*height*sizeof(uint32_t));
-    
-    for (int i = 0; i < width*height; i++)
+    Image tmpData(width, height, pixelBuffer);
+
+    for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++)    
     {
-        switch (tmpData[i])
+        switch (tmpData.get(x,y))
         {
             case 0xFFFFFFFF: 
             case 0xFF00FF00: 
             case 0xFFDFDFDF: 
-                tmpData[i] = 0;
+                tmpData.set(x,y,0);
                 break;
                 
             default: 
-                tmpData[i] = 1; //walls, outside
+                tmpData.set(x,y, 1); //walls, outside
                 break;
         }
     }
 
-    unsigned int maxDistance = distanceTransform(tmpData, width, height);
+    unsigned int maxDistance = tmpData.distanceTransform();
     
     
     for (int y = 0; y < height; y++)
         for (int x = 0; x < width; x++)
-            if (tmpData[y*width+x] == maxDistance-1)
+            if (tmpData.get(x,y) == maxDistance-1)
             {
-                delete [] tmpData;
                 return pair<int, int>(x, y);
             }
     
-    delete [] tmpData;
     assert(false);
     return pair<int, int>(-1, -1);
 }
 
-void floodFill(int x, int y, uint32_t *pixelBuffer, int width, int height, uint32_t value, uint32_t background)
+
+
+int traverseRoom(Image &img, int x, int y, unsigned int &maxDist, pair<int, int> &maxPos)
 {
-    if (getData(x, y, pixelBuffer, width, height) != background)
-        return;
-        
-    setData(x, y, value, pixelBuffer, width, height);
-    
-    floodFill( x-1, y-1, pixelBuffer, width, height, value, background);
-    floodFill( x-1, y  , pixelBuffer, width, height, value, background);
-    floodFill( x-1, y+1, pixelBuffer, width, height, value, background);
+    if (x < 0 || x >= img.getWidth() ) return 0;
+    if (y < 0 || y >= img.getHeight() ) return 0;
 
-    floodFill( x  , y-1, pixelBuffer, width, height, value, background);
-//  floodFill( x  , y  , pixelBuffer, width, height, value, background);
-    floodFill( x  , y+1, pixelBuffer, width, height, value, background);
-
-    floodFill( x+1, y-1, pixelBuffer, width, height, value, background);
-    floodFill( x+1, y  , pixelBuffer, width, height, value, background);
-    floodFill( x+1, y+1, pixelBuffer, width, height, value, background);
-}
-
-
-int traverseRoom(int x, int y, uint32_t *pixelData, int width, int height, unsigned int &maxDist, pair<int, int> &maxPos)
-{
-    uint32_t valHere = getData(x, y, pixelData, width, height);
+    uint32_t valHere = img.get(x, y);
     //cout << "at position " << x << ", " << y << " with value " << valHere << endl;
     assert( valHere > 1);
 
-    setData(x, y, 0, pixelData, width, height);
+    img.set(x, y, 0);
     int numPixels = 1;
     
     if ( valHere > maxDist)
@@ -222,22 +135,22 @@ int traverseRoom(int x, int y, uint32_t *pixelData, int width, int height, unsig
         maxPos = pair<int, int>(x, y);
     }
     
-    if ( x > 0       && getData(x-1, y, pixelData, width, height) > 1) numPixels += traverseRoom(x-1, y, pixelData, width, height, maxDist, maxPos);
-    if ( x+1 < width && getData(x+1, y, pixelData, width, height) > 1) numPixels += traverseRoom(x+1, y, pixelData, width, height, maxDist, maxPos);
+    if ( x > 0                 && img.get(x-1, y) > 1) numPixels += traverseRoom(img, x-1, y, maxDist, maxPos);
+    if ( x+1 < img.getWidth()  && img.get(x+1, y) > 1) numPixels += traverseRoom(img, x+1, y, maxDist, maxPos);
     
-    if ( y > 0        && getData(x, y-1, pixelData, width, height) > 1) numPixels += traverseRoom(x, y-1, pixelData, width, height, maxDist, maxPos);
-    if ( y+1 < height && getData(x, y+1, pixelData, width, height) > 1) numPixels += traverseRoom(x, y+1, pixelData, width, height, maxDist, maxPos);
+    if ( y > 0                 && img.get(x, y-1) > 1) numPixels += traverseRoom(img, x, y-1, maxDist, maxPos);
+    if ( y+1 < img.getHeight() && img.get(x, y+1) > 1) numPixels += traverseRoom(img, x, y+1, maxDist, maxPos);
     
     return numPixels;
 }
 
-void createWindowInRoom(int x, int y, uint32_t *pixelData, int width, int height, float scaling, vector<Rectangle> &windowsOut)
+void createLightSourceInRoom(Image &img, int roomX, int roomY, float scaling, vector<Rectangle> &lightsOut)
 {
-    assert( getData(x, y, pixelData, width, height) > 1);
+    assert( img.get(roomX, roomY) > 1);
     
     unsigned int maxDist = 1;
-    pair<int, int> maxPos = pair<int, int>(x, y);
-    int numPixels = traverseRoom(x, y, pixelData, width, height, maxDist, maxPos);    
+    pair<int, int> maxPos = pair<int, int>(roomX, roomY);
+    int numPixels = traverseRoom(img, roomX, roomY, maxDist, maxPos);    
 
     cout << "found room with center at (" << maxPos.first << ", " << maxPos.second << ") with distance " << maxDist << " and area " << numPixels << endl;
     float edgeHalfLength = sqrt(numPixels) / 5;
@@ -255,7 +168,7 @@ void createWindowInRoom(int x, int y, uint32_t *pixelData, int width, int height
     //cout << "after scaling: x=" << px << ", y=" << py << endl;
     //cout << "edgeHalfLength is " << edgeHalfLength << endl;
     
-    windowsOut.push_back(createRectangle( px - edgeHalfLength, py - edgeHalfLength, HEIGHT-0.001,
+    lightsOut.push_back(createRectangle( px - edgeHalfLength, py - edgeHalfLength, HEIGHT-0.001,
                                           2*edgeHalfLength, 0, 0,
                                           0, 2*edgeHalfLength, 0));
 /*
@@ -278,47 +191,40 @@ void createWindowInRoom(int x, int y, uint32_t *pixelData, int width, int height
      3b. the room size is calculated (pixel counting)
      3c. a light source is created at the center point with a size proportional to the room size;
  */
-void createLights(const uint32_t *pixelBuffer, int width, int height, float scaling, vector<Rectangle> &windowsOut)
+void createLights(Image img, float scaling, vector<Rectangle> &lightsOut)
 {
-    uint32_t *tmpData = new uint32_t[width*height];
-    memcpy(tmpData, pixelBuffer, width*height*sizeof(uint32_t));
     
-    
-    for (int y = 0; y < height; y++)
-        for (int x = 0; x < width; x++)
+    for (int y = 0; y < img.getHeight(); y++)
+        for (int x = 0; x < img.getWidth(); x++)
     {
-        if (getData(x, y, tmpData, width, height) == 0xFF00FF00) //window
+        if (img.get(x, y) == 0xFF00FF00) //window
         {
-            if (getData(x-1, y, tmpData, width, height) == 0xFFFFFFFF) floodFill(x-1, y, tmpData, width, height, 0xFF00FF00, 0xFFFFFFFF);
-            if (getData(x+1, y, tmpData, width, height) == 0xFFFFFFFF) floodFill(x+1, y, tmpData, width, height, 0xFF00FF00, 0xFFFFFFFF);
-            if (getData(x, y-1, tmpData, width, height) == 0xFFFFFFFF) floodFill(x, y-1, tmpData, width, height, 0xFF00FF00, 0xFFFFFFFF);
-            if (getData(x, y+1, tmpData, width, height) == 0xFFFFFFFF) floodFill(x, y+1, tmpData, width, height, 0xFF00FF00, 0xFFFFFFFF);
+            if (img.get(x-1, y  ) == 0xFFFFFFFF) img.floodFill(x-1, y,   0xFF00FF00, 0xFFFFFFFF);
+            if (img.get(x+1, y  ) == 0xFFFFFFFF) img.floodFill(x+1, y,   0xFF00FF00, 0xFFFFFFFF);
+            if (img.get(x,   y-1) == 0xFFFFFFFF) img.floodFill(x,   y-1, 0xFF00FF00, 0xFFFFFFFF);
+            if (img.get(x,   y+1) == 0xFFFFFFFF) img.floodFill(x,   y+1, 0xFF00FF00, 0xFFFFFFFF);
         }
     }
 
     /*write_png_file( "distance.png", width, height, PNG_COLOR_TYPE_RGBA, (uint8_t*)tmpData);*/
-    for (int i = 0; i < width*height; i++)
-        tmpData[i] = (tmpData[i] == 0xFFFFFFFF) ? 0 : 1;
 
+    for (int y = 0; y < img.getHeight(); y++)
+        for (int x = 0; x < img.getWidth(); x++)
+            img.set(x, y, (img.get(x,y) == 0xFFFFFFFF) ? 0 : 1);
 
-    distanceTransform(tmpData, width, height);
+    img.distanceTransform();
     
-    for (int y = 0; y < height; y++)
-        for (int x = 0; x < width; x++)
+    for (int y = 0; y < img.getHeight(); y++)
+        for (int x = 0; x < img.getWidth(); x++)
         {
-            if (getData(x, y, tmpData, width, height) > 1)
-                createWindowInRoom(x, y, tmpData, width, height, scaling, windowsOut);
+            if (img.get(x, y) > 1)
+                createLightSourceInRoom(img, x, y, scaling, lightsOut);
         }
 
-    /*for (int i = 0; i < width*height; i++)
-        tmpData[i] = tmpData[i] * 3 | 0xFF000000;
-
+    /*
     write_png_file( "distance.png", width, height, PNG_COLOR_TYPE_RGBA, (uint8_t*)tmpData);
-    exit(0);    */
+    exit(0);*/
     
-    delete [] tmpData;
-    //assert(false);
-    //return pair<int, int>(-1, -1);
 }
 
 
@@ -326,6 +232,7 @@ void parseLayout(const char* const filename, const float scaling, vector<Rectang
 {
     wallsOut.clear();
     windowsOut.clear();
+    lightsOut.clear();
     
     int width, height, color_type;
     uint32_t *pixelBuffer;
@@ -364,7 +271,7 @@ void parseLayout(const char* const filename, const float scaling, vector<Rectang
     startingPositionOut.first  = centralPos.first * scaling;
     startingPositionOut.second = centralPos.second * scaling;
     
-    createLights(pixelBuffer, width, height, scaling, lightsOut);
+    createLights( Image(width, height, pixelBuffer), scaling, lightsOut);
     
     
     free (pixelBuffer);
@@ -474,5 +381,6 @@ void parseLayout(const char* const filename, const float scaling, vector<Rectang
     
 
     delete [] pixels;
+    exit(0);
 }
 
