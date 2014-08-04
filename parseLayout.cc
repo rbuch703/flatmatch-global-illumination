@@ -111,39 +111,49 @@ pair<int, int> getCentralPosition(uint32_t *pixelBuffer, int width, int height)
     return pair<int, int>(-1, -1);
 }
 
-
-
 int traverseRoom(Image &img, Image &visited, int x, int y, unsigned int &maxDist, vector<pair<int, int>> &skeletalPoints)
 {
-    if (x < 0 || x >= img.getWidth() ) return 0;
-    if (y < 0 || y >= img.getHeight() ) return 0;
-    assert( img.getWidth () == visited.getWidth());
-    assert( img.getHeight() == visited.getHeight());
+    std::set< pair<int, int> > candidates;
+    std::set< pair<int, int> > visitedPoints;
+    
+    candidates.insert(pair<int, int>(x,y));
 
-    if (img.get(x, y) == 0) return 0; //stepped on a wall
-    if (visited.get(x,y))   return 0; //already been here
-    visited.set(x, y, 2);
+    int numPixels = 0;
 
-    if ( img.get(x,y) >= img.get(x+1, y) && img.get(x,y) >= img.get(x-1, y) &&
-         img.get(x,y) >= img.get(x, y+1) && img.get(x,y) >= img.get(x, y-1))
-     {
-            skeletalPoints.push_back( pair<int, int>(x, y));
-            visited.set(x, y, 3);
+    while (! candidates.empty())
+    {
+        pair<int,int> pos = * (candidates.begin());
+        int x = pos.first;
+        int y = pos.second;
+        visitedPoints.insert(pos);
+        candidates.erase(pos);
+
+        if (x < 0 || x >= img.getWidth() ) return 0;
+        if (y < 0 || y >= img.getHeight() ) return 0;
+        assert( img.getWidth () == visited.getWidth());
+        assert( img.getHeight() == visited.getHeight());
+
+        if (img.get(x, y) == 0) continue; //stepped on a wall
+        if (visited.get(x,y))   continue; //already been here
+        visited.set(x, y, 2);
+        numPixels += 1;
+
+        if ( img.get(x,y) >= img.get(x+1, y) && img.get(x,y) >= img.get(x-1, y) &&
+             img.get(x,y) >= img.get(x, y+1) && img.get(x,y) >= img.get(x, y-1))
+        {
+                skeletalPoints.push_back( pair<int, int>(x, y));
+                visited.set(x, y, 3);
+        }
+
+        
+        if ( img.get(x, y) > maxDist)
+            maxDist = img.get(x, y);
+        
+        if (visitedPoints.count(pair<int,int>(x-1, y  )) == 0) candidates.insert( pair<int, int>(x-1,y  ));
+        if (visitedPoints.count(pair<int,int>(x+1, y  )) == 0) candidates.insert( pair<int, int>(x+1,y  ));
+        if (visitedPoints.count(pair<int,int>(x  , y-1)) == 0) candidates.insert( pair<int, int>(x  ,y-1));
+        if (visitedPoints.count(pair<int,int>(x  , y+1)) == 0) candidates.insert( pair<int, int>(x  ,y+1));
     }
-
-    //cout << "at position " << x << ", " << y << " with value " << img.get(x, y) << endl;
-
-    int numPixels = 1;
-    
-    if ( img.get(x, y) > maxDist)
-        maxDist = img.get(x, y);
-    
-    if ( x > 0                ) numPixels += traverseRoom(img, visited, x-1, y, maxDist, skeletalPoints);
-    if ( x+1 < img.getWidth() ) numPixels += traverseRoom(img, visited, x+1, y, maxDist, skeletalPoints);
-    
-    if ( y > 0                ) numPixels += traverseRoom(img, visited, x, y-1, maxDist, skeletalPoints);
-    if ( y+1 < img.getHeight()) numPixels += traverseRoom(img, visited, x, y+1, maxDist, skeletalPoints);
-
     
     return numPixels;
 }
@@ -197,41 +207,20 @@ void createLightSourceInRoom(Image &img, Image &visited, int roomX, int roomY, f
     }    
     visited.set( bestCenter.first, bestCenter.second, 5);
     
-    /*for (int y = 0; y < img.getHeight(); y++)
-        for (int x = 0; x < img.getWidth(); x++)
-            if (visited.get(x,y))   //mark the whole visited room as a wall to prevent revisits
-                img.set(x,y,1);*/
-    
-    //pair<int, int> maxPos = skeletalPoints[0];
-
-    //exit(0);
-
     cout << "found room with center at (" << bestCenter.first << ", " << bestCenter.second << ") with distance " << maxDist << " and area " << numPixels << endl;
     float edgeHalfLength = sqrt(numPixels) / 5;
+
     //maxDist is the maximum distance from maxPos for which it is guaranteed that there is no wall in any direction
-    // (might be one-off though)
-    
     if (edgeHalfLength > maxDist-1)
         edgeHalfLength = maxDist-1;
     
-    //cout << "scaling: " << scaling << ", x=" << maxPos.first << ", y=" << maxPos.second << endl;
     edgeHalfLength *=scaling;
     float px = bestCenter.first  * scaling;
     float py = bestCenter.second * scaling;
     
-    //cout << "after scaling: x=" << px << ", y=" << py << endl;
-    //cout << "edgeHalfLength is " << edgeHalfLength << endl;
-    
     lightsOut.push_back(createRectangle( px - edgeHalfLength, py - edgeHalfLength, HEIGHT-0.001,
                                           2*edgeHalfLength, 0, 0,
                                           0, 2*edgeHalfLength, 0));
-/*
-    for (int i = 0; i < width*height; i++)
-        pixelData[i] |= 0xFF000000;
-
-    setData(maxPos.first, maxPos.second, 0xFF00FF00, pixelData, width, height);
-    write_png_file("lamp.png", width, height, PNG_COLOR_TYPE_RGBA, (uint8_t*)pixelData);
-    exit(0);*/
 
 }
 
@@ -264,6 +253,7 @@ void createLights(Image img, float scaling, vector<Rectangle> &lightsOut)
             if (img.get(x,   y+1) == 0xFFFFFFFF) img.floodFill(x,   y+1, 0xFF00FF00, 0xFFFFFFFF);
         }
     }
+    img.saveAs("filled.png");
 
     //prepare map for distance transform: only empty space inside the apartment is considered ("0")
     for (int y = 0; y < img.getHeight(); y++)
@@ -273,13 +263,13 @@ void createLights(Image img, float scaling, vector<Rectangle> &lightsOut)
     //Step 2, the actual distance transform
     img.distanceTransform();
 
-    // prepare map if pixels that have already been considered for placing lights (initially only those not used in the distance transform
+    // prepare map of pixels that have already been considered for placing lights (initially only those not used in the distance transform
     Image visited(img.getWidth(), img.getHeight());
     for (int y = 0; y < img.getHeight(); y++)
         for (int x = 0; x < img.getWidth(); x++)
             if (img.get(x,y) == 1) //WALL
                 visited.set(x,y,1);
-    
+
     // The actual steps 3a-e are performed by createLightSourceInRoom(), which also updates the 'visited' map
     for (int y = 0; y < img.getHeight(); y++)
         for (int x = 0; x < img.getWidth(); x++)
@@ -288,13 +278,6 @@ void createLights(Image img, float scaling, vector<Rectangle> &lightsOut)
                 createLightSourceInRoom(img, visited, x, y, scaling, lightsOut);
         }
 
-    /*
-    for (int y = 0; y < visited.getHeight(); y++)
-        for (int x = 0; x < visited.getWidth(); x++)
-            visited.set(x, y, visited.get(x,y) *40 | 0xFF000000);
-            
-    visited.saveAs("distance.png");
-    exit(0);*/
 }
 
 

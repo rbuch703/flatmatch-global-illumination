@@ -2,7 +2,10 @@
 #define IMAGE_H
 
 #include <stdint.h>
+#include <set>
 #include "png_helper.h"
+
+using namespace std;
 
 class Image {
 
@@ -89,12 +92,6 @@ public:
             distance += 1;
         }
 
-        /*for (int i = 0; i < width*height; i++)
-            data[i] = data[i] * 4 | 0xFF000000;
-
-        write_png_file("distance.png", width, height, PNG_COLOR_TYPE_RGBA, (uint8_t*)data);*/
-
-        
         //the while loop loops until the open list for a distance is completely empty,
         //i.e. until a distance is reached for which not a single pixel exists.
         //so the actual maximum distance returned here is one less than the distance
@@ -105,25 +102,37 @@ public:
 
     void floodFill(int x, int y, uint32_t value, uint32_t background)
     {
-        if (x < 0 || x >= width) return;
-        if (y < 0 || y >= height) return;
-    
-        if (this->get(x, y) != background)
-            return;
-            
-        this->set(x, y, value);
+        std::set< pair<int, int> > candidates;
         
-        this->floodFill( x-1, y-1, value, background);
-        this->floodFill( x-1, y  , value, background);
-        this->floodFill( x-1, y+1, value, background);
+        candidates.insert(pair<int, int>(x,y));
+        
+        while (! candidates.empty())
+        {
+            pair<int,int> pos = * (candidates.begin());
+            int x = pos.first;
+            int y = pos.second;
+            candidates.erase(pos);
+            if (x < 0 || x >= width) return;
+            if (y < 0 || y >= height) return;
+        
+            if (this->get(x, y) != background)
+                return;
+                
+            this->set(x, y, value);
+            
+            if (this->get(x - 1, y - 1) == background) candidates.insert(pair<int, int>( x - 1, y - 1) );
+            if (this->get(x    , y - 1) == background) candidates.insert(pair<int, int>( x    , y - 1) );
+            if (this->get(x + 1, y - 1) == background) candidates.insert(pair<int, int>( x + 1, y - 1) );
 
-        this->floodFill( x  , y-1, value, background);
-    //  this->floodFill( x  , y  , value, background);
-        this->floodFill( x  , y+1, value, background);
+            if (this->get(x - 1, y    ) == background) candidates.insert(pair<int, int>( x - 1, y    ) );
+          //if (this->get(x    , y    ) == background) candidates.insert(pair<int, int>( x    , y    ) );
+            if (this->get(x + 1, y    ) == background) candidates.insert(pair<int, int>( x + 1, y    ) );
 
-        this->floodFill( x+1, y-1, value, background);
-        this->floodFill( x+1, y  , value, background);
-        this->floodFill( x+1, y+1, value, background);
+            if (this->get(x - 1, y + 1) == background) candidates.insert(pair<int, int>( x - 1, y + 1) );
+            if (this->get(x    , y + 1) == background) candidates.insert(pair<int, int>( x    , y + 1) );
+            if (this->get(x + 1, y + 1) == background) candidates.insert(pair<int, int>( x + 1, y + 1) );
+
+        }
     }
 
     void saveAs(const char* filename) const
