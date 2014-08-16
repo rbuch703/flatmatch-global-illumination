@@ -8,23 +8,23 @@ typedef struct __attribute__ ((aligned(16))) Rectangle {
 //    int lightNumTiles;
 } Rectangle;
 
-float rand(ulong *rng_state);
-float3 getDiffuseSkyRandomRay(ulong *rng_state, const float3 ndir/*, const float3 udir, const float3 vdir*/);
-float3 getCosineDistributedRandomRay(ulong *rng_state, const float3 ndir);
+float rand(uint *rng_state);
+float3 getDiffuseSkyRandomRay(uint *rng_state, const float3 ndir/*, const float3 udir, const float3 vdir*/);
+float3 getCosineDistributedRandomRay(uint *rng_state, const float3 ndir);
 int getTileIdAt(__constant const Rectangle *rect, const float3 p);
 float intersects( __constant const Rectangle *rect, const float3 ray_src, const float3 ray_dir, const float closestDist);
-//void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constant const Rectangle* rects, const int numRects, __global float3 *lightColors, /*const int numLightColors,*/ const float TILE_SIZE);
+//void tracePhoton(uint *rng_state, __constant const Rectangle *window, __constant const Rectangle* rects, const int numRects, __global float3 *lightColors, /*const int numLightColors,*/ const float TILE_SIZE);
 
 
 
 //generates float random numbers in the interval [0..1]
-float rand(ulong *rng_state)
+float rand(uint *rng_state)
 {
-    *rng_state = (*rng_state * 6364136223846793005 + 1);
-    return (*rng_state >> 32) / (float)0xFFFFFFFF;
+    *rng_state = (*rng_state * 1664525 + 1013904223);
+    return (*rng_state) / (float)0xFFFFFFFF;
 }
 
-float3 getDiffuseSkyRandomRay(ulong *rng_state, const float3 ndir/*, const float3 udir, const float3 vdir*/)
+float3 getDiffuseSkyRandomRay(uint *rng_state, const float3 ndir/*, const float3 udir, const float3 vdir*/)
 {
     //HACK: computes a lambertian quarter-sphere (lower half of hemisphere)
     
@@ -51,7 +51,7 @@ float3 getDiffuseSkyRandomRay(ulong *rng_state, const float3 ndir/*, const float
     return udir*u + vdir*v + ndir*n;
 }
 
-float3 getCosineDistributedRandomRay(ulong *rng_state, const float3 ndir) {
+float3 getCosineDistributedRandomRay(uint *rng_state, const float3 ndir) {
     // Step 1:Compute a uniformly distributed point on the unit disk
     float r = sqrt(rand(rng_state));
     float phi = 2 * 3.141592f * rand(rng_state);
@@ -158,7 +158,7 @@ float intersects( __constant const Rectangle *rect, const float3 ray_src, const 
 }
 
 
-void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constant const Rectangle* rects, const int numRects,
+void tracePhoton(uint *rng_state, __constant const Rectangle *window, __constant const Rectangle* rects, const int numRects,
                         __global float3 *lightColors, const int isWindow)
 {
 
@@ -212,9 +212,10 @@ void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constan
         //    return; //hit a light source;
             
         //hit_obj[get_global_id(0)] = closestObject;
-        float3 hit_pos = pos + ray_dir * dist_out;
+        //re-set the ray position to the intersection point (which is the starting position for the next ray);
+        pos = pos + ray_dir * dist_out;
         
-        int tile_id = getTileIdAt( hitObj, hit_pos);
+        int tile_id = getTileIdAt( hitObj, pos);
         int light_idx = hitObj->lightmapSetup.s0 + tile_id;
         
         /*if (light_idx >= numLightColors)
@@ -222,7 +223,13 @@ void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constan
             printf("invalid light index %d\n", light_idx);
             return;
         }*/
-    
+        
+        //hack: make floor slightly brownish
+        if (pos.s2 < 1E-5f)
+        {
+            lightColor.s1 *= 0.95f;
+            lightColor.s2 *= 0.8f;
+        }    
         //FIXME: make this increment atomic
         lightColors[ light_idx ] += 
             lightColor;
@@ -230,7 +237,7 @@ void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constan
         lightColor *= /*(hitObj->color**/0.9f;
         //printf ("lightColor %d/%d is (%f, %f, %f)\n", get_global_id(0), depth, lightColor.x, lightColor.y, lightColor.z);
         
-        pos = hit_pos;
+        //pos = hit_pos;
         //float3 udir, vdir;
         //createBase(hitObj->n, &udir, &vdir);
         //printf("work_item %d, base1 (%f,%f,%f), base2 (%f,%f,%f) \n", get_global_id(0), udir.s0, udir.s1, udir.s2, vdir.s0, vdir.s1, vdir.s2);
@@ -247,7 +254,7 @@ void tracePhoton(ulong *rng_state, __constant const Rectangle *window, __constan
 __kernel void photonmap(__constant const Rectangle * restrict window, __constant const Rectangle* restrict rects, int numRects,
                         __global float3 *lightColors/*, const int numLightColors*/, int rng_offset, int isWindow)
 {
-    ulong rng_state = get_global_id(0) + rng_offset;
+    uint rng_state = get_global_id(0) + rng_offset;
     float r = rand(&rng_state) * 40; //warm-up / decorrelate individual RNGs
     for (int i = 0; i < r; i++)
         rand(&rng_state);   
