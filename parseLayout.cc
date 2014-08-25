@@ -40,7 +40,7 @@ void addHorizontalRect(vector<Rectangle> &segments, float startX, float startY, 
     segments.push_back(createRectangle( startX,startY,z,       dx, 0, 0,        0, dy, 0));
 }
 
-void registerWall( vector<Rectangle> &walls, vector<Rectangle> &windows, 
+void registerWall( vector<Rectangle> &walls, vector<Rectangle> &windows, vector<Rectangle> &box,
                    uint32_t col0, uint32_t col1, float x0, float y0, float x1, float y1)
 {
 
@@ -56,11 +56,12 @@ void registerWall( vector<Rectangle> &walls, vector<Rectangle> &windows,
     else if (col0 == OUTSIDE  && col1 == EMPTY) addWall(walls, x0, y1, x1 - x0, y0 - y1); //transition from entrace to inside area
     else if (col0 == EMPTY && col1 == OUTSIDE ) addWall(walls, x1, y0, x0 - x1, y1 - y0);// transition from entrace to inside area
 
-    else if (col0 == OUTSIDE  && col1 == WINDOW) addWall(windows, x0, y1, x1 - x0, y0 - y1, WINDOW_LOW, WINDOW_HIGH);
-    else if (col0 == WINDOW && col1 == OUTSIDE)  addWall(windows, x1, y0, x0 - x1, y1 - y0, WINDOW_LOW, WINDOW_HIGH);
-
     else if (col0 == DOOR && col1 == EMPTY) addWall(walls, x0, y1, x1 - x0, y0 - y1, DOOR_HEIGHT, HEIGHT); //transition from door frame to inside area
     else if (col0 == EMPTY && col1 == DOOR) addWall(walls, x1, y0, x0 - x1, y1 - y0, DOOR_HEIGHT, HEIGHT);// transition from door frame to inside area
+
+    else if (col0 == WALL    && col1 == OUTSIDE) addWall(box, x0, y1, x1 - x0, y0 - y1, -0.2, HEIGHT + 0.2); 
+    else if (col0 == OUTSIDE && col1 == WALL   ) addWall(box, x1, y0, x0 - x1, y1 - y0, -0.2, HEIGHT + 0.2); 
+
 
     else if (col0 == WINDOW && col1 == EMPTY) { //transition from window to inside area
         addWall(walls, x0, y1, x1 - x0, y0 - y1, 0, WINDOW_LOW); 
@@ -70,6 +71,19 @@ void registerWall( vector<Rectangle> &walls, vector<Rectangle> &windows,
     else if (col0 == EMPTY && col1 == WINDOW) {
         addWall(walls, x1, y0, x0 - x1, y1 - y0, 0, WINDOW_LOW);
         addWall(walls, x1, y0, x0 - x1, y1 - y0, WINDOW_HIGH, HEIGHT);
+    }
+
+    else if (col0 == OUTSIDE  && col1 == WINDOW) 
+    {
+        addWall(box,     x1, y0, x0 - x1, y1 - y0, -0.2, WINDOW_LOW);
+        addWall(box,     x1, y0, x0 - x1, y1 - y0, WINDOW_HIGH, HEIGHT + 0.2);
+        addWall(windows, x0, y1, x1 - x0, y0 - y1, WINDOW_LOW, WINDOW_HIGH);
+    }
+    else if (col0 == WINDOW && col1 == OUTSIDE)  
+    {
+        addWall(box,     x0, y1, x1 - x0, y0 - y1, -0.2, WINDOW_LOW);
+        addWall(box,     x0, y1, x1 - x0, y0 - y1, WINDOW_HIGH, HEIGHT + 0.2);
+        addWall(windows, x1, y0, x0 - x1, y1 - y0, WINDOW_LOW, WINDOW_HIGH);
     }
 
 
@@ -281,7 +295,8 @@ void createLights(Image img, float scaling, vector<Rectangle> &lightsOut)
 }
 
 
-void parseLayout(const char* const filename, const float scaling, vector<Rectangle> &wallsOut, vector<Rectangle> &windowsOut, vector<Rectangle> &lightsOut, pair<float, float> &startingPositionOut)
+void parseLayout(const char* const filename, const float scaling, vector<Rectangle> &wallsOut, vector<Rectangle> &windowsOut, 
+                 vector<Rectangle> &lightsOut, vector<Rectangle> &boxOut, pair<float, float> &startingPositionOut)
 {
     wallsOut.clear();
     windowsOut.clear();
@@ -350,7 +365,7 @@ void parseLayout(const char* const filename, const float scaling, vector<Rectang
                 
             float endX = x;
             
-            registerWall(wallsOut, windowsOut, pxAbove, pxHere, startX*scaling, y*scaling, endX*scaling, y*scaling);
+            registerWall(wallsOut, windowsOut, boxOut, pxAbove, pxHere, startX*scaling, y*scaling, endX*scaling, y*scaling);
         }
     }
     //cout << "  == End of horizontal scan, beginning vertical scan ==" << endl;
@@ -375,7 +390,7 @@ void parseLayout(const char* const filename, const float scaling, vector<Rectang
                 
             float endY = y;
             
-            registerWall(wallsOut, windowsOut, pxLeft, pxHere, x*scaling, startY*scaling, x*scaling, endY*scaling);
+            registerWall(wallsOut, windowsOut, boxOut, pxLeft, pxHere, x*scaling, startY*scaling, x*scaling, endY*scaling);
         }
     }
 
@@ -427,8 +442,12 @@ void parseLayout(const char* const filename, const float scaling, vector<Rectang
                 addHorizontalRect(wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), 0); 
                 addHorizontalRect(wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), DOOR_HEIGHT); 
             break;
-
+        }
         
+        if (color != OUTSIDE)
+        {
+            addHorizontalRect(boxOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), HEIGHT + 0.2); 
+            addHorizontalRect(boxOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), - 0.2); 
         }
     }
     

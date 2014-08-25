@@ -18,7 +18,7 @@ using namespace std;
 Rectangle* walls = NULL;
 cl_int numWalls;
 
-vector<Rectangle> windows, lights;
+vector<Rectangle> windows, lights, box;
 
 Vector3* lightColors = NULL;
 cl_int numTexels;
@@ -29,7 +29,7 @@ pair<float, float> startingPos;
 void loadGeometry(string filename, float scale)
 {
     vector<Rectangle> vWalls;
-    parseLayout(filename.c_str(), scale, vWalls, windows, lights, startingPos);
+    parseLayout(filename.c_str(), scale, vWalls, windows, lights, box, startingPos);
     
     //the set of walls will be uploaded to OpenCL, and thus needs to be converted to a suitable structure (array of structs)
     //the windows are only uploaded only one by one, so no conversion is necessary here
@@ -431,10 +431,24 @@ int main(int argc, const char** argv)
                         ", \"height\": "<< walls[i].height <<
                         ", \"textureId\": " << i << "}";
         if (i+1 < numWalls)
-        jsonGeometry << ", ";
+            jsonGeometry << ", ";
         jsonGeometry << endl;
         
     }
+
+    jsonGeometry << "]," << endl;
+    jsonGeometry << "\"box\": [" << endl;
+
+    for (unsigned int i = 0; i < box.size(); i++)
+    {
+        jsonGeometry << "  { \"pos\": " << box[i].pos <<
+                        ", \"width\": " << box[i].width << 
+                        ", \"height\": "<< box[i].height << "}";
+        if (i + 1 < box.size())
+            jsonGeometry << ", ";
+        jsonGeometry << endl;
+    }
+
 
     jsonGeometry << "]" << endl;
     jsonGeometry << "}" << endl;
