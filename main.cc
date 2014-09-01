@@ -22,6 +22,7 @@ vector<Rectangle> windows, lights, box;
 
 Vector3* lightColors = NULL;
 cl_int numTexels;
+int width, height;
 
 pair<float, float> startingPos;
 
@@ -29,7 +30,7 @@ pair<float, float> startingPos;
 void loadGeometry(string filename, float scale)
 {
     vector<Rectangle> vWalls;
-    parseLayout(filename.c_str(), scale, vWalls, windows, lights, box, startingPos);
+    parseLayout(filename.c_str(), scale, width, height, vWalls, windows, lights, box, startingPos);
     
     //the set of walls will be uploaded to OpenCL, and thus needs to be converted to a suitable structure (array of structs)
     //the windows are only uploaded only one by one, so no conversion is necessary here
@@ -347,9 +348,51 @@ ostream& operator<<(ostream &os, const Vector3 &vec)
     return os;
 }
 
-/*void toJson(const Vector3 &vec, stringstream &ss)
+void writeJsonOutput()
 {
-}*/
+    ofstream jsonGeometry("geometry.json");
+
+    jsonGeometry << "{" << endl;
+    jsonGeometry << "\"startingPosition\" : [" << startingPos.first << ", " << startingPos.second << "]," <<  endl;
+    jsonGeometry << "\"layoutImageSize\" : [" << width << ", " << height << "]," <<  endl;
+
+    jsonGeometry << "\"geometry\" : [" << endl;
+    char num[50];
+    for ( int i = 0; i < numWalls; i++)
+    {
+        snprintf(num, 49, "%d", i);
+        string filename = string("tiles/tile_") + num + ".png";
+        saveAs( &walls[i], filename.c_str(), lightColors);
+        
+            //{ pos: [1,2,3], width: [4,5,6], height: [7,8,9], texture_id: 10, isWindow: false};
+
+        jsonGeometry << "  { \"pos\": " << walls[i].pos <<
+                        ", \"width\": " << walls[i].width << 
+                        ", \"height\": "<< walls[i].height <<
+                        ", \"textureId\": " << i << "}";
+        if (i+1 < numWalls)
+            jsonGeometry << ", ";
+        jsonGeometry << endl;
+        
+    }
+
+    jsonGeometry << "]," << endl;
+    jsonGeometry << "\"box\": [" << endl;
+
+    for (unsigned int i = 0; i < box.size(); i++)
+    {
+        jsonGeometry << "  { \"pos\": " << box[i].pos <<
+                        ", \"width\": " << box[i].width << 
+                        ", \"height\": "<< box[i].height << "}";
+        if (i + 1 < box.size())
+            jsonGeometry << ", ";
+        jsonGeometry << endl;
+    }
+
+
+    jsonGeometry << "]" << endl;
+    jsonGeometry << "}" << endl;
+}
 
 int main(int argc, const char** argv)
 {
@@ -401,58 +444,18 @@ int main(int argc, const char** argv)
             lightColors[baseIdx + j] = mul(lightColors[baseIdx +j], 0.4 * tilesPerSample);
     }    
 
-    /*
-    for ( unsigned int i = 0; i < windows.size(); i++)
-    {
-        Rectangle window = windows[i];
-        for (int j = 0; j < getNumTiles(&window); j++)
-            lightColors[ window.lightmapSetup.s[0] + j] = createVector3(10, 10, 10);
-    }*/
-
-
-    
-    ofstream jsonGeometry("geometry.json");
-
-    jsonGeometry << "{" << endl;
-    jsonGeometry << "\"startingPosition\" : [" << startingPos.first << ", " << startingPos.second << "]," <<  endl;
-
-    jsonGeometry << "\"geometry\" : [" << endl;
+    //write texture files
     char num[50];
     for ( int i = 0; i < numWalls; i++)
     {
         snprintf(num, 49, "%d", i);
         string filename = string("tiles/tile_") + num + ".png";
         saveAs( &walls[i], filename.c_str(), lightColors);
-        
-            //{ pos: [1,2,3], width: [4,5,6], height: [7,8,9], texture_id: 10, isWindow: false};
-
-        jsonGeometry << "  { \"pos\": " << walls[i].pos <<
-                        ", \"width\": " << walls[i].width << 
-                        ", \"height\": "<< walls[i].height <<
-                        ", \"textureId\": " << i << "}";
-        if (i+1 < numWalls)
-            jsonGeometry << ", ";
-        jsonGeometry << endl;
-        
-    }
-
-    jsonGeometry << "]," << endl;
-    jsonGeometry << "\"box\": [" << endl;
-
-    for (unsigned int i = 0; i < box.size(); i++)
-    {
-        jsonGeometry << "  { \"pos\": " << box[i].pos <<
-                        ", \"width\": " << box[i].width << 
-                        ", \"height\": "<< box[i].height << "}";
-        if (i + 1 < box.size())
-            jsonGeometry << ", ";
-        jsonGeometry << endl;
     }
 
 
-    jsonGeometry << "]" << endl;
-    jsonGeometry << "}" << endl;
-    
+    writeJsonOutput();
+   
     free( walls);
     free( lightColors);
 
