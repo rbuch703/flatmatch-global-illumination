@@ -295,14 +295,15 @@ void createLights(Image img, float scaling, vector<Rectangle> &lightsOut)
 }
 
 
-void parseLayout(const char* const filename, const float scaling, vector<Rectangle> &wallsOut, vector<Rectangle> &windowsOut, 
-                 vector<Rectangle> &lightsOut, vector<Rectangle> &boxOut, pair<float, float> &startingPositionOut)
+void parseLayout(const char* const filename, const float scaling, int& width, int& height, vector<Rectangle> &wallsOut, 
+                 vector<Rectangle> &windowsOut, vector<Rectangle> &lightsOut, vector<Rectangle> &boxOut, 
+                 pair<float, float> &startingPositionOut)
 {
     wallsOut.clear();
     windowsOut.clear();
     lightsOut.clear();
     
-    int width, height, color_type;
+    int color_type;
     uint32_t *pixelBuffer;
     read_png_file(filename, &width, &height, &color_type, (uint8_t**)&pixelBuffer );
 
