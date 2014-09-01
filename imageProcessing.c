@@ -15,7 +15,25 @@ static uint8_t clamp(float d)
 //convert light energy to perceived brightness
 float convert(float color)
 {
-    return 1 - exp(-color);
+//    if (color < 0.8)
+//        return 1 - exp(-2*color);
+//    else
+//        return 1/16.0*color + 0.75;
+    return 1 - exp(-1.5*color);
+    //return 5/8.0* pow(color, 1/3.0);
+}
+
+
+void convert2(float *r, float *g, float *b)
+{
+    
+    float luminance = 0.2126 * (*r) + 0.7152* (*g) + 0.0722 * (*b);
+    
+    float luminance_perceptive = convert(luminance);
+     
+    (*r) *= luminance_perceptive/luminance;
+    (*g) *= luminance_perceptive/luminance;
+    (*b) *= luminance_perceptive/luminance;
 }
 
 int isBlack(const uint8_t *data, int width, int height, int x, int y)
@@ -147,11 +165,19 @@ void subsampleAndConvertToPerceptive(Vector3* lights, uint8_t *dataOut, int widt
                 count +=1;
             }
         }
+        
+        sum_r/= count;
+        sum_g/=count;
+        sum_b/=count;
+        convert2(&sum_r, &sum_g, &sum_b);
 
-        dataOut[(y * width + x) * 3 + 0] = clamp( convert(sum_r / count ) * 255);
+/*        dataOut[(y * width + x) * 3 + 0] = clamp( convert(sum_r / count ) * 255);
         dataOut[(y * width + x) * 3 + 1] = clamp( convert(sum_g / count ) * 255);
-        dataOut[(y * width + x) * 3 + 2] = clamp( convert(sum_b / count ) * 255);
-            
+        dataOut[(y * width + x) * 3 + 2] = clamp( convert(sum_b / count ) * 255);*/
+        
+        dataOut[(y * width + x) * 3 + 0] = clamp( sum_r * 255);
+        dataOut[(y * width + x) * 3 + 1] = clamp( sum_g * 255);
+        dataOut[(y * width + x) * 3 + 2] = clamp( sum_b * 255);
     }
 
 }

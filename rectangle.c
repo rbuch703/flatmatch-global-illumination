@@ -161,6 +161,18 @@ void saveAs(const Rectangle *rect, const char *filename, Vector3 *lights)
     subsampleAndConvertToPerceptive( lights+baseIdx, data, hNumTiles, vNumTiles);
     selectiveDilate(data, hNumTiles, vNumTiles);
 
+    /*hack: make floor slightly brownish *after* the global illumination and thus
+     *      after its brown color would cause too much color bleeding;
+     */
+    if (rect->pos.s[2] == 0 && rect->width.s[2] == 0 && rect->height.s[2] == 0)
+    {
+        for (int i = 0; i < hNumTiles * vNumTiles *3; i+=3)
+        {
+            //data[0]
+            data[i+1] *= 0.95;
+            data[i+2] *= 0.8;
+        }
+    }
 #if 0    
     for (int i = 0; i < hNumTiles * vNumTiles; i++)
     {

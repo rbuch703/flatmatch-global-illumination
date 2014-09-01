@@ -165,7 +165,7 @@ void tracePhoton(uint *rng_state, __constant const Rectangle *window, __constant
     
     //float3 lightColor = 
     float3 lightColor = isWindow ? 
-        (float3)(18, 17, 15):  //slightly yellow-ish for outside areas
+        (float3)(18, 18, 18):  //slightly yellow-ish for outside areas
         (float3)(16, 16, 18);  //slightly blue-ish for artificial light
 
     const int MAX_DEPTH = 8;
@@ -227,7 +227,8 @@ void tracePhoton(uint *rng_state, __constant const Rectangle *window, __constant
         //hack: make floor slightly brownish
         if (pos.s2 < 1E-5f)
         {
-            lightColor.s1 *= 0.95f;
+            lightColor.s0 *= 1.0f;
+            lightColor.s1 *= 0.9f;
             lightColor.s2 *= 0.8f;
         }    
         //FIXME: make this increment atomic

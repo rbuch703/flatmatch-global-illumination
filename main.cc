@@ -279,7 +279,7 @@ void photonMapLightSource(cl_context ctx, cl_command_queue queue, cl_kernel kern
         st |= clSetKernelArg(kernel, 4, sizeof(cl_int), (void *)&idx);
         if (st)
             exit(-1);
-        size_t workSize = numSamples < maxWorkGroupSize * 40 ? numSamples : maxWorkGroupSize * 40;  //openCL becomes unstable on ATI GPUs with work sizes > 40000 items
+        size_t workSize = numSamples < maxWorkGroupSize * 100 ? numSamples : maxWorkGroupSize * 100;  //openCL becomes unstable on ATI GPUs with work sizes > 40000 items
         numSamples -=workSize;
 
     	st |= clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &workSize, &maxWorkGroupSize, 0, NULL, NULL);
@@ -398,7 +398,7 @@ int main(int argc, const char** argv)
         int baseIdx = obj.lightmapSetup.s[0];
 
         for (int j = 0; j < getNumTiles(&obj); j++)
-            lightColors[baseIdx + j] = mul(lightColors[baseIdx +j], 0.3 * tilesPerSample);
+            lightColors[baseIdx + j] = mul(lightColors[baseIdx +j], 0.4 * tilesPerSample);
     }    
 
     /*
