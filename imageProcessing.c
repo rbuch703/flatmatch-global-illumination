@@ -1,3 +1,4 @@
+#error THIS FILE IS NOT CURRENTLY USED!
 
 #include "imageProcessing.h"
 #include "rectangle.h" // for SUPER_SAMPLING

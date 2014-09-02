@@ -431,7 +431,7 @@ int main(int argc, const char** argv)
     cl_device_id device;
 	initCl(&ctx, &device);
 
-    int numSamplesPerArea = 1000000 * 10;   // rays per square meter of window/light surface
+    int numSamplesPerArea = 1000000 * 100;   // rays per square meter of window/light surface
     performGlobalIllumination(ctx, device, windows, numSamplesPerArea);
     
     for ( int i = 0; i < numWalls; i++)
@@ -441,7 +441,7 @@ int main(int argc, const char** argv)
         int baseIdx = obj.lightmapSetup.s[0];
 
         for (int j = 0; j < getNumTiles(&obj); j++)
-            lightColors[baseIdx + j] = mul(lightColors[baseIdx +j], 0.4 * tilesPerSample);
+            lightColors[baseIdx + j] = mul(lightColors[baseIdx +j], 0.35 * tilesPerSample);
     }    
 
     //write texture files
@@ -449,8 +449,9 @@ int main(int argc, const char** argv)
     for ( int i = 0; i < numWalls; i++)
     {
         snprintf(num, 49, "%d", i);
-        string filename = string("tiles/tile_") + num + ".png";
-        saveAs( &walls[i], filename.c_str(), lightColors);
+        string filename = string("tiles/tile_") + num;
+        saveAs(    &walls[i], (filename + ".png").c_str(), lightColors);
+        saveAsRaw( &walls[i], (filename + ".raw").c_str(), lightColors);
     }
 
 

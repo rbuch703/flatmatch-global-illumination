@@ -4,8 +4,10 @@
 //#include <math.h>
 #include "png_helper.h"
 
-#include "imageProcessing.h"
+//#include "imageProcessing.h"
 
+#include <math.h>
+#include <stdio.h>
 
 int max(int a, int b)
 {
@@ -145,21 +147,58 @@ int getTileIdAt(const Rectangle *rect, const Vector3 p)
 }
 */
 
+//convert light energy to perceived brightness
+float convert(float color)
+{
+//    if (color < 0.8)
+//        return 1 - exp(-2*color);
+//    else
+//        return 1/16.0*color + 0.75;
+    return 1 - exp(-1.5*color);
+    //return 5/8.0* pow(color, 1/3.0);
+}
 
-void saveAs(const Rectangle *rect, const char *filename, Vector3 *lights)
+
+void convert2(float *r, float *g, float *b)
+{
+    
+    float luminance = 0.2126 * (*r) + 0.7152* (*g) + 0.0722 * (*b);
+    
+    float luminance_perceptive = convert(luminance);
+     
+    (*r) *= luminance_perceptive/luminance;
+    (*g) *= luminance_perceptive/luminance;
+    (*b) *= luminance_perceptive/luminance;
+}
+
+static uint8_t clamp(float d)
+{
+    if (d < 0) d = 0;
+    if (d > 255) d = 255;
+    return d;
+}
+
+
+void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights)
 {
     int baseIdx = rect->lightmapSetup.s[0];
     int hNumTiles = rect->lightmapSetup.s[1];//max( ceil(length(rect->width) / TILE_SIZE), 1);
     int vNumTiles = rect->lightmapSetup.s[2];//max( ceil(length(rect->height)/ TILE_SIZE), 1);
-    assert( hNumTiles % SUPER_SAMPLING == 0);
-    assert( vNumTiles % SUPER_SAMPLING == 0);
-    hNumTiles /= SUPER_SAMPLING;
-    vNumTiles /= SUPER_SAMPLING;
 
     uint8_t *data = (uint8_t*) malloc( hNumTiles * vNumTiles * 3 * sizeof(uint8_t));
     
+    for (int i = 0; i < hNumTiles*vNumTiles; i++)
+    {
+        Vector3 color = (lights[baseIdx + i]);
+        convert2( &(color.s[0]), &(color.s[1]), &(color.s[2]) );
+        data[3*i+0] = clamp( color.s[0] * 255 );
+        data[3*i+1] = clamp( color.s[1] * 255 );
+        data[3*i+2] = clamp( color.s[2] * 255 );
+    }
+        
+    /*
     subsampleAndConvertToPerceptive( lights+baseIdx, data, hNumTiles, vNumTiles);
-    selectiveDilate(data, hNumTiles, vNumTiles);
+    selectiveDilate(data, hNumTiles, vNumTiles);*/
 
     /*hack: make floor slightly brownish *after* the global illumination and thus
      *      after its brown color would cause too much color bleeding;
@@ -169,25 +208,38 @@ void saveAs(const Rectangle *rect, const char *filename, Vector3 *lights)
         for (int i = 0; i < hNumTiles * vNumTiles *3; i+=3)
         {
             //data[0]
-            data[i+1] *= 0.95;
+            data[i+1] *= 0.9;
             data[i+2] *= 0.8;
         }
     }
-#if 0    
-    for (int i = 0; i < hNumTiles * vNumTiles; i++)
-    {
-            /*col.r = 1 - exp(-col.r);
-            col.g = 1 - exp(-col.g);
-            col.b = 1 - exp(-col.b);*/
-        
-        data[i*3+0] = clamp( convert(lights[baseIdx + i].s[0])*255);
-        data[i*3+1] = clamp( convert(lights[baseIdx + i].s[1])*255);
-        data[i*3+2] = clamp( convert(lights[baseIdx + i].s[2])*255);
-    }
-#endif
+    
     write_png_file(filename, hNumTiles, vNumTiles, PNG_COLOR_TYPE_RGB, data);
     free (data);
 }
+
+void saveAsRaw(const Rectangle *rect, const char *filename, const Vector3 *lights)
+{
+    int baseIdx = rect->lightmapSetup.s[0];
+    int hNumTiles = rect->lightmapSetup.s[1];//max( ceil(length(rect->width) / TILE_SIZE), 1);
+    int vNumTiles = rect->lightmapSetup.s[2];//max( ceil(length(rect->height)/ TILE_SIZE), 1);
+
+    float *data = (float*) malloc( hNumTiles * vNumTiles * 3 * sizeof(float));
+    
+    for (int i = 0; i < hNumTiles*vNumTiles; i++)
+    {
+        Vector3 color = (lights[baseIdx + i]);
+        data[3*i+0] = color.s[0];
+        data[3*i+1] = color.s[1];
+        data[3*i+2] = color.s[2];
+    }
+    
+    FILE* f = fopen(filename, "wb");
+    fwrite(data, hNumTiles * vNumTiles * 3 * sizeof(float), 1, f);
+    fclose(f);
+   
+    free (data);
+}
+
 
 Vector3 getOrigin(const Rectangle *rect) { return rect->pos; }
 Vector3 getWidthVector(const Rectangle *rect) { return rect->width; }

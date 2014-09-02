@@ -1,5 +1,5 @@
 
-SRC_C = png_helper.c rectangle.c vector3_cl.c imageProcessing.c
+SRC_C = png_helper.c rectangle.c vector3_cl.c
 SRC_CC = main.cc parseLayout.cc
 SRC = $(SRC_C) $(SRC_CC)
 

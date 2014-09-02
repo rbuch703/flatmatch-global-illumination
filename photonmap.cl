@@ -228,9 +228,9 @@ void tracePhoton(uint *rng_state, __constant const Rectangle *window, __constant
         if (pos.s2 < 1E-5f)
         {
             lightColor.s0 *= 1.0f;
-            lightColor.s1 *= 0.9f;
-            lightColor.s2 *= 0.8f;
-        }    
+            lightColor.s1 *= 0.95f;
+            lightColor.s2 *= 0.9f;
+        }
         //FIXME: make this increment atomic
         lightColors[ light_idx ] += 
             lightColor;
