@@ -208,8 +208,8 @@ void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights)
         for (int i = 0; i < hNumTiles * vNumTiles *3; i+=3)
         {
             //data[0]
-            data[i+1] *= 0.9;
-            data[i+2] *= 0.8;
+            data[i+1] *= 0.95;
+            data[i+2] *= 0.9;
         }
     }
     
