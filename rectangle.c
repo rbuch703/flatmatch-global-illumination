@@ -217,6 +217,14 @@ void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights)
     free (data);
 }
 
+typedef struct {
+    int pixelWidth;
+    int pixelHeight;
+    float pos[3];
+    float width[3];
+    float height[3];
+} TileMetadata;
+
 void saveAsRaw(const Rectangle *rect, const char *filename, const Vector3 *lights)
 {
     int baseIdx = rect->lightmapSetup.s[0];
@@ -233,7 +241,16 @@ void saveAsRaw(const Rectangle *rect, const char *filename, const Vector3 *light
         data[3*i+2] = color.s[2];
     }
     
+    TileMetadata header ={  .pixelWidth = hNumTiles, 
+                            .pixelHeight = vNumTiles,
+                            .pos = {rect->pos.s[0],   rect->pos.s[1],   rect->pos.s[2]  },
+                            .width={rect->width.s[0], rect->width.s[1], rect->width.s[2]},
+                            .height={rect->height.s[0], rect->height.s[1], rect->height.s[2]}
+                         };
+    
+    
     FILE* f = fopen(filename, "wb");
+    fwrite(&header, sizeof(header), 1, f);
     fwrite(data, hNumTiles * vNumTiles * 3 * sizeof(float), 1, f);
     fclose(f);
    
