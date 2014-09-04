@@ -257,7 +257,7 @@ void createLightSourceInRoom(Image &img, Image &visited, int roomX, int roomY, f
     visited.set( bestCenter.first, bestCenter.second, 5);
     
     cout << "found room with center at (" << bestCenter.first << ", " << bestCenter.second << ") with distance " << maxDist << " and area " << numPixels << endl;
-    float edgeHalfLength = sqrt(numPixels) / 7;
+    float edgeHalfLength = sqrt(numPixels) / 10;//7;
 
     //maxDist is the maximum distance from maxPos for which it is guaranteed that there is no wall in any direction
     if (edgeHalfLength > maxDist-1)

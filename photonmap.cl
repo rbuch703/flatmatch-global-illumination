@@ -224,18 +224,6 @@ void tracePhoton(uint *rng_state, __constant const Rectangle *window, __constant
             return;
         }*/
         
-        //hack: make floor slightly brownish
-        if (pos.s2 < 1E-5f)
-        {
-            lightColor.s0 *= 1.0f;
-            lightColor.s1 *= 0.95f;
-            lightColor.s2 *= 0.9f;
-        }
-        //FIXME: make this increment atomic
-        lightColors[ light_idx ] += 
-            lightColor;
-            
-        lightColor *= /*(hitObj->color**/0.9f;
         //printf ("lightColor %d/%d is (%f, %f, %f)\n", get_global_id(0), depth, lightColor.x, lightColor.y, lightColor.z);
         
         //pos = hit_pos;
@@ -243,9 +231,35 @@ void tracePhoton(uint *rng_state, __constant const Rectangle *window, __constant
         //createBase(hitObj->n, &udir, &vdir);
         //printf("work_item %d, base1 (%f,%f,%f), base2 (%f,%f,%f) \n", get_global_id(0), udir.s0, udir.s1, udir.s2, vdir.s0, vdir.s1, vdir.s2);
         //printf("work_item %d, hit_pos (%f,%f,%f), new_dir (%f,%f,%f) \n", get_global_id(0), pos.s0, pos.s1, pos.s2, ray_dir.s0, ray_dir.s1, ray_dir.s2);
-        ray_dir = getCosineDistributedRandomRay(rng_state, hitObj->n);//, udir, vdir);
+        
+        /* Russian roulette for type of reflection: perfect or diffuse (floor is slightly reflective, everything else is diffuse*/
+        if (pos.s2 > 0.0005 || rand(rng_state) > 0.75)
+        {   //diffuse reflection
+            ray_dir = getCosineDistributedRandomRay(rng_state, hitObj->n);
+
+            //hack: make floor slightly brownish
+            if (pos.s2 < 1E-5f)
+            {   
+                //printf("%s\n", "Beep");
+                //lightColor.s0 *= 0.0f;
+                lightColor.s0 *= 1.0f;
+                lightColor.s1 *= 0.85f;
+                lightColor.s2 *= 0.7f;
+            }
+            lightColor *= 0.9f;
+        } else
+        {   //perfect reflection
+        
+            ray_dir = ray_dir - 2* (dot(hitObj->n,ray_dir)) * hitObj->n;
+        }
+
+        //FIXME: make this increment atomic
+        lightColors[ light_idx ] += 
+            lightColor;
+
         //ray_dir = getCosineDistributedRandomRay(rng_state, hitObj->n, normalize(hitObj->width), normalize(hitObj->height));
         pos += (ray_dir* 1E-5f); //to prevent self-intersection on the light source geometry
+
             
     }
 }
