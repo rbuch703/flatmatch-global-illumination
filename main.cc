@@ -154,9 +154,9 @@ int main(int argc, const char** argv)
 
 
 
-    int numSamplesPerArea = 1000000 * 1;   // rays per square meter of window/light surface
-    performGlobalIlluminationCl(geo, lightColors, numTexels, numSamplesPerArea);
-    //performGlobalIlluminationNative(geo, lightColors, numSamplesPerArea);
+    int numSamplesPerArea = 1000000 * 0.1;   // rays per square meter of window/light surface
+    //performGlobalIlluminationCl(geo, lightColors, numTexels, numSamplesPerArea);
+    performGlobalIlluminationNative(geo, lightColors, numSamplesPerArea);
     
     for ( int i = 0; i < geo.numWalls; i++)
     {

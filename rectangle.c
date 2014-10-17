@@ -262,3 +262,43 @@ Vector3 getOrigin(const Rectangle *rect) { return rect->pos; }
 Vector3 getWidthVector(const Rectangle *rect) { return rect->width; }
 Vector3 getHeightVector(const Rectangle *rect) { return rect->height;}
 
+double getDistance(const Rectangle *plane, const Vector3 p)
+{
+    Vector3 dir = sub(p, plane->pos);
+
+    return dot(dir, plane->n);
+}
+
+int getPosition(const Rectangle *plane, const Rectangle *rect)
+{
+    Vector3 p1 = rect->pos;
+    Vector3 p2 = add( rect->pos, rect->width);
+    Vector3 p3 = add( rect->pos, rect->height);
+    Vector3 p4 = add3(rect->pos, rect->width, rect->height);
+
+    int isLeft = 0;
+    int isRight= 0;
+    
+    double d = getDistance(plane, p1);
+    isLeft |= (d < 0);
+    isRight|= (d > 0);
+
+    d = getDistance(plane, p2);
+    isLeft |= (d < 0);
+    isRight|= (d > 0);
+    
+    d = getDistance(plane, p3);
+    isLeft |= (d < 0);
+    isRight|= (d > 0);
+    
+    d = getDistance(plane, p4);
+    isLeft |= (d < 0);
+    isRight|= (d > 0);
+    
+    if (isLeft && !isRight) return -1;
+    if (isRight&& !isLeft) return 1;
+    
+    return 0;    
+}
+
+

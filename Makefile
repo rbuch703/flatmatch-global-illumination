@@ -7,7 +7,10 @@ OBJ_C  = $(SRC_C:.c=.o)
 OBJ_CC = $(SRC_CC:.cc=.oo)
 OBJ    = $(OBJ_C) $(OBJ_CC)
 
-OPT_FLAGS = -O2
+CC = gcc#clang
+CPP= g++#clang++
+
+OPT_FLAGS = #-O2
 OSX_INCLUDES = #-I /usr/local/include -framework OpenCL
 OSX_LIBS = #-L /usr/local/lib -framework OpenCL
 FLAGS = -g -Wall -Wextra -msse3 $(OPT_FLAGS)
@@ -17,7 +20,7 @@ PROFILE =
 
 CFLAGS = $(FLAGS) $(PROFILE) -std=c99 -flto #$(OSX_INCLUDES)
 CCFLAGS = $(FLAGS) $(PROFILE) -std=c++11 -flto #$(OSX_INCLUDES)
-LD_FLAGS = $(PROFILE) $(OSX_LIBS) -lOpenCL -lm -flto $(OPT_FLAGS) 
+LD_FLAGS = $(PROFILE) $(OSX_LIBS) -lOpenCL -lm  $(OPT_FLAGS)  #-flto
 .PHONY: all clean
 
 all: make.dep globalIllumination tiles
@@ -25,11 +28,11 @@ all: make.dep globalIllumination tiles
 
 globalIllumination: $(OBJ_C) $(OBJ_CC)
 	@echo [LD] $@
-	@g++ $^  $(LD_FLAGS) -lpng -o $@
+	@$(CPP) $^  $(LD_FLAGS) -lpng -o $@
 
 %.o: %.c
 	@echo [CC] $<
-	@gcc $(CFLAGS) $< -c -o $@
+	@$(CC) $(CFLAGS) $< -c -o $@
 
 tiles:
 	@echo [MKDIR] tiles
@@ -37,7 +40,7 @@ tiles:
     
 %.oo: %.cc
 	@echo [CP] $<
-	@g++ $(CCFLAGS) $< -c -o $@
+	@$(CPP) $(CCFLAGS) $< -c -o $@
 
 clean:
 	@echo [CLEAN]
@@ -46,9 +49,10 @@ clean:
 	@rm -rf globalIllumination
 	@rm -rf coverage.info callgrind.out.*
 
-make.dep: $(SRC)
+make.dep: $(SRC_C) $(SRC_CC)
 	@echo [DEP]
-	@g++ -MM -I /usr/local/include $^ > make.dep
+	@$(CC)  -MM -I /usr/local/include $(SRC_C) > make.dep
+	@$(CPP) -MM -I /usr/local/include $(SRC_CC) >> make.dep
 
 include make.dep
 

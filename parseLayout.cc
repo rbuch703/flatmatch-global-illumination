@@ -28,8 +28,8 @@ static const float HEIGHT      = 2.60;
 static const float DOOR_HEIGHT = 2.00;
 static const float WINDOW_LOW  = 0.85;
 static const float WINDOW_HIGH = 2.30;
-static const float WINDOW_HEIGHT = WINDOW_HIGH - WINDOW_LOW;
-static const float TOP_WALL_HEIGHT = HEIGHT - WINDOW_HIGH;
+//static const float WINDOW_HEIGHT = WINDOW_HIGH - WINDOW_LOW;
+//static const float TOP_WALL_HEIGHT = HEIGHT - WINDOW_HIGH;
 
 
 void addWall( vector<Rectangle> &segments, float startX, float startY, float dx, float dy, float min_z = 0.0f, float max_z = HEIGHT)

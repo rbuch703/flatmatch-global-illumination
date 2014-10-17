@@ -5,11 +5,23 @@
 #include "rectangle.h"
 
 #include <stdio.h> //for printf()
+#include <string.h> //for memcpy()
+//#include <math.h> //for max()
 
 Vector3 getDiffuseSkyRandomRay(const Vector3 ndir/*, const Vector3 udir, const Vector3 vdir*/);
 Vector3 getCosineDistributedRandomRay(const Vector3 ndir);
 int getTileIdAt(const Rectangle *rect, const Vector3 p);
 //float intersects( const Rectangle *rect, const Vector3 ray_src, const Vector3 ray_dir, const float closestDist);
+
+typedef struct BspTreeNode {
+    Rectangle plane;
+    Rectangle *items;
+    int       numItems;
+    struct BspTreeNode *left;
+    struct BspTreeNode *right;
+
+} BspTreeNode;
+
 
 Vector3 getDiffuseSkyRandomRay(const Vector3 ndir/*, const Vector3 udir, const Vector3 vdir*/)
 {
@@ -148,8 +160,82 @@ float intersects( const Rectangle *rect, const Vector3 ray_src, const Vector3 ra
 
 }*/
 
+void findClosestIntersection(Vector3 ray_pos, Vector3 ray_dir, const BspTreeNode *node, float *dist, Rectangle** target_out)
+{
+    for ( int i = 0; i < node->numItems; i++)
+    {
+        Rectangle *target = &(node->items[i]);
+        float dist_new = intersects(target , ray_pos, ray_dir, *dist);
+        if (dist_new < 0)
+            continue;
+            
+        if (dist_new < *dist) {
+            *target_out = target;
+            *dist = dist_new;
+        }
+    }
 
-void tracePhoton(const Rectangle *window, const Rectangle* rects, const int numRects, Vector3 *lightColors, const int isWindow)
+    //if (node->left)    findClosestIntersection(ray_pos, ray_dir, node->left, dist, target_out);
+    //if (node->right)    findClosestIntersection(ray_pos, ray_dir, node->right, dist, target_out);
+    
+    /** FIXME: if ray_pos is on the left side, and ray_dir looks away from the plane, intersections for the right plane would
+                all be behind the ray_pos, and thus are irrelevant; same goes for the other way around
+    */
+    
+    //has at least one child node --> split plane must be valid
+    if (node->left || node->right)
+    {
+        float pos = getDistance( &(node->plane), ray_pos);
+        
+        if (pos < 0)    //we are left --> search left and center first, then right
+        {
+            if (node->left)
+                findClosestIntersection(ray_pos, ray_dir, node->left, dist, target_out);
+            if (*dist != INFINITY) return;  // found a hit in left or center --> possible hits in right are guaranteed to be further away
+            
+            if (node->right)
+                findClosestIntersection(ray_pos, ray_dir, node->right, dist, target_out);
+            return;
+        }
+            
+        if (pos > 0)
+        {
+            if (node->right)
+                findClosestIntersection(ray_pos, ray_dir, node->right, dist, target_out);
+            if (*dist != INFINITY)
+            { 
+                /*float oldDist = *dist;
+                if (node->left)
+                    findClosestIntersection(ray_pos, ray_dir, node->left, dist, target_out);
+                if (*dist != oldDist)
+                {
+                    printf("%f vs. %f\n", *dist, oldDist);
+                    assert(*dist == oldDist);
+                }*/
+                return;  // found a hit in right or center --> possible hits in left are guaranteed to be further away
+            }
+            
+            if (node->left)
+                findClosestIntersection(ray_pos, ray_dir, node->left, dist, target_out);
+            return;
+        
+        }
+        
+        if (pos == 0)
+        {
+            if (*dist != INFINITY) return;  // found a hit in center --> possible hits in left and right are guaranteed to be further away
+            if (node->left)
+                findClosestIntersection(ray_pos, ray_dir, node->left, dist, target_out);
+            if (node->right)
+                findClosestIntersection(ray_pos, ray_dir, node->right, dist, target_out);
+            
+        }
+    }
+    
+}
+
+
+void tracePhoton(const Rectangle *window, const BspTreeNode *root, Vector3 *lightColors, const int isWindow)
 {
 
     
@@ -178,12 +264,13 @@ void tracePhoton(const Rectangle *window, const Rectangle* rects, const int numR
                     The first object in this address space can have address 0x00000000, so a 'null' pointer 
                     can indeed be valid here --> comparing 'hitObj' to 0 does not return whether hitObj points
                     to a valid object */
-        const Rectangle* hitObj = 0;
+        Rectangle* hitObj = 0;
         float dist_out = INFINITY;
 
         //printf("work_item %d, pos (%f,%f,%f), dir (%f,%f,%f) \n", get_global_id(0), pos.s0, pos.s1, pos.s2, ray_dir.s0, ray_dir.s1, ray_dir.s2);
         
-        for ( int i = 0; i < numRects; i++)
+        findClosestIntersection(pos, ray_dir, root, &dist_out, &hitObj);
+        /*for ( int i = 0; i < numRects; i++)
         {
 
             const Rectangle *target = &(rects[i]);
@@ -195,7 +282,7 @@ void tracePhoton(const Rectangle *window, const Rectangle* rects, const int numR
                 hitObj = target;
                 dist_out = dist;
             }
-        }
+        }*/
         
         if (dist_out == INFINITY)
             return;
@@ -257,22 +344,157 @@ void tracePhoton(const Rectangle *window, const Rectangle* rects, const int numR
 
 
 
-void photonmap( const Rectangle *window, const Rectangle* rects, int numRects, Vector3 *lightColors/*, const int numLightColors*/, int isWindow, int numSamples)
+void photonmap( const Rectangle *window, const BspTreeNode* root, Vector3 *lightColors/*, const int numLightColors*/, int isWindow, int numSamples)
 {
 
     //printf("kernel supplied with %d rectangles\n", numRects);
     
     for (int i = 0; i < numSamples; i++)
     {
-        if (i % 1000000 == 0)
+        if (i % 100000 == 0)
             printf("%f %% done.\n", (i/(double)numSamples*100));
-        tracePhoton(window, rects, numRects, lightColors, isWindow);
+        tracePhoton(window, root, lightColors, isWindow);
     }
 }
 
+/* returns the number of items this subdivision would require to check in the worst case.
+   This is used as a measure of the quality of the subdivision
+ */
+int getSubdivisionOverhead( BspTreeNode *node, const Rectangle *splitPlane)
+{
+    if (node->numItems == 0)
+        return 0;
+
+    int numLeftItems = 0;
+    int numRightItems = 0;
+    int numCenterItems = 0;
+    for (int i = 0; i < node->numItems; i++)
+    {
+        Rectangle *rect = &(node->items[i]);
+        
+        int pos = getPosition( splitPlane, rect);
+        numLeftItems  += (pos <  0);
+        numRightItems += (pos >  0);
+        numCenterItems+= (pos == 0);
+    }
+    
+    return (numLeftItems > numRightItems ? numLeftItems : numRightItems) + numCenterItems;
+
+}
+
+void subdivideNode( BspTreeNode *node)
+{
+    /*printf( "subdividing at %f,%f,%f  ---  %f,%f,%f\n", 
+        splitPlane->pos.s[0], splitPlane->pos.s[1], splitPlane->pos.s[2],
+        splitPlane->n.s[0], splitPlane->n.s[1], splitPlane->n.s[2]);*/
+        
+    if (node->numItems < 5) return; //is likely to have a bigger overhead than benefit
+    int lowestOverhead = node->numItems;
+    Rectangle* splitPlane = &(node->items[0]);
+
+    for (int i = 0; i < node->numItems; i++)
+    {
+        int overhead = getSubdivisionOverhead(node, &(node->items[i]) );
+        if (overhead < lowestOverhead)
+        {
+            lowestOverhead = overhead;
+            splitPlane = &(node->items[i]);
+        }
+    }
+    
+    Rectangle *leftItems = (Rectangle*)malloc(sizeof(Rectangle) * node->numItems);
+    Rectangle *rightItems = (Rectangle*)malloc(sizeof(Rectangle) * node->numItems);
+    int numLeftItems = 0;
+    int numRightItems = 0;
+    node->plane = *splitPlane;//node->items[ node->numItems / 2];
+    
+    for (int i = 0; i < node->numItems; )
+    {
+        Rectangle *rect = &(node->items[i]);
+        
+        int pos = getPosition( &(node->plane), rect);
+        if (pos < 0)
+            leftItems[numLeftItems++] = *rect;
+        
+        if (pos > 0)
+            rightItems[numRightItems++] = *rect;
+
+        if (pos != 0) //smaller or bigger
+            node->items[i] = node->items[--node->numItems];
+        else
+            i++;
+    }
+    
+    if (numLeftItems)
+    {
+        node->left = (BspTreeNode*)malloc(sizeof(BspTreeNode));
+        node->left->left = NULL;
+        node->left->right= NULL;
+        node->left->items = leftItems;
+        node->left->numItems= numLeftItems;
+        subdivideNode(node->left);
+    }
+    
+    if (numRightItems)
+    {
+        node->right = (BspTreeNode*)malloc(sizeof(BspTreeNode));
+        node->right->left = NULL;
+        node->right->right= NULL;
+        node->right->items = rightItems;
+        node->right->numItems= numRightItems;
+        subdivideNode(node->right);
+    }
+
+}
+
+void freeBspTree(BspTreeNode *root)
+{
+    if (root->left)
+    {
+        freeBspTree(root->left);
+        free(root->left);
+    }
+        
+    if (root->right)
+    {
+        freeBspTree(root->right);
+        free(root->right);
+    }
+
+    free(root->items);        
+}
 
 void performGlobalIlluminationNative(Geometry geo, Vector3* lightColors, int numSamplesPerArea)
 {
+    BspTreeNode root = { .numItems = geo.numWalls, .left = NULL, .right=NULL };
+    root.items =  (Rectangle*)malloc(sizeof(Rectangle) * geo.numWalls);
+    memcpy( root.items, geo.walls, sizeof(Rectangle) * geo.numWalls);
+    
+    printf("root size: %d\n", root.numItems);
+    
+    /*for (int i = 0; i < root.numItems; i++)
+    {
+        BspTreeNode r2 = root;
+        r2.items = (Rectangle*)malloc(sizeof(Rectangle) * root.numItems);
+        memcpy( r2.items, root.items, sizeof(Rectangle) * root.numItems);
+
+        
+        subdivideNode(&r2, &(root.items[i]) );
+
+        int l = r2.left ? r2.left->numItems : 0;
+        int r = r2.right ? r2.right->numItems : 0;
+        printf("node sizes (max/L/C/R): %d/%d/%d/%d\n", 
+            ( l > r ? l : r)+r2.numItems,l, r2.numItems, r);
+    }*/
+    subdivideNode(&root);
+
+    int l = root.left ? root.left->numItems : 0;
+    int r = root.right ? root.right->numItems : 0;
+    printf("node sizes (max/L/C/R): %d/%d/%d/%d\n", 
+        ( l > r ? l : r)+root.numItems,l, root.numItems, r);
+    
+    //exit(0);
+    //root.plane = 
 
 
     for ( int i = 0; i < geo.numWindows; i++)
@@ -283,7 +505,7 @@ void performGlobalIlluminationNative(Geometry geo, Vector3* lightColors, int num
         float area = length(xDir) * length(yDir);
         uint64_t numSamples = (numSamplesPerArea * area);
         
-        photonmap(&geo.windows[i], geo.walls, geo.numWalls, lightColors, 1/*true*/, numSamples);
+        photonmap(&geo.windows[i], &root, lightColors, 1/*true*/, numSamples);
     }
 
     for ( int i = 0; i < geo.numLights; i++)
@@ -293,8 +515,8 @@ void performGlobalIlluminationNative(Geometry geo, Vector3* lightColors, int num
         
         float area = length(xDir) * length(yDir);
         uint64_t numSamples = (numSamplesPerArea * area);
-        photonmap(&geo.lights[i], geo.walls, geo.numWalls, lightColors, 0/*false*/, numSamples);
+        photonmap(&geo.lights[i], &root, lightColors, 0/*false*/, numSamples);
     }
-
+    freeBspTree(&root);
 }
 
