@@ -1,6 +1,6 @@
 
 SRC_C = png_helper.c rectangle.c vector3_cl.c photonmap.c
-SRC_CC = main.cc parseLayout.cc
+SRC_CC = main.cc parseLayout.cc global_illumination_cl.cc
 SRC = $(SRC_C) $(SRC_CC)
 
 OBJ_C  = $(SRC_C:.c=.o)

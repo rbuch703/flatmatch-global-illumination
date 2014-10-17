@@ -329,25 +329,40 @@ void createLights(Image img, float scaling, vector<Rectangle> &lightsOut)
 
 }
 
-
-void parseLayout(const char* const filename, const float scaling, int& width, int& height, vector<Rectangle> &wallsOut, 
-                 vector<Rectangle> &windowsOut, vector<Rectangle> &lightsOut, vector<Rectangle> &boxOut, 
-                 pair<float, float> &startingPositionOut)
+void rectangleVectorToArray( vector<Rectangle> rects, Rectangle* &rectsOut, cl_int &numRectsOut)
 {
-    wallsOut.clear();
-    windowsOut.clear();
-    lightsOut.clear();
+    numRectsOut = rects.size();
+
+    //these Rectangle arrays are to be passed to OpenCL --> have to be aligned to 16 byte boundary
+    if (0 != posix_memalign((void**)&rectsOut, 16, numRectsOut * sizeof(Rectangle))) 
+    {
+        cout << "[Err] aligned memory allocation failed, exiting ..." << endl;
+        exit(0);
+    }
+    
+    for (int i = 0; i < numRectsOut; i++)
+        rectsOut[i] = rects[i];
+}
+
+Geometry parseLayout(const char* const filename, const float scaling)
+{
+    Geometry geo;
+
+    vector<Rectangle> wallsOut;
+    vector<Rectangle> windowsOut;
+    vector<Rectangle> lightsOut;
+    vector<Rectangle> boxOut;
     
     int color_type;
     uint32_t *pixelBuffer;
-    read_png_file(filename, &width, &height, &color_type, (uint8_t**)&pixelBuffer );
+    read_png_file(filename, &geo.width, &geo.height, &color_type, (uint8_t**)&pixelBuffer );
 
     if (color_type == PNG_COLOR_TYPE_RGB)
     {
         uint8_t *src = (uint8_t*)pixelBuffer;
-        pixelBuffer = (uint32_t*)malloc( width*height*sizeof(uint32_t));
+        pixelBuffer = (uint32_t*)malloc( geo.width*geo.height*sizeof(uint32_t));
         
-        for (int i = 0; i < width*height; i++)
+        for (int i = 0; i < geo.width * geo.height; i++)
             pixelBuffer[i] =
                 0xFF000000 | src[i*3] | (src[i*3+1] << 8) | (src[i*3+2] << 16);
         
@@ -357,8 +372,8 @@ void parseLayout(const char* const filename, const float scaling, int& width, in
 
     assert (color_type == PNG_COLOR_TYPE_RGBA);
 
-    uint8_t *pixels = new uint8_t[width*height];
-    for (int i = 0; i < width*height; i++)
+    uint8_t *pixels = new uint8_t[geo.width * geo.height];
+    for (int i = 0; i < geo.width * geo.height; i++)
     {
         switch (pixelBuffer[i])
         {
@@ -373,21 +388,21 @@ void parseLayout(const char* const filename, const float scaling, int& width, in
         }
     }
 
-    pair<int, int> centralPos = getCentralPosition(pixelBuffer, width, height);
-    startingPositionOut.first  = centralPos.first * scaling;
-    startingPositionOut.second = centralPos.second * scaling;
+    pair<int, int> centralPos = getCentralPosition(pixelBuffer, geo.width, geo.height);
+    geo.startingPositionX = centralPos.first * scaling;
+    geo.startingPositionY = centralPos.second * scaling;
     
-    createLights( Image(width, height, pixelBuffer), scaling, lightsOut);
+    createLights( Image(geo.width, geo.height, pixelBuffer), scaling, lightsOut);
     
     
     free (pixelBuffer);
     
-    for (int y = 1; y < height; y++)
+    for (int y = 1; y < geo.height; y++)
     {
         //cout << "scanning row " << y << endl;
-        for (int x = 1; x < width;) {
-            uint32_t pxAbove = pixels[(y-1) * width + (x)];
-            uint32_t pxHere =  pixels[(y  ) * width + (x)];
+        for (int x = 1; x < geo.width;) {
+            uint32_t pxAbove = pixels[(y-1) * geo.width + (x)];
+            uint32_t pxHere =  pixels[(y  ) * geo.width + (x)];
             if (pxAbove == pxHere)
             {
                 x++;
@@ -396,9 +411,9 @@ void parseLayout(const char* const filename, const float scaling, int& width, in
                 
             float startX = x;
             
-            while ( x < width && 
-                   pxAbove == pixels[(y-1) * width + (x)] && 
-                   pxHere == pixels[(y) * width + (x)])
+            while ( x < geo.width && 
+                   pxAbove == pixels[(y-1) * geo.width + (x)] && 
+                   pxHere == pixels[(y) * geo.width + (x)])
                 x++;
                 
             float endX = x;
@@ -408,11 +423,11 @@ void parseLayout(const char* const filename, const float scaling, int& width, in
     }
     //cout << "  == End of horizontal scan, beginning vertical scan ==" << endl;
 
-    for (int x = 1; x < width; x++)
+    for (int x = 1; x < geo.width; x++)
     {
-        for (int y = 1; y < height; ) {
-            uint32_t pxLeft = pixels[y * width + (x - 1) ];
-            uint32_t pxHere = pixels[y * width + (x    ) ];
+        for (int y = 1; y < geo.height; ) {
+            uint32_t pxLeft = pixels[y * geo.width + (x - 1) ];
+            uint32_t pxHere = pixels[y * geo.width + (x    ) ];
             if (pxLeft == pxHere)
             {
                 y++;
@@ -421,9 +436,9 @@ void parseLayout(const char* const filename, const float scaling, int& width, in
                 
             float startY = y;
             
-            while (y < height && 
-                   pxLeft == pixels[y * width + (x-1)] && 
-                   pxHere == pixels[y * width + x])
+            while (y < geo.height && 
+                   pxLeft == pixels[y * geo.width + (x-1)] && 
+                   pxHere == pixels[y * geo.width + x])
                 y++;
                 
             float endY = y;
@@ -432,25 +447,25 @@ void parseLayout(const char* const filename, const float scaling, int& width, in
         }
     }
 
-    for (int y = 0; y < height; y++)
-        for (int x = 0; x < width; x++)
+    for (int y = 0; y < geo.height; y++)
+        for (int x = 0; x < geo.width; x++)
     {
         int xStart = x;
-        uint32_t color = pixels[y * width + x];
+        uint32_t color = pixels[y * geo.width + x];
         if (color == INVALIDATED)
             continue;
         
-        while (x+1 < width && pixels[y*width + (x+1)] == color) 
+        while (x+1 < geo.width && pixels[y*geo.width + (x+1)] == color) 
             x++;
             
         int xEnd = x;
         
         int yEnd;
-        for (yEnd = y + 1; yEnd < height; yEnd++)
+        for (yEnd = y + 1; yEnd < geo.height; yEnd++)
         {
             bool rowWithIdenticalColor = true;
             for (int xi = xStart; xi <= xEnd && rowWithIdenticalColor; xi++)
-                rowWithIdenticalColor &= (pixels[yEnd * width + xi] == color);
+                rowWithIdenticalColor &= (pixels[yEnd * geo.width + xi] == color);
             
             if (! rowWithIdenticalColor)
                 break;
@@ -460,7 +475,7 @@ void parseLayout(const char* const filename, const float scaling, int& width, in
 
         for (int yi = y; yi <= yEnd; yi++)
             for (int xi = xStart; xi <= xEnd; xi++)
-                pixels[yi * width + xi] = INVALIDATED;
+                pixels[yi * geo.width + xi] = INVALIDATED;
 
         yEnd +=1;   //cover the area to the end of the pixel, not just to the start
         xEnd +=1;        
@@ -503,5 +518,17 @@ void parseLayout(const char* const filename, const float scaling, int& width, in
 
     delete [] pixels;
     //exit(0);
+/*    vector<Rectangle> wallsOut;
+    vector<Rectangle> windowsOut;
+    vector<Rectangle> lightsOut;
+    vector<Rectangle> boxOut;
+*/
+
+    rectangleVectorToArray(  wallsOut, geo.walls, geo.numWalls);
+    rectangleVectorToArray(  boxOut, geo.boxWalls, geo.numBoxWalls);
+    rectangleVectorToArray(  windowsOut, geo.windows, geo.numWindows);
+    rectangleVectorToArray(  lightsOut, geo.lights, geo.numLights);
+    
+    return geo;
 }
 

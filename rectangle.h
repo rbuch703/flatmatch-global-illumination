@@ -10,7 +10,6 @@ extern "C" {
 //#include "color3.h"
 #include "assert.h"
 
-
 static const float TILE_SIZE = 10000/20.0f;   //lightmap texels per m²
 static const int   SUPER_SAMPLING = 1;
 
@@ -27,6 +26,14 @@ typedef struct __attribute__ ((aligned(16))) Rectangle{
 //    int hNumTiles, vNumTiles;
 //    float 
 } Rectangle;
+
+typedef struct Geometry {
+    Rectangle *windows, *lights, *walls, *boxWalls;
+    cl_int     numWindows, numLights, numWalls, numBoxWalls; 
+    cl_int     width, height;
+    float     startingPositionX, startingPositionY;
+} Geometry;
+
 
 Rectangle createRectangleV( const Vector3 _pos, const Vector3 _width, const Vector3 _height);
 Rectangle createRectangle( float px, float py, float pz,

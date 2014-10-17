@@ -1,19 +1,13 @@
 
-#include "vector3_cl.h"
 #include <math.h>
-typedef struct __attribute__ ((aligned(16))) Rectangle {
-    Vector3 pos;
-    Vector3 width, height;
-    Vector3 n;
-//    Vector3 color;
-    cl_int3 lightmapSetup;
-//    int lightNumTiles;
-} Rectangle;
+
+#include "vector3_cl.h"
+#include "rectangle.h"
 
 Vector3 getDiffuseSkyRandomRay(const Vector3 ndir/*, const Vector3 udir, const Vector3 vdir*/);
 Vector3 getCosineDistributedRandomRay(const Vector3 ndir);
 int getTileIdAt(const Rectangle *rect, const Vector3 p);
-float intersects( const Rectangle *rect, const Vector3 ray_src, const Vector3 ray_dir, const float closestDist);
+//float intersects( const Rectangle *rect, const Vector3 ray_src, const Vector3 ray_dir, const float closestDist);
 
 Vector3 getDiffuseSkyRandomRay(const Vector3 ndir/*, const Vector3 udir, const Vector3 vdir*/)
 {
