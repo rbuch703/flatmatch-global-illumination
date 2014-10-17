@@ -4,6 +4,8 @@
 #include "vector3_cl.h"
 #include "rectangle.h"
 
+#include <stdio.h> //for printf()
+
 Vector3 getDiffuseSkyRandomRay(const Vector3 ndir/*, const Vector3 udir, const Vector3 vdir*/);
 Vector3 getCosineDistributedRandomRay(const Vector3 ndir);
 int getTileIdAt(const Rectangle *rect, const Vector3 p);
@@ -255,12 +257,44 @@ void tracePhoton(const Rectangle *window, const Rectangle* rects, const int numR
 
 
 
-void photonmap( const Rectangle *window, const Rectangle* rects, int numRects, Vector3 *lightColors/*, const int numLightColors*/, int isWindow)
+void photonmap( const Rectangle *window, const Rectangle* rects, int numRects, Vector3 *lightColors/*, const int numLightColors*/, int isWindow, int numSamples)
 {
+
     //printf("kernel supplied with %d rectangles\n", numRects);
     
-    for (int i = 0; i < 100; i++)
+    for (int i = 0; i < numSamples; i++)
+    {
+        if (i % 1000000 == 0)
+            printf("%f %% done.\n", (i/(double)numSamples*100));
         tracePhoton(window, rects, numRects, lightColors, isWindow);
+    }
 }
 
+
+void performGlobalIlluminationNative(Geometry geo, Vector3* lightColors, int numSamplesPerArea)
+{
+
+
+    for ( int i = 0; i < geo.numWindows; i++)
+    {
+        Vector3 xDir= getWidthVector(  &geo.windows[i]);
+        Vector3 yDir= getHeightVector( &geo.windows[i]);
+        
+        float area = length(xDir) * length(yDir);
+        uint64_t numSamples = (numSamplesPerArea * area);
+        
+        photonmap(&geo.windows[i], geo.walls, geo.numWalls, lightColors, 1/*true*/, numSamples);
+    }
+
+    for ( int i = 0; i < geo.numLights; i++)
+    {
+        Vector3 xDir= getWidthVector(  &geo.lights[i]);
+        Vector3 yDir= getHeightVector( &geo.lights[i]);
+        
+        float area = length(xDir) * length(yDir);
+        uint64_t numSamples = (numSamplesPerArea * area);
+        photonmap(&geo.lights[i], geo.walls, geo.numWalls, lightColors, 0/*false*/, numSamples);
+    }
+
+}
 

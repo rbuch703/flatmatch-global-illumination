@@ -14,6 +14,7 @@
 
 
 #include "global_illumination_cl.h"
+#include "global_illumination_native.h"
 using namespace std;
 
 
@@ -153,8 +154,9 @@ int main(int argc, const char** argv)
 
 
 
-    int numSamplesPerArea = 1000000 * 10;   // rays per square meter of window/light surface
+    int numSamplesPerArea = 1000000 * 1;   // rays per square meter of window/light surface
     performGlobalIlluminationCl(geo, lightColors, numTexels, numSamplesPerArea);
+    //performGlobalIlluminationNative(geo, lightColors, numSamplesPerArea);
     
     for ( int i = 0; i < geo.numWalls; i++)
     {
