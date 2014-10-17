@@ -9,10 +9,29 @@
 Vector3 add(Vector3 a, Vector3 b) { Vector3 res = { .s = {a.s[0]+b.s[0], a.s[1]+b.s[1], a.s[2]+b.s[2]} }; return res;}
 Vector3 sub(Vector3 a, Vector3 b) { Vector3 res = { .s = {a.s[0]-b.s[0], a.s[1]-b.s[1], a.s[2]-b.s[2]} }; return res;}
 
-/*inline Vector3 mul(float a, const Vector3 b) { 
-    __m128 tmp = _mm_load1_ps(&a);
-    return _mm_mul_ps(tmp, b);
-}*/
+Vector3 add3(const Vector3 a, const Vector3 b, const Vector3 c)
+{
+    Vector3 res = { .s = {a.s[0] + b.s[0] + c.s[0], 
+                          a.s[1] + b.s[1] + c.s[1], 
+                          a.s[2] + b.s[2] + c.s[2]} };   
+    return res;
+}
+
+Vector3 add4(const Vector3 a, const Vector3 b, const Vector3 c, const Vector3 d)
+{
+    Vector3 res = { .s = {a.s[0] + b.s[0] + c.s[0] + d.s[0], 
+                          a.s[1] + b.s[1] + c.s[1] + d.s[1], 
+                          a.s[2] + b.s[2] + c.s[2] + d.s[2]} };   
+    return res;
+}
+
+
+Vector3 initVector3(float x, float y, float z)
+{
+    Vector3 res = {.s = {x, y, z}};
+    return res;
+}
+
 
 Vector3 mul(const Vector3 b, float a) { 
     Vector3 res = {.s = {b.s[0]*a, 

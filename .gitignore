@@ -10,4 +10,6 @@ globalIllumination
 make.dep
 
 tiles
+tiles.bak
+
 geometry.json
