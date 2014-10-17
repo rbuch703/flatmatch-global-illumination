@@ -20,6 +20,8 @@ static const uint8_t EMPTY = 0x2;
 static const uint8_t OUTSIDE =  0x3;
 static const uint8_t DOOR = 0x4;
 static const uint8_t WINDOW = 0x5;
+static const uint8_t BALCONY_WINDOW = 0x6;  //has no upper edge (ends at the ceiling)
+static const uint8_t BALCONY_DOOR = 0x7;    //upper edge is WINDOW_HIGH to match the window next to it
 
 
 static const float HEIGHT      = 2.60;
@@ -50,14 +52,26 @@ void registerWall( vector<Rectangle> &walls, vector<Rectangle> &windows, vector<
     else if (col0 == WALL && col1 == DOOR) addWall(walls, x0, y1, x1 - x0, y0 - y1, 0, DOOR_HEIGHT); //transition from wall to door frame
     else if (col0 == DOOR && col1 == WALL) addWall(walls, x1, y0, x0 - x1, y1 - y0, 0, DOOR_HEIGHT);// 
 
+    else if (col0 == WALL && col1 == BALCONY_DOOR) addWall(walls, x0, y1, x1 - x0, y0 - y1, 0, WINDOW_HIGH); //transition from wall to door frame
+    else if (col0 == BALCONY_DOOR && col1 == WALL) addWall(walls, x1, y0, x0 - x1, y1 - y0, 0, WINDOW_HIGH);// 
+
+
     else if (col0 == WALL && col1 == WINDOW) addWall(walls, x0, y1, x1 - x0, y0 - y1, WINDOW_LOW, WINDOW_HIGH); //transition from wall to window (frame)
     else if (col0 == WINDOW && col1 == WALL) addWall(walls, x1, y0, x0 - x1, y1 - y0, WINDOW_LOW, WINDOW_HIGH); //transition from wall to window (frame)
+
+    else if (col0 == WALL && col1 == BALCONY_WINDOW) addWall(walls, x0, y1, x1 - x0, y0 - y1, WINDOW_LOW, HEIGHT); //transition from wall to window (frame)
+    else if (col0 == BALCONY_WINDOW && col1 == WALL) addWall(walls, x1, y0, x0 - x1, y1 - y0, WINDOW_LOW, HEIGHT); //transition from wall to window (frame)
+
 
     else if (col0 == OUTSIDE  && col1 == EMPTY) addWall(walls, x0, y1, x1 - x0, y0 - y1); //transition from entrace to inside area
     else if (col0 == EMPTY && col1 == OUTSIDE ) addWall(walls, x1, y0, x0 - x1, y1 - y0);// transition from entrace to inside area
 
     else if (col0 == DOOR && col1 == EMPTY) addWall(walls, x0, y1, x1 - x0, y0 - y1, DOOR_HEIGHT, HEIGHT); //transition from door frame to inside area
     else if (col0 == EMPTY && col1 == DOOR) addWall(walls, x1, y0, x0 - x1, y1 - y0, DOOR_HEIGHT, HEIGHT);// transition from door frame to inside area
+
+    else if (col0 == BALCONY_DOOR && col1 == EMPTY) addWall(walls, x0, y1, x1 - x0, y0 - y1, WINDOW_HIGH, HEIGHT); //transition from door frame to inside area
+    else if (col0 == EMPTY && col1 == BALCONY_DOOR) addWall(walls, x1, y0, x0 - x1, y1 - y0, WINDOW_HIGH, HEIGHT);// transition from door frame to inside area
+
 
     else if (col0 == WALL    && col1 == OUTSIDE) addWall(box, x0, y1, x1 - x0, y0 - y1, -0.2, HEIGHT + 0.2); 
     else if (col0 == OUTSIDE && col1 == WALL   ) addWall(box, x1, y0, x0 - x1, y1 - y0, -0.2, HEIGHT + 0.2); 
@@ -73,6 +87,15 @@ void registerWall( vector<Rectangle> &walls, vector<Rectangle> &windows, vector<
         addWall(walls, x1, y0, x0 - x1, y1 - y0, WINDOW_HIGH, HEIGHT);
     }
 
+    else if (col0 == BALCONY_WINDOW && col1 == EMPTY) { //transition from window to inside area
+        addWall(walls, x0, y1, x1 - x0, y0 - y1, 0, WINDOW_LOW); 
+    }
+    
+    else if (col0 == EMPTY && col1 == BALCONY_WINDOW) {
+        addWall(walls, x1, y0, x0 - x1, y1 - y0, 0, WINDOW_LOW);
+    }
+
+
     else if (col0 == OUTSIDE  && col1 == WINDOW) 
     {
         addWall(box,     x1, y0, x0 - x1, y1 - y0, -0.2, WINDOW_LOW);
@@ -84,6 +107,18 @@ void registerWall( vector<Rectangle> &walls, vector<Rectangle> &windows, vector<
         addWall(box,     x0, y1, x1 - x0, y0 - y1, -0.2, WINDOW_LOW);
         addWall(box,     x0, y1, x1 - x0, y0 - y1, WINDOW_HIGH, HEIGHT + 0.2);
         addWall(windows, x1, y0, x0 - x1, y1 - y0, WINDOW_LOW, WINDOW_HIGH);
+    }
+    else if (col0 == OUTSIDE  && col1 == BALCONY_WINDOW) 
+    {
+        addWall(box,     x1, y0, x0 - x1, y1 - y0, -0.2, WINDOW_LOW);
+        addWall(windows, x0, y1, x1 - x0, y0 - y1, WINDOW_LOW, HEIGHT);
+        addWall(box,     x1, y0, x0 - x1, y1 - y0, HEIGHT, HEIGHT + 0.2);
+    }
+    else if (col0 == BALCONY_WINDOW && col1 == OUTSIDE)  
+    {
+        addWall(box,     x0, y1, x1 - x0, y0 - y1, -0.2, WINDOW_LOW);
+        addWall(windows, x1, y0, x0 - x1, y1 - y0, WINDOW_LOW, HEIGHT);
+        addWall(box,     x0, y1, x1 - x0, y0 - y1, HEIGHT, HEIGHT + 0.2);
     }
 
 
@@ -255,7 +290,7 @@ void createLightSourceInRoom(Image &img, Image &visited, int roomX, int roomY, f
 void createLights(Image img, float scaling, vector<Rectangle> &lightsOut)
 {
 
-    //Step 1: Flood-fill rooms adjacent to windows with windo color, to mark them as not requiring additional lighting    
+    //Step 1: Flood-fill rooms adjacent to windows with window color, to mark them as not requiring additional lighting    
     for (int y = 0; y < img.getHeight(); y++)
         for (int x = 0; x < img.getWidth(); x++)
     {
@@ -333,6 +368,8 @@ void parseLayout(const char* const filename, const float scaling, int& width, in
             case 0xFF7F7F7F: pixels[i] = OUTSIDE; break;
             case 0xFF00FF00: pixels[i] = WINDOW; break;
             case 0xFFDFDFDF: pixels[i] = DOOR; break;
+            case 0xFFFF0000: pixels[i] = BALCONY_DOOR; break;
+            case 0xFFFF7F00: pixels[i] = BALCONY_WINDOW; break;
         }
     }
 
@@ -434,15 +471,26 @@ void parseLayout(const char* const filename, const float scaling, int& width, in
                 addHorizontalRect(wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), WINDOW_HIGH); 
                 break;
 
+            case BALCONY_WINDOW: //window --> create upper and lower window frame
+                addHorizontalRect(wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), WINDOW_LOW); 
+                addHorizontalRect(wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), HEIGHT); 
+                break;
+
+
             case EMPTY: //empty floor --> create floor and ceiling
                 addHorizontalRect(wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), 0); 
                 addHorizontalRect(wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), HEIGHT); 
                 break;
                 
-            case DOOR: 
+            case DOOR: // --> create floor and upper door frame
                 addHorizontalRect(wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), 0); 
                 addHorizontalRect(wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), DOOR_HEIGHT); 
-            break;
+                break;
+                
+            case BALCONY_DOOR: // --> create floor and upper door frame
+                addHorizontalRect(wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), 0); 
+                addHorizontalRect(wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), WINDOW_HIGH);
+                break;
         }
         
         if (color != OUTSIDE)
