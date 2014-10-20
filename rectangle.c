@@ -98,6 +98,21 @@ float intersects( const Rectangle *rect, Vector3 ray_src, Vector3 ray_dir, float
     return fac;
 }
 
+float distanceToPlane( Vector3 planeNormal, Vector3 planePos, Vector3 ray_src, Vector3 ray_dir)
+{
+    //if (dot(ray_dir,n) > 0) return -1; //backface culling
+    float denom = dot(planeNormal, ray_dir);
+    if (denom == 0) // == 0 > ray lies on plane or is parallel to it
+        return -1;
+        
+    //float fac = n.dot( pos - ray_src ) / denom;
+    float fac = dot(planeNormal, sub(planePos, ray_src)) / denom;
+    if (fac < 0) 
+        return -1;    //is behind camera, cannot be hit
+    
+    return fac;
+}
+
 /*Vector3 Rectangle::getNormalAt(const Vector3&) const {
     return n;
 }*/
@@ -146,6 +161,39 @@ int getTileIdAt(const Rectangle *rect, const Vector3 p)
     return ty * hNumTiles + tx;
 }
 */
+static int clamp_int(int val, int lo, int hi)
+{
+    return val < lo ? lo : (val > hi ? hi : val);
+}
+
+
+int getTileIdAt(const Rectangle *rect, const Vector3 p)
+{
+    Vector3 pDir = sub(p, rect->pos); //vector from rectangle origin (its lower left corner) to current point
+    
+    float hLength = length(rect->width);
+    float vLength = length(rect->height);
+    
+    float dx = dot( div_vec3(rect->width, hLength), pDir);
+    float dy = dot( div_vec3(rect->height, vLength), pDir);
+
+    
+    int hNumTiles = rect->lightmapSetup.s[1];//max( (int)ceil(hLength / TILE_SIZE), 1);
+    int vNumTiles = rect->lightmapSetup.s[2];//max( (int)ceil(vLength / TILE_SIZE), 1);
+    //printf("rectangle has %dx%d tiles\n", hNumTiles, vNumTiles);
+    //FIXME: check whether a float->int conversion in OpenCL also is round-towards-zero
+    int tx = clamp_int( (int)(dx * hNumTiles / hLength), 0, hNumTiles-1);
+    int ty = clamp_int( (int)(dy * vNumTiles / vLength), 0, vNumTiles-1);
+    
+    /*if (ty * hNumTiles + tx >= rect->lightNumTiles)
+    {
+        printf("Invalid tile index %d in rect %#x\n", ty * hNumTiles + tx, rect);
+        return 0;
+    }*/
+    //assert(ty * hNumTiles + tx < getNumTiles(rect));
+    return ty * hNumTiles + tx;
+}
+
 
 //convert light energy to perceived brightness
 float convert(float color)

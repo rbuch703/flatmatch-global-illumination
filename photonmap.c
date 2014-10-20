@@ -6,12 +6,15 @@
 
 #include <stdio.h> //for printf()
 #include <string.h> //for memcpy()
+
+#include "global_illumination_native.h"
 //#include <math.h> //for max()
 
-Vector3 getDiffuseSkyRandomRay(const Vector3 ndir/*, const Vector3 udir, const Vector3 vdir*/);
-Vector3 getCosineDistributedRandomRay(const Vector3 ndir);
-int getTileIdAt(const Rectangle *rect, const Vector3 p);
+//Vector3 getDiffuseSkyRandomRay(const Vector3 ndir/*, const Vector3 udir, const Vector3 vdir*/);
+//Vector3 getCosineDistributedRandomRay(const Vector3 ndir);
+//int getTileIdAt(const Rectangle *rect, const Vector3 p);
 //float intersects( const Rectangle *rect, const Vector3 ray_src, const Vector3 ray_dir, const float closestDist);
+
 
 typedef struct BspTreeNode {
     Rectangle plane;
@@ -23,7 +26,7 @@ typedef struct BspTreeNode {
 } BspTreeNode;
 
 
-Vector3 getDiffuseSkyRandomRay(const Vector3 ndir/*, const Vector3 udir, const Vector3 vdir*/)
+static Vector3 getDiffuseSkyRandomRay(const Vector3 ndir/*, const Vector3 udir, const Vector3 vdir*/)
 {
     //HACK: computes a lambertian quarter-sphere (lower half of hemisphere)
     
@@ -50,7 +53,7 @@ Vector3 getDiffuseSkyRandomRay(const Vector3 ndir/*, const Vector3 udir, const V
     return add3( mul(udir, u), mul(vdir, v), mul(ndir, n));
 }
 
-Vector3 getCosineDistributedRandomRay(const Vector3 ndir) {
+static Vector3 getCosineDistributedRandomRay(const Vector3 ndir) {
     // Step 1:Compute a uniformly distributed point on the unit disk
     float r = sqrt(rand()/(double)RAND_MAX);
     float phi = 2 * 3.141592f * (rand()/(double)RAND_MAX);
@@ -90,38 +93,6 @@ void createBase( const Vector3 ndir, Vector3 *c1, Vector3 *c2) {
 }
 #endif
 
-int clamp_int(int val, int lo, int hi)
-{
-    return val < lo ? lo : (val > hi ? hi : val);
-}
-
-int getTileIdAt(const Rectangle *rect, const Vector3 p)
-{
-    Vector3 pDir = sub(p, rect->pos); //vector from rectangle origin (its lower left corner) to current point
-    
-    float hLength = length(rect->width);
-    float vLength = length(rect->height);
-    
-    float dx = dot( div_vec3(rect->width, hLength), pDir);
-    float dy = dot( div_vec3(rect->height, vLength), pDir);
-
-    
-    int hNumTiles = rect->lightmapSetup.s[1];//max( (int)ceil(hLength / TILE_SIZE), 1);
-    int vNumTiles = rect->lightmapSetup.s[2];//max( (int)ceil(vLength / TILE_SIZE), 1);
-    //printf("rectangle has %dx%d tiles\n", hNumTiles, vNumTiles);
-    //FIXME: check whether a float->int conversion in OpenCL also is round-towards-zero
-    int tx = clamp_int( (int)(dx * hNumTiles / hLength), 0, hNumTiles-1);
-    int ty = clamp_int( (int)(dy * vNumTiles / vLength), 0, vNumTiles-1);
-    
-    /*if (ty * hNumTiles + tx >= rect->lightNumTiles)
-    {
-        printf("Invalid tile index %d in rect %#x\n", ty * hNumTiles + tx, rect);
-        return 0;
-    }*/
-    //assert(ty * hNumTiles + tx < getNumTiles(rect));
-    return ty * hNumTiles + tx;
-}
-
 /*
 float intersects( const Rectangle *rect, const Vector3 ray_src, const Vector3 ray_dir, const float closestDist) 
 {
@@ -160,82 +131,99 @@ float intersects( const Rectangle *rect, const Vector3 ray_src, const Vector3 ra
 
 }*/
 
-void findClosestIntersection(Vector3 ray_pos, Vector3 ray_dir, const BspTreeNode *node, float *dist, Rectangle** target_out)
+static int findClosestIntersection(Vector3 ray_pos, Vector3 ray_dir, const BspTreeNode *node, float *dist, Rectangle **targetOut)
 {
+    //printf ("depth is %d\n", depth);
+    int hasHit = 0;
     for ( int i = 0; i < node->numItems; i++)
     {
-        Rectangle *target = &(node->items[i]);
-        float dist_new = intersects(target , ray_pos, ray_dir, *dist);
+        //printf("\ttesting local rect %d/%d/%d\n", node->items[i].lightmapSetup.s[0], node->items[i].lightmapSetup.s[1], node->items[i].lightmapSetup.s[2]);
+        float dist_new = intersects(&(node->items[i]), ray_pos, ray_dir, *dist);
         if (dist_new < 0)
             continue;
+        //printf("\thit at dist=%f\n", dist_new);
             
         if (dist_new < *dist) {
-            *target_out = target;
+            *targetOut = &(node->items[i]);
             *dist = dist_new;
+            hasHit = 1;
         }
     }
-
-    //if (node->left)    findClosestIntersection(ray_pos, ray_dir, node->left, dist, target_out);
-    //if (node->right)    findClosestIntersection(ray_pos, ray_dir, node->right, dist, target_out);
     
     /** FIXME: if ray_pos is on the left side, and ray_dir looks away from the plane, intersections for the right plane would
                 all be behind the ray_pos, and thus are irrelevant; same goes for the other way around
     */
+   
+    //has no child nodes --> no further geometry to check
+    if (!node->left &&  !node->right)
+        return hasHit;
     
-    //has at least one child node --> split plane must be valid
-    if (node->left || node->right)
+    
+    Vector3 splitPlaneNormal = node->plane.n;
+    Vector3 planeToRaySrc = sub(ray_pos, node->plane.pos);
+    if ( dot(planeToRaySrc, splitPlaneNormal) < 0)  //ensure that the split plane normal faces towards the ray source
+        splitPlaneNormal = neg(splitPlaneNormal);
+        
+    int facesAwayFromSplitPlane = dot(splitPlaneNormal, ray_dir) >= 0;
+    
+    
+    float pos = getDistance( &(node->plane), ray_pos);
+    //printf("\tcamera distance to split plane is %f\n", pos);
+    
+    if (pos < 0)    //we are left --> search left and center first, then right
     {
-        float pos = getDistance( &(node->plane), ray_pos);
+        int hasChildHit = 0;
+        //printf("\ttesting left child node first\n");
+        if (node->left)
+            hasChildHit = findClosestIntersection(ray_pos, ray_dir, node->left, dist, targetOut);
         
-        if (pos < 0)    //we are left --> search left and center first, then right
-        {
-            if (node->left)
-                findClosestIntersection(ray_pos, ray_dir, node->left, dist, target_out);
-            if (*dist != INFINITY) return;  // found a hit in left or center --> possible hits in right are guaranteed to be further away
-            
-            if (node->right)
-                findClosestIntersection(ray_pos, ray_dir, node->right, dist, target_out);
-            return;
-        }
-            
-        if (pos > 0)
-        {
-            if (node->right)
-                findClosestIntersection(ray_pos, ray_dir, node->right, dist, target_out);
-            if (*dist != INFINITY)
-            { 
-                /*float oldDist = *dist;
-                if (node->left)
-                    findClosestIntersection(ray_pos, ray_dir, node->left, dist, target_out);
-                if (*dist != oldDist)
-                {
-                    printf("%f vs. %f\n", *dist, oldDist);
-                    assert(*dist == oldDist);
-                }*/
-                return;  // found a hit in right or center --> possible hits in left are guaranteed to be further away
-            }
-            
-            if (node->left)
-                findClosestIntersection(ray_pos, ray_dir, node->left, dist, target_out);
-            return;
         
-        }
-        
-        if (pos == 0)
+        /* Possible hits in the 'right' set are guaranteed to be further away that those in the 'left' set.
+         * So only test right when there was no hit in left child node: (there is no guarantee as to the
+         * relative location of rectangle in the 'center' and 'right' sets, so a hit in the 'center' set
+         * does not guarantee that there is no closer 'right' hit). 
+         * Also, if the ray faces away from the split plane, it cannot 'see' it, and thus cannot see 
+         * anything beyond it. So, in that case, no hit in node->right can occur, and thus does not need
+         * to be tested.
+         */
+        if (!hasChildHit && node->right && !facesAwayFromSplitPlane)
         {
-            if (*dist != INFINITY) return;  // found a hit in center --> possible hits in left and right are guaranteed to be further away
-            if (node->left)
-                findClosestIntersection(ray_pos, ray_dir, node->left, dist, target_out);
-            if (node->right)
-                findClosestIntersection(ray_pos, ray_dir, node->right, dist, target_out);
-            
-        }
+            //printf("\talso testing right child node\n");
+            /*float planeDist = distanceToPlane( node->plane.n, node->plane.pos, ray_pos, ray_dir);
+            if (planeDist > 0)
+                ray_pos = add( ray_pos, mul(ray_dir, planeDist));
+            else
+                printf("[WARN] cannot reach plane\n");*/
+            hasHit |= findClosestIntersection(ray_pos, ray_dir, node->right, dist, targetOut);
+        } 
+        hasHit |= hasChildHit;
     }
+    else  //if (pos >= 0)
+    {
+        //printf("\ttesting right child node first\n");
+        int hasChildHit = 0;
+        if (node->right)
+            hasChildHit = findClosestIntersection(ray_pos, ray_dir, node->right, dist, targetOut);
+
+        if (!hasChildHit && node->left && !facesAwayFromSplitPlane)
+        {
+            //printf("\talso testing left child node\n");
+            /*float planeDist = distanceToPlane( node->plane.n, node->plane.pos, ray_pos, ray_dir);
+            if (planeDist > 0)
+                ray_pos = add( ray_pos, mul(ray_dir, planeDist*0.5));
+            else
+                printf("[WARN] cannot reach plane\n");*/
+            
+            hasHit |= findClosestIntersection(ray_pos, ray_dir, node->left, dist, targetOut);
+        }
+        hasHit |= hasChildHit;
     
+    }    
+    return hasHit;
 }
 
 
-void tracePhoton(const Rectangle *window, const BspTreeNode *root, Vector3 *lightColors, const int isWindow)
+static void tracePhoton(const Rectangle *window, const BspTreeNode *root, Vector3 *lightColors, const int isWindow)
 {
 
     
@@ -270,19 +258,6 @@ void tracePhoton(const Rectangle *window, const BspTreeNode *root, Vector3 *ligh
         //printf("work_item %d, pos (%f,%f,%f), dir (%f,%f,%f) \n", get_global_id(0), pos.s0, pos.s1, pos.s2, ray_dir.s0, ray_dir.s1, ray_dir.s2);
         
         findClosestIntersection(pos, ray_dir, root, &dist_out, &hitObj);
-        /*for ( int i = 0; i < numRects; i++)
-        {
-
-            const Rectangle *target = &(rects[i]);
-            float dist = intersects(target , pos, ray_dir, dist_out);
-            if (dist < 0)
-                continue;
-                
-            if (dist < dist_out) {
-                hitObj = target;
-                dist_out = dist;
-            }
-        }*/
         
         if (dist_out == INFINITY)
             return;
@@ -344,7 +319,7 @@ void tracePhoton(const Rectangle *window, const BspTreeNode *root, Vector3 *ligh
 
 
 
-void photonmap( const Rectangle *window, const BspTreeNode* root, Vector3 *lightColors/*, const int numLightColors*/, int isWindow, int numSamples)
+static void photonmap( const Rectangle *window, const BspTreeNode* root, Vector3 *lightColors/*, const int numLightColors*/, int isWindow, int numSamples)
 {
 
     //printf("kernel supplied with %d rectangles\n", numRects);
@@ -352,7 +327,7 @@ void photonmap( const Rectangle *window, const BspTreeNode* root, Vector3 *light
     for (int i = 0; i < numSamples; i++)
     {
         if (i % 100000 == 0)
-            printf("%f %% done.\n", (i/(double)numSamples*100));
+            printf("%d samples, %f %% done.\n", i, (i/(double)numSamples*100));
         tracePhoton(window, root, lightColors, isWindow);
     }
 }
@@ -360,7 +335,7 @@ void photonmap( const Rectangle *window, const BspTreeNode* root, Vector3 *light
 /* returns the number of items this subdivision would require to check in the worst case.
    This is used as a measure of the quality of the subdivision
  */
-int getSubdivisionOverhead( BspTreeNode *node, const Rectangle *splitPlane)
+static int getSubdivisionOverhead( BspTreeNode *node, const Rectangle *splitPlane)
 {
     if (node->numItems == 0)
         return 0;
@@ -377,36 +352,43 @@ int getSubdivisionOverhead( BspTreeNode *node, const Rectangle *splitPlane)
         numRightItems += (pos >  0);
         numCenterItems+= (pos == 0);
     }
-    
+
+    //printf("potential split is %d/%d/%d\n", numLeftItems, numCenterItems, numRightItems);
+
     return (numLeftItems > numRightItems ? numLeftItems : numRightItems) + numCenterItems;
 
 }
 
-void subdivideNode( BspTreeNode *node)
+static void subdivideNode( BspTreeNode *node, int depth )
 {
     /*printf( "subdividing at %f,%f,%f  ---  %f,%f,%f\n", 
         splitPlane->pos.s[0], splitPlane->pos.s[1], splitPlane->pos.s[2],
         splitPlane->n.s[0], splitPlane->n.s[1], splitPlane->n.s[2]);*/
         
-    if (node->numItems < 5) return; //is likely to have a bigger overhead than benefit
+    if (node->numItems < 50) return; //is otherwise likely to have a bigger overhead than benefit
     int lowestOverhead = node->numItems;
-    Rectangle* splitPlane = &(node->items[0]);
+    int splitPlanePos = 0;
 
     for (int i = 0; i < node->numItems; i++)
     {
         int overhead = getSubdivisionOverhead(node, &(node->items[i]) );
+        //printf("\tOverhead %d is %d\n", i, overhead);
         if (overhead < lowestOverhead)
         {
             lowestOverhead = overhead;
-            splitPlane = &(node->items[i]);
+            splitPlanePos = i;
         }
     }
+    //printf("optimal split has overhead %d (position %d)\n", lowestOverhead, splitPlanePos);
     
     Rectangle *leftItems = (Rectangle*)malloc(sizeof(Rectangle) * node->numItems);
     Rectangle *rightItems = (Rectangle*)malloc(sizeof(Rectangle) * node->numItems);
     int numLeftItems = 0;
     int numRightItems = 0;
-    node->plane = *splitPlane;//node->items[ node->numItems / 2];
+    node->plane = node->items[splitPlanePos];
+    /*node->items[splitPlanePos].lightmapSetup.s[0] = 64;
+    node->items[splitPlanePos].lightmapSetup.s[1] = 0;
+    node->items[splitPlanePos].lightmapSetup.s[2] = 0;*/
     
     for (int i = 0; i < node->numItems; )
     {
@@ -424,6 +406,8 @@ void subdivideNode( BspTreeNode *node)
         else
             i++;
     }
+
+    //printf("optimal split is %d/%d/%d\n", numLeftItems, node->numItems, numRightItems);
     
     if (numLeftItems)
     {
@@ -432,7 +416,8 @@ void subdivideNode( BspTreeNode *node)
         node->left->right= NULL;
         node->left->items = leftItems;
         node->left->numItems= numLeftItems;
-        subdivideNode(node->left);
+        //if (depth < 2)
+            subdivideNode(node->left, depth+1);
     }
     
     if (numRightItems)
@@ -442,12 +427,13 @@ void subdivideNode( BspTreeNode *node)
         node->right->right= NULL;
         node->right->items = rightItems;
         node->right->numItems= numRightItems;
-        subdivideNode(node->right);
+        //if (depth < 2)
+            subdivideNode(node->right, depth+1);
     }
 
 }
 
-void freeBspTree(BspTreeNode *root)
+static void freeBspTree(BspTreeNode *root)
 {
     if (root->left)
     {
@@ -486,7 +472,7 @@ void performGlobalIlluminationNative(Geometry geo, Vector3* lightColors, int num
         printf("node sizes (max/L/C/R): %d/%d/%d/%d\n", 
             ( l > r ? l : r)+r2.numItems,l, r2.numItems, r);
     }*/
-    subdivideNode(&root);
+    subdivideNode(&root, 0);
 
     int l = root.left ? root.left->numItems : 0;
     int r = root.right ? root.right->numItems : 0;

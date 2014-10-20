@@ -19,6 +19,7 @@ Vector3 add3(const Vector3 a, const Vector3 b, const Vector3 c);
 Vector3 add4(const Vector3 a, const Vector3 b, const Vector3 c, const Vector3 d);
 Vector3 sub(const Vector3 a, const Vector3 b);
 Vector3 mul(const Vector3 b, float a);
+Vector3 neg(const Vector3 v);
 Vector3 div_vec3(const Vector3 a, float b);
 
 Vector3 createVector3(float x, float y, float z);

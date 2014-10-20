@@ -10,7 +10,7 @@ extern "C" {
 //#include "color3.h"
 #include "assert.h"
 
-static const float TILE_SIZE = 10000/200.0f;   //lightmap texels per m²
+static const float TILE_SIZE = 10000/20.0f;   //lightmap texels per m²
 static const int   SUPER_SAMPLING = 1;
 
 
@@ -44,6 +44,7 @@ int getPosition(const Rectangle *plane, const Rectangle *rect);
 double getDistance(const Rectangle *plane, const Vector3 p);
 
 float intersects( const Rectangle *rect, Vector3 ray_src, Vector3 ray_dir, float closestDist);
+float distanceToPlane( Vector3 planeNormal, Vector3 planePos, Vector3 ray_src, Vector3 ray_dir);
 int getNumTiles(const Rectangle *rect);
 float getArea(const Rectangle *rect);
 int getTileIdAt(const Rectangle *rect, const Vector3 p);

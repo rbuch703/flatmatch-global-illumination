@@ -48,6 +48,12 @@ Vector3 div_vec3(const Vector3 a, float b) {
     return res;
 }
 
+Vector3 neg(const Vector3 v)
+{
+    Vector3 res = {.s = {-v.s[0], -v.s[1], -v.s[2]} };
+    return res;
+}
+
 
 /*inline Vector3 diva(Vector3 a, float b) { 
     __m128 tmp = _mm_load1_ps(&b);
@@ -62,7 +68,7 @@ Vector3 createVector3(float _x, float _y, float _z)
     return res;
 }
 
-float dot(const Vector3 a, const Vector3 b)     //copied from the internet, not verified
+float dot(const Vector3 a, const Vector3 b)
 { 
     return a.s[0]*b.s[0] + a.s[1]*b.s[1] + a.s[2]*b.s[2];
 }
@@ -77,10 +83,10 @@ Vector3 cross(const Vector3 a, const Vector3 b)      //copied from the internet,
 
 float squaredLength(const Vector3 a) 
 {
-    return dot(a,a);    
+    return a.s[0]*a.s[0] + a.s[1]*a.s[1] + a.s[2]*a.s[2];
 }
 
-float length(const Vector3 a) { return sqrtf( dot(a,a) ); }
+float length(const Vector3 a) { return sqrtf( a.s[0]*a.s[0] + a.s[1]*a.s[1] + a.s[2]*a.s[2] ); }
 
 Vector3 normalized(const Vector3 a) {
     float fac = 1.0f / length(a);
