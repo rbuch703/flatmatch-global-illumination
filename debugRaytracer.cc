@@ -4,8 +4,27 @@
 #include "parseLayout.h"
 #include <string.h> //for memset();
 #include <map>
+#include <iostream>
 
 #include "rectangle.h"
+
+/** begin of forward definitions from the photon mapper*/
+extern "C" {
+    typedef struct BspTreeNode {
+        Rectangle plane;
+        Rectangle *items;
+        int       numItems;
+        struct BspTreeNode *left;
+        struct BspTreeNode *right;
+
+    } BspTreeNode;
+
+    void subdivideNode( BspTreeNode *node, int depth );
+    int findClosestIntersection(Vector3 ray_pos, Vector3 ray_dir, const BspTreeNode *node, float *dist, float distShift, Rectangle **targetOut, int depth);
+    void freeBspTree(BspTreeNode *root);
+}
+/** end of forward definitions from the photon mapper*/
+
 
 using namespace std;
 
@@ -21,8 +40,8 @@ void freeGeometry(Geometry geo)
 
 int main()
 {
-    Geometry geo = parseLayout("137.png", /*scale*/30);
-
+    Geometry geo = parseLayout("137.png", /*scale*/1/30.0);
+    cout << "Total number of walls: " << geo.numWalls << endl;
 
     int WIDTH = 1024;
     int HEIGHT= 768;
@@ -32,13 +51,13 @@ int main()
     map<Rectangle*, uint32_t> colors;
     for ( int i = 0; i < geo.numWalls; i++)
     {
-        int r = i % 4;
-        int g = (i/4) % 4;
-        int b = (i/16)% 4;
+        int r = i % 5;
+        int g = (i/5) % 5;
+        int b = (i/25)% 5;
         //colors[ &geo.walls[i]] = b << 16 | g << 8 | r;
-        geo.walls[i].lightmapSetup.s[0] = r*85;
-        geo.walls[i].lightmapSetup.s[1] = g*85;
-        geo.walls[i].lightmapSetup.s[2] = b*85;
+        geo.walls[i].lightmapSetup.s[0] = r*51;
+        geo.walls[i].lightmapSetup.s[1] = g*51;
+        geo.walls[i].lightmapSetup.s[2] = b*51;
         
     }
     
@@ -55,11 +74,11 @@ int main()
     int r = root.right ? root.right->numItems : 0;
     cout << "node sizes (max/L/C/R):" << (( l > r ? l : r)+root.numItems) << ", " <<  l << ", " << root.numItems << ", " <<  r << endl;
     
-    Vector3 camPos = createVector3(1, 2, 1.6);
-    Vector3 camDir = normalized(createVector3(1, 2, 0));
+    Vector3 camPos = createVector3(1, 1.2, 1.6);
+    Vector3 camDir = normalized(createVector3(1, 1, 0));
     Vector3 screenCenter = add( camPos, camDir);
-    float dx = 1/700.0;
-    float dy = 1/700.0;
+    float dx = 1/2000.0;
+    float dy = 1/2000.0;
     
     Vector3 camUp  = createVector3(0, 0, 1);
     
@@ -67,12 +86,12 @@ int main()
     
     
     cout << "camRight: (" << camRight.s[0] << ", " << camRight.s[1] << ", " << camRight.s[2] << ")" << endl;
-    //int x = 550;
-    //int y = 350;
+    //int y = 400;
     for (int y = 0; y < HEIGHT; y++)
         for (int x = 0; x < WIDTH; x++)
-    //for (int x = 550; x == 550; x++)
+    //for (int x = 200; x == 200; x++)
     {
+        
         Vector3 screenPos = add3( screenCenter, mul(camRight, dx*(x- WIDTH/2)), mul(camUp, -dy*(y-HEIGHT/2))) ;
         Vector3 rayDir = normalized(sub(screenPos, camPos));
 
@@ -96,7 +115,7 @@ int main()
         }
 #endif
         //exit(0);
-        if (!findClosestIntersection(camPos, rayDir, &root, &dist, &targetOut) )
+        if (!findClosestIntersection(camPos, rayDir, &root, &dist, 0, &targetOut, 0) )
             continue;
 
         if (!targetOut)
@@ -112,14 +131,15 @@ int main()
         imgData[ (y*WIDTH+x)*3 + 0] = r;
         imgData[ (y*WIDTH+x)*3 + 1] = g;
         imgData[ (y*WIDTH+x)*3 + 2] = b;
-        
+          
 
     }
 
-    delete imgData;    
     write_png_file("image.png", WIDTH, HEIGHT, PNG_COLOR_TYPE_RGB, imgData);
+    delete [] imgData;
         
     freeBspTree(&root);
+    freeGeometry(geo);
     return 0;
 }    
 

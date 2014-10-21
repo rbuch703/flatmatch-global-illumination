@@ -131,24 +131,41 @@ float intersects( const Rectangle *rect, const Vector3 ray_src, const Vector3 ra
 
 }*/
 
-static int findClosestIntersection(Vector3 ray_pos, Vector3 ray_dir, const BspTreeNode *node, float *dist, Rectangle **targetOut)
+//#define DEBUG(X) {X;}
+#define DEBUG(X) {}
+
+int findClosestIntersection(Vector3 ray_pos, Vector3 ray_dir, const BspTreeNode *node, float *dist, float distShift, Rectangle **targetOut, int depth)
 {
-    //printf ("depth is %d\n", depth);
+
+    char* spaces = (char*)malloc(depth*2+1);
+    for (int i = 0; i < depth*2+1; i++)
+        spaces[i] = ' ';
+    spaces[depth*2] = '\0';
+    DEBUG (printf ("%sdepth is %d, depthShift %f\n", spaces, depth, distShift));
+    if (node->left || node->right)
+        DEBUG(printf("%ssplit plane: %d/%d/%d\n",  spaces, node->plane.lightmapSetup.s[0], node->plane.lightmapSetup.s[1], node->plane.lightmapSetup.s[2]));
+      
     int hasHit = 0;
     for ( int i = 0; i < node->numItems; i++)
     {
-        //printf("\ttesting local rect %d/%d/%d\n", node->items[i].lightmapSetup.s[0], node->items[i].lightmapSetup.s[1], node->items[i].lightmapSetup.s[2]);
+        DEBUG(printf("%stesting local rect %d/%d/%d\n", spaces, node->items[i].lightmapSetup.s[0], node->items[i].lightmapSetup.s[1], node->items[i].lightmapSetup.s[2]));
         float dist_new = intersects(&(node->items[i]), ray_pos, ray_dir, *dist);
-        if (dist_new < 0)
+        if (dist_new == -1)
+        //if (dist_new < 0)
             continue;
-        //printf("\thit at dist=%f\n", dist_new);
+        DEBUG(printf("%s#hit at dist=%f\n", spaces, dist_new));
             
-        if (dist_new < *dist) {
+        if (dist_new + distShift < *dist) {
             *targetOut = &(node->items[i]);
-            *dist = dist_new;
+            *dist = dist_new + distShift;
             hasHit = 1;
         }
     }
+
+
+    //printf("%sleft  node is 0x%x\n", spaces, node->left);
+    //printf("%sright node is 0x%x\n", spaces, node->right);
+
     
     /** FIXME: if ray_pos is on the left side, and ray_dir looks away from the plane, intersections for the right plane would
                 all be behind the ray_pos, and thus are irrelevant; same goes for the other way around
@@ -172,10 +189,11 @@ static int findClosestIntersection(Vector3 ray_pos, Vector3 ray_dir, const BspTr
     
     if (pos < 0)    //we are left --> search left and center first, then right
     {
+
         int hasChildHit = 0;
-        //printf("\ttesting left child node first\n");
+        DEBUG(printf("%stesting left child node first\n", spaces));
         if (node->left)
-            hasChildHit = findClosestIntersection(ray_pos, ray_dir, node->left, dist, targetOut);
+            hasChildHit = findClosestIntersection(ray_pos, ray_dir, node->left, dist, distShift, targetOut, depth+1);
         
         
         /* Possible hits in the 'right' set are guaranteed to be further away that those in the 'left' set.
@@ -188,33 +206,36 @@ static int findClosestIntersection(Vector3 ray_pos, Vector3 ray_dir, const BspTr
          */
         if (!hasChildHit && node->right && !facesAwayFromSplitPlane)
         {
-            //printf("\talso testing right child node\n");
-            /*float planeDist = distanceToPlane( node->plane.n, node->plane.pos, ray_pos, ray_dir);
-            if (planeDist > 0)
-                ray_pos = add( ray_pos, mul(ray_dir, planeDist));
-            else
-                printf("[WARN] cannot reach plane\n");*/
-            hasHit |= findClosestIntersection(ray_pos, ray_dir, node->right, dist, targetOut);
-        } 
+            DEBUG(printf("%salso testing right child node\n", spaces));
+            float planeDist = distanceToPlane( node->plane.n, node->plane.pos, ray_pos, ray_dir);
+            if (planeDist < 0) 
+              planeDist = 0;
+            ray_pos = add(ray_pos, mul(ray_dir, planeDist));
+
+            hasHit |= findClosestIntersection(ray_pos, ray_dir, node->right, dist, distShift + planeDist, targetOut, depth+1);
+        } else
+        {
+            if (hasChildHit)  DEBUG(printf("%sNOT testing right child, because we already had a hit\n", spaces));
+            if (!node->right) DEBUG(printf("%sNOT testing right child, because there is none\n", spaces));
+            if (facesAwayFromSplitPlane) DEBUG(printf("%sNOT testing right child, because the ray faces away from it\n", spaces));
+        }
         hasHit |= hasChildHit;
     }
     else  //if (pos >= 0)
     {
-        //printf("\ttesting right child node first\n");
+        DEBUG(printf("%stesting right child node first\n", spaces));
         int hasChildHit = 0;
         if (node->right)
-            hasChildHit = findClosestIntersection(ray_pos, ray_dir, node->right, dist, targetOut);
+            hasChildHit = findClosestIntersection(ray_pos, ray_dir, node->right, dist, distShift, targetOut, depth+1);
 
         if (!hasChildHit && node->left && !facesAwayFromSplitPlane)
         {
-            //printf("\talso testing left child node\n");
-            /*float planeDist = distanceToPlane( node->plane.n, node->plane.pos, ray_pos, ray_dir);
-            if (planeDist > 0)
-                ray_pos = add( ray_pos, mul(ray_dir, planeDist*0.5));
-            else
-                printf("[WARN] cannot reach plane\n");*/
-            
-            hasHit |= findClosestIntersection(ray_pos, ray_dir, node->left, dist, targetOut);
+            DEBUG(printf("%salso testing left child node\n", spaces));
+            float planeDist = distanceToPlane( node->plane.n, node->plane.pos, ray_pos, ray_dir);
+            if (planeDist < 0) 
+              planeDist = 0;
+            ray_pos = add(ray_pos, mul(ray_dir, planeDist));
+            hasHit |= findClosestIntersection(ray_pos, ray_dir, node->left, dist, distShift + planeDist, targetOut, depth+1);
         }
         hasHit |= hasChildHit;
     
@@ -257,7 +278,7 @@ static void tracePhoton(const Rectangle *window, const BspTreeNode *root, Vector
 
         //printf("work_item %d, pos (%f,%f,%f), dir (%f,%f,%f) \n", get_global_id(0), pos.s0, pos.s1, pos.s2, ray_dir.s0, ray_dir.s1, ray_dir.s2);
         
-        findClosestIntersection(pos, ray_dir, root, &dist_out, &hitObj);
+        findClosestIntersection(pos, ray_dir, root, &dist_out, 0, &hitObj, 0);
         
         if (dist_out == INFINITY)
             return;
@@ -359,13 +380,13 @@ static int getSubdivisionOverhead( BspTreeNode *node, const Rectangle *splitPlan
 
 }
 
-static void subdivideNode( BspTreeNode *node, int depth )
+void subdivideNode( BspTreeNode *node, int depth )
 {
     /*printf( "subdividing at %f,%f,%f  ---  %f,%f,%f\n", 
         splitPlane->pos.s[0], splitPlane->pos.s[1], splitPlane->pos.s[2],
         splitPlane->n.s[0], splitPlane->n.s[1], splitPlane->n.s[2]);*/
         
-    if (node->numItems < 50) return; //is otherwise likely to have a bigger overhead than benefit
+    if (node->numItems < 20) return; //is otherwise likely to have a bigger overhead than benefit
     int lowestOverhead = node->numItems;
     int splitPlanePos = 0;
 
@@ -433,7 +454,7 @@ static void subdivideNode( BspTreeNode *node, int depth )
 
 }
 
-static void freeBspTree(BspTreeNode *root)
+void freeBspTree(BspTreeNode *root)
 {
     if (root->left)
     {

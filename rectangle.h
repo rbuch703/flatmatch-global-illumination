@@ -10,7 +10,7 @@ extern "C" {
 //#include "color3.h"
 #include "assert.h"
 
-static const float TILE_SIZE = 10000/20.0f;   //lightmap texels per m²
+static const float TILE_SIZE = 1000/20.0f;   //lightmap texels per m²
 static const int   SUPER_SAMPLING = 1;
 
 
