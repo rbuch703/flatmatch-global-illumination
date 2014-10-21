@@ -386,7 +386,7 @@ void subdivideNode( BspTreeNode *node, int depth )
         splitPlane->pos.s[0], splitPlane->pos.s[1], splitPlane->pos.s[2],
         splitPlane->n.s[0], splitPlane->n.s[1], splitPlane->n.s[2]);*/
         
-    if (node->numItems < 5) return; //is otherwise likely to have a bigger overhead than benefit
+    if (node->numItems < 20) return; //is otherwise likely to have a bigger overhead than benefit
     int lowestOverhead = node->numItems;
     int splitPlanePos = 0;
 

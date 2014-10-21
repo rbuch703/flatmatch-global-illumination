@@ -74,11 +74,11 @@ int main()
     int r = root.right ? root.right->numItems : 0;
     cout << "node sizes (max/L/C/R):" << (( l > r ? l : r)+root.numItems) << ", " <<  l << ", " << root.numItems << ", " <<  r << endl;
     
-    Vector3 camPos = createVector3(1, 2, 6);
-    Vector3 camDir = normalized(createVector3(1, 1.2, -1));
+    Vector3 camPos = createVector3(1, 1.2, 1.6);
+    Vector3 camDir = normalized(createVector3(1, 1, 0));
     Vector3 screenCenter = add( camPos, camDir);
-    float dx = 1/1000.0;
-    float dy = 1/1000.0;
+    float dx = 1/2000.0;
+    float dy = 1/2000.0;
     
     Vector3 camUp  = createVector3(0, 0, 1);
     
