@@ -30,7 +30,7 @@ Rectangle createRectangleV( const Vector3 _pos, const Vector3 _width, const Vect
     
     float width = length(_width);
     float height = length(_height);
-    float tile_size = (res.lightmapSetup.s[1] * res.lightmapSetup.s[2]) / (width*height);
+    float tile_size = ((float)res.lightmapSetup.s[1] * res.lightmapSetup.s[2]) / (width*height);
     while (tile_size < TILE_SIZE) 
     {
         float width_res = res.lightmapSetup.s[1] / width;
