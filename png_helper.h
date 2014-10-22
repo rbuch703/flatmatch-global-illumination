@@ -8,7 +8,10 @@ extern "C" {
 #include <stdint.h>
 
 void read_png_file(const char* file_name, int *width, int* height, int* color_type, uint8_t** pixel_buffer );
+int read_png_from_memory(uint8_t *data, int numBytesIn, int *width, int *height, int *color_type, uint8_t** pixel_buffer );
 void write_png_file(const char* file_name, int width, int height, int color_type, uint8_t *pixel_buffer);
+void write_png_to_memory(uint8_t **outData, int *outSize, int width, int height, int color_type, uint8_t *pixel_buffer);
+
 static const int PNG_COLOR_TYPE_RGB  = 2;
 static const int PNG_COLOR_TYPE_RGBA = 6;
 
