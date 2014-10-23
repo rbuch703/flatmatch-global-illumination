@@ -4,6 +4,7 @@
 #include <math.h> //for sqrt()
 
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 //#include <list>
@@ -530,5 +531,58 @@ Geometry parseLayout(const char* const filename, const float scaling)
     rectangleVectorToArray(  lightsOut, geo.lights, geo.numLights);
     
     return geo;
+}
+
+ostream& operator<<(ostream &os, const Vector3 &vec)
+{
+    os <<  "[" << vec.s[0] << ", " << vec.s[1] << ", " << vec.s[2] << "]";
+    return os;
+}
+
+void writeJsonOutput(Geometry geo, ostream &jsonGeometry)
+{
+
+    jsonGeometry << "{" << endl;
+    jsonGeometry << "\"startingPosition\" : [" << geo.startingPositionX << ", " << geo.startingPositionY << "]," <<  endl;
+    jsonGeometry << "\"layoutImageSize\" : [" << geo.width << ", " << geo.height << "]," <<  endl;
+
+    jsonGeometry << "\"geometry\" : [" << endl;
+    for ( int i = 0; i < geo.numWalls; i++)
+    {
+        //{ pos: [1,2,3], width: [4,5,6], height: [7,8,9], texture_id: 10, isWindow: false};
+        jsonGeometry << "  { \"pos\": " << geo.walls[i].pos <<
+                        ", \"width\": " << geo.walls[i].width << 
+                        ", \"height\": "<< geo.walls[i].height <<
+                        ", \"textureId\": " << i << "}";
+        if (i+1 < geo.numWalls)
+            jsonGeometry << ", ";
+        jsonGeometry << endl;
+        
+    }
+
+    jsonGeometry << "]," << endl;
+    jsonGeometry << "\"box\": [" << endl;
+
+    for (int i = 0; i < geo.numBoxWalls; i++)
+    {
+        jsonGeometry << "  { \"pos\": " << geo.boxWalls[i].pos <<
+                        ", \"width\": " << geo.boxWalls[i].width << 
+                        ", \"height\": "<< geo.boxWalls[i].height << "}";
+        if (i + 1 < geo.numBoxWalls)
+            jsonGeometry << ", ";
+        jsonGeometry << endl;
+    }
+
+
+    jsonGeometry << "]" << endl;
+    jsonGeometry << "}" << endl;
+}
+
+char* getJsonFromLayout(const char* const filename, float scaling)
+{
+    Geometry geo = parseLayout(filename, scaling);
+    stringstream ss;
+    writeJsonOutput(geo, ss);
+    return strdup( ss.str().c_str());
 }
 

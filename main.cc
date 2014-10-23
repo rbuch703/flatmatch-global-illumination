@@ -68,58 +68,6 @@ Geometry loadGeometry(string filename, float scale)
     return geo;
 }
 
-ostream& operator<<(ostream &os, const Vector3 &vec)
-{
-    os <<  "[" << vec.s[0] << ", " << vec.s[1] << ", " << vec.s[2] << "]";
-    return os;
-}
-
-void writeJsonOutput(Geometry geo)
-{
-    ofstream jsonGeometry("geometry.json");
-
-    jsonGeometry << "{" << endl;
-    jsonGeometry << "\"startingPosition\" : [" << geo.startingPositionX << ", " << geo.startingPositionY << "]," <<  endl;
-    jsonGeometry << "\"layoutImageSize\" : [" << geo.width << ", " << geo.height << "]," <<  endl;
-
-    jsonGeometry << "\"geometry\" : [" << endl;
-    char num[50];
-    for ( int i = 0; i < geo.numWalls; i++)
-    {
-        snprintf(num, 49, "%d", i);
-        string filename = string("tiles/tile_") + num + ".png";
-        saveAs( &geo.walls[i], filename.c_str(), lightColors);
-        
-            //{ pos: [1,2,3], width: [4,5,6], height: [7,8,9], texture_id: 10, isWindow: false};
-
-        jsonGeometry << "  { \"pos\": " << geo.walls[i].pos <<
-                        ", \"width\": " << geo.walls[i].width << 
-                        ", \"height\": "<< geo.walls[i].height <<
-                        ", \"textureId\": " << i << "}";
-        if (i+1 < geo.numWalls)
-            jsonGeometry << ", ";
-        jsonGeometry << endl;
-        
-    }
-
-    jsonGeometry << "]," << endl;
-    jsonGeometry << "\"box\": [" << endl;
-
-    for (int i = 0; i < geo.numBoxWalls; i++)
-    {
-        jsonGeometry << "  { \"pos\": " << geo.boxWalls[i].pos <<
-                        ", \"width\": " << geo.boxWalls[i].width << 
-                        ", \"height\": "<< geo.boxWalls[i].height << "}";
-        if (i + 1 < geo.numBoxWalls)
-            jsonGeometry << ", ";
-        jsonGeometry << endl;
-    }
-
-
-    jsonGeometry << "]" << endl;
-    jsonGeometry << "}" << endl;
-}
-
 int main(int argc, const char** argv)
 {
     //cout << "Rectangle size is " << sizeof(Rectangle) << " bytes" << endl;
@@ -178,8 +126,9 @@ int main(int argc, const char** argv)
         saveAsRaw( &geo.walls[i], (filename + ".raw").c_str(), lightColors);
     }
 
-
-    writeJsonOutput(geo);
+    ofstream jsonGeometry("geometry.json");
+    writeJsonOutput(geo, jsonGeometry);
+    jsonGeometry.close();
    
     freeGeometry(geo);
     free( lightColors);
