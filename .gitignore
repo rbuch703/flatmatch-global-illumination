@@ -13,3 +13,12 @@ tiles
 tiles.bak
 
 geometry.json
+
+# output of emscripten
+*.html
+*.js
+*.mem
+3rdParty
+lib
+build
+include

@@ -345,33 +345,34 @@ void rectangleVectorToArray( vector<Rectangle> rects, Rectangle* &rectsOut, cl_i
         rectsOut[i] = rects[i];
 }
 
-Geometry parseLayout(const char* const filename, const float scaling)
+static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorType, const float scaling)
 {
     Geometry geo;
+    geo.width = width;
+    geo.height= height;
 
     vector<Rectangle> wallsOut;
     vector<Rectangle> windowsOut;
     vector<Rectangle> lightsOut;
     vector<Rectangle> boxOut;
-    
-    int color_type;
-    uint32_t *pixelBuffer;
-    read_png_file(filename, &geo.width, &geo.height, &color_type, (uint8_t**)&pixelBuffer );
 
-    if (color_type == PNG_COLOR_TYPE_RGB)
+    
+    uint32_t *pixelBuffer = (uint32_t*)src;
+    if (colorType == PNG_COLOR_TYPE_RGB)
     {
-        uint8_t *src = (uint8_t*)pixelBuffer;
+        //uint8_t *src = (uint8_t*)pixelBuffer;
         pixelBuffer = (uint32_t*)malloc( geo.width*geo.height*sizeof(uint32_t));
         
         for (int i = 0; i < geo.width * geo.height; i++)
             pixelBuffer[i] =
                 0xFF000000 | src[i*3] | (src[i*3+1] << 8) | (src[i*3+2] << 16);
         
-        free(src);
-        color_type = PNG_COLOR_TYPE_RGBA;
-    }
+        //free(src);
+        colorType = PNG_COLOR_TYPE_RGBA;
+    } else
 
-    assert (color_type == PNG_COLOR_TYPE_RGBA);
+
+    assert (colorType == PNG_COLOR_TYPE_RGBA);
 
     uint8_t *pixels = new uint8_t[geo.width * geo.height];
     for (int i = 0; i < geo.width * geo.height; i++)
@@ -395,8 +396,8 @@ Geometry parseLayout(const char* const filename, const float scaling)
     
     createLights( Image(geo.width, geo.height, pixelBuffer), scaling, lightsOut);
     
-    
-    free (pixelBuffer);
+    if (pixelBuffer != (void*)src) //if they are equal, no memory was allocated for pixelBuffer, and none should be freed
+        free (pixelBuffer);
     
     for (int y = 1; y < geo.height; y++)
     {
@@ -531,6 +532,20 @@ Geometry parseLayout(const char* const filename, const float scaling)
     rectangleVectorToArray(  lightsOut, geo.lights, geo.numLights);
     
     return geo;
+
+}
+
+
+Geometry parseLayout(const char* const filename, const float scaling)
+{
+   
+    int colorType, width, height;
+    uint8_t *pixelBuffer;
+    read_png_file(filename, &width, &height, &colorType, (uint8_t**)&pixelBuffer );
+    
+    Geometry res = parseLayoutCore(pixelBuffer, width, height, colorType, scaling);
+    free(pixelBuffer);
+    return res;
 }
 
 ostream& operator<<(ostream &os, const Vector3 &vec)
@@ -581,6 +596,20 @@ void writeJsonOutput(Geometry geo, ostream &jsonGeometry)
 char* getJsonFromLayout(const char* const filename, float scaling)
 {
     Geometry geo = parseLayout(filename, scaling);
+    stringstream ss;
+    writeJsonOutput(geo, ss);
+    return strdup( ss.str().c_str());
+}
+
+
+char* getJsonFromLayoutMem(const uint8_t *data, int dataSize,float scaling)
+{
+    int width, height, colorType;
+    uint8_t *pixelBuffer;
+    
+    read_png_from_memory(data, dataSize, &width, &height, &colorType, &pixelBuffer );
+    Geometry geo = parseLayoutCore(pixelBuffer, width, height, colorType, scaling);
+    free(pixelBuffer);
     stringstream ss;
     writeJsonOutput(geo, ss);
     return strdup( ss.str().c_str());

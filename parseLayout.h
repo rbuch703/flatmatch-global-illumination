@@ -13,6 +13,8 @@ void writeJsonOutput(Geometry geo, ostream &jsonGeometry);
 
 extern "C" {
 char* getJsonFromLayout(const char* const filename,float scaling);
+char* getJsonFromLayoutMem( const uint8_t *data, int dataSize, float scaling);
+
 }
 
 #endif

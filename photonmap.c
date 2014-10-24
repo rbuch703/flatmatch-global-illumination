@@ -6,6 +6,7 @@
 
 #include <stdio.h> //for printf()
 #include <string.h> //for memcpy()
+#include <stdlib.h>
 
 #include "global_illumination_native.h"
 //#include <math.h> //for max()

@@ -13,16 +13,23 @@
 //#define PNG_DEBUG 3
 #include <png.h>
 
-typedef struct PngIo {
+typedef struct PngInput {
+    const uint8_t *data;
+    uint32_t dataSize;
+    uint32_t position;
+} PngInput;
+
+typedef struct PngOutput {
     uint8_t *data;
     uint32_t dataSize;
     uint32_t position;
-} PngIo;
+} PngOutput;
+
 
 static void readFromMemory(png_structp png_ptr, png_bytep outBytes,
    png_size_t byteCountToRead)
 {
-    PngIo *io = png_ptr->io_ptr;
+    PngInput *io = png_ptr->io_ptr;
     assert( io->position + byteCountToRead < io->dataSize);
     memcpy( outBytes, io->data + io->position, byteCountToRead);
     io->position += byteCountToRead;
@@ -67,14 +74,18 @@ static int read_png_core(png_structp png_ptr, png_infop info_ptr, int *width, in
 
 }
 
-int read_png_from_memory(uint8_t *data, int numBytesIn, int *width, int *height, int *color_type, uint8_t** pixel_buffer )
+int read_png_from_memory(const uint8_t *data, int numBytesIn, int *width, int *height, int *color_type, uint8_t** pixel_buffer )
 {
     png_structp png_ptr;
     png_infop info_ptr;
-    PngIo io = { .data = data, .dataSize = numBytesIn, .position = 0};
-    //unsigned char header[8];    // 8 is the maximum size that can be checked
+    PngInput io = { .data = data, .dataSize = numBytesIn, .position = 0};
+    
+    if (numBytesIn < 8) //too small for a valid PNG signature --> cannot be a PNG
+        return 0; 
+        
+    unsigned char header[8] = { data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]};    // 8 is the maximum size that can be checked
 
-    if (png_sig_cmp(data, 0, 8))
+    if (png_sig_cmp(header, 0, 8))
         return 0;
 
     png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
@@ -146,7 +157,7 @@ static void writeToMemory(png_structp png_ptr, png_bytep src_data, png_size_t nu
 {
     //printf("supposed to write %ld bytes coming from %p\n", numBytes, src_data);
     
-    PngIo *io = png_ptr->io_ptr;
+    PngOutput *io = png_ptr->io_ptr;
     while (io->position + numBytes > io->dataSize)
     {
         //printf("resizing output array to %d bytes\n", 2*io->dataSize);
@@ -200,7 +211,7 @@ void write_png_to_memory(uint8_t **outData, int *outSize, int width, int height,
     png_structp png_ptr;
     png_infop info_ptr;
 
-    PngIo io = { .data = malloc(8), .dataSize = 8, .position = 0};
+    PngOutput io = { .data = malloc(8), .dataSize = 8, .position = 0};
 
     /* create file */
     //FILE *fp = fopen(file_name, "wb");
