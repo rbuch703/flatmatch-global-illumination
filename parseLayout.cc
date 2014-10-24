@@ -598,6 +598,12 @@ char* getJsonFromLayout(const char* const filename, float scaling)
     Geometry geo = parseLayout(filename, scaling);
     stringstream ss;
     writeJsonOutput(geo, ss);
+
+    free (geo.walls);
+    free (geo.boxWalls);
+    free (geo.windows);
+    free (geo.lights);
+
     return strdup( ss.str().c_str());
 }
 
@@ -612,6 +618,12 @@ char* getJsonFromLayoutMem(const uint8_t *data, int dataSize,float scaling)
     free(pixelBuffer);
     stringstream ss;
     writeJsonOutput(geo, ss);
+    
+    free (geo.walls);
+    free (geo.boxWalls);
+    free (geo.windows);
+    free (geo.lights);
+    
     return strdup( ss.str().c_str());
 }
 
