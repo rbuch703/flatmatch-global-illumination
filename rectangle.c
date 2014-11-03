@@ -350,4 +350,8 @@ int getPosition(const Rectangle *plane, const Rectangle *rect)
     return 0;    
 }
 
+Geometry* createGeometryObject() 
+{
+    return (Geometry*)malloc(sizeof(Geometry));
+}
 

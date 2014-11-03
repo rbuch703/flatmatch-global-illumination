@@ -34,6 +34,8 @@ typedef struct Geometry {
     float     startingPositionX, startingPositionY;
 } Geometry;
 
+// just for the emscripten/JavaScript interface
+Geometry* createGeometryObject();
 
 Rectangle createRectangleV( const Vector3 _pos, const Vector3 _width, const Vector3 _height);
 Rectangle createRectangle( float px, float py, float pz,

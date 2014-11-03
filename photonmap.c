@@ -472,11 +472,11 @@ void freeBspTree(BspTreeNode *root)
     free(root->items);        
 }
 
-void performGlobalIlluminationNative(Geometry geo, Vector3* lightColors, int numSamplesPerArea)
+void performGlobalIlluminationNative(Geometry *geo, Vector3* lightColors, int numSamplesPerArea)
 {
-    BspTreeNode root = { .numItems = geo.numWalls, .left = NULL, .right=NULL };
-    root.items =  (Rectangle*)malloc(sizeof(Rectangle) * geo.numWalls);
-    memcpy( root.items, geo.walls, sizeof(Rectangle) * geo.numWalls);
+    BspTreeNode root = { .numItems = geo->numWalls, .left = NULL, .right=NULL };
+    root.items =  (Rectangle*)malloc(sizeof(Rectangle) * geo->numWalls);
+    memcpy( root.items, geo->walls, sizeof(Rectangle) * geo->numWalls);
     
     printf("root size: %d\n", root.numItems);
     
@@ -505,25 +505,25 @@ void performGlobalIlluminationNative(Geometry geo, Vector3* lightColors, int num
     //root.plane = 
 
 
-    for ( int i = 0; i < geo.numWindows; i++)
+    for ( int i = 0; i < geo->numWindows; i++)
     {
-        Vector3 xDir= getWidthVector(  &geo.windows[i]);
-        Vector3 yDir= getHeightVector( &geo.windows[i]);
+        Vector3 xDir= getWidthVector(  &geo->windows[i]);
+        Vector3 yDir= getHeightVector( &geo->windows[i]);
         
         float area = length(xDir) * length(yDir);
         uint64_t numSamples = (numSamplesPerArea * area);
         
-        photonmap(&geo.windows[i], &root, lightColors, 1/*true*/, numSamples);
+        photonmap(&geo->windows[i], &root, lightColors, 1/*true*/, numSamples);
     }
 
-    for ( int i = 0; i < geo.numLights; i++)
+    for ( int i = 0; i < geo->numLights; i++)
     {
-        Vector3 xDir= getWidthVector(  &geo.lights[i]);
-        Vector3 yDir= getHeightVector( &geo.lights[i]);
+        Vector3 xDir= getWidthVector(  &geo->lights[i]);
+        Vector3 yDir= getHeightVector( &geo->lights[i]);
         
         float area = length(xDir) * length(yDir);
         uint64_t numSamples = (numSamplesPerArea * area);
-        photonmap(&geo.lights[i], &root, lightColors, 0/*false*/, numSamples);
+        photonmap(&geo->lights[i], &root, lightColors, 0/*false*/, numSamples);
     }
     freeBspTree(&root);
 }

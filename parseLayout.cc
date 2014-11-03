@@ -345,11 +345,10 @@ void rectangleVectorToArray( vector<Rectangle> rects, Rectangle* &rectsOut, cl_i
         rectsOut[i] = rects[i];
 }
 
-static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorType, const float scaling)
+static int parseLayoutCore(uint8_t *src, int width, int height, int colorType, const float scaling, Geometry* geo)
 {
-    Geometry geo;
-    geo.width = width;
-    geo.height= height;
+    geo->width = width;
+    geo->height= height;
 
     vector<Rectangle> wallsOut;
     vector<Rectangle> windowsOut;
@@ -361,9 +360,9 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
     if (colorType == PNG_COLOR_TYPE_RGB)
     {
         //uint8_t *src = (uint8_t*)pixelBuffer;
-        pixelBuffer = (uint32_t*)malloc( geo.width*geo.height*sizeof(uint32_t));
+        pixelBuffer = (uint32_t*)malloc( width * height * sizeof(uint32_t));
         
-        for (int i = 0; i < geo.width * geo.height; i++)
+        for (int i = 0; i < width * height; i++)
             pixelBuffer[i] =
                 0xFF000000 | src[i*3] | (src[i*3+1] << 8) | (src[i*3+2] << 16);
         
@@ -374,8 +373,8 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
 
     assert (colorType == PNG_COLOR_TYPE_RGBA);
 
-    uint8_t *pixels = new uint8_t[geo.width * geo.height];
-    for (int i = 0; i < geo.width * geo.height; i++)
+    uint8_t *pixels = new uint8_t[width * height];
+    for (int i = 0; i < width * height; i++)
     {
         switch (pixelBuffer[i])
         {
@@ -390,21 +389,21 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
         }
     }
 
-    pair<int, int> centralPos = getCentralPosition(pixelBuffer, geo.width, geo.height);
-    geo.startingPositionX = centralPos.first * scaling;
-    geo.startingPositionY = centralPos.second * scaling;
+    pair<int, int> centralPos = getCentralPosition(pixelBuffer, width, height);
+    geo->startingPositionX = centralPos.first * scaling;
+    geo->startingPositionY = centralPos.second * scaling;
     
-    createLights( Image(geo.width, geo.height, pixelBuffer), scaling, lightsOut);
+    createLights( Image(width, height, pixelBuffer), scaling, lightsOut);
     
     if (pixelBuffer != (void*)src) //if they are equal, no memory was allocated for pixelBuffer, and none should be freed
         free (pixelBuffer);
     
-    for (int y = 1; y < geo.height; y++)
+    for (int y = 1; y < height; y++)
     {
         //cout << "scanning row " << y << endl;
-        for (int x = 1; x < geo.width;) {
-            uint32_t pxAbove = pixels[(y-1) * geo.width + (x)];
-            uint32_t pxHere =  pixels[(y  ) * geo.width + (x)];
+        for (int x = 1; x < width;) {
+            uint32_t pxAbove = pixels[(y-1) * width + (x)];
+            uint32_t pxHere =  pixels[(y  ) * width + (x)];
             if (pxAbove == pxHere)
             {
                 x++;
@@ -413,9 +412,9 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
                 
             float startX = x;
             
-            while ( x < geo.width && 
-                   pxAbove == pixels[(y-1) * geo.width + (x)] && 
-                   pxHere == pixels[(y) * geo.width + (x)])
+            while ( x < width && 
+                   pxAbove == pixels[(y-1) * width + (x)] && 
+                   pxHere == pixels[(y) * width + (x)])
                 x++;
                 
             float endX = x;
@@ -425,11 +424,11 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
     }
     //cout << "  == End of horizontal scan, beginning vertical scan ==" << endl;
 
-    for (int x = 1; x < geo.width; x++)
+    for (int x = 1; x < width; x++)
     {
-        for (int y = 1; y < geo.height; ) {
-            uint32_t pxLeft = pixels[y * geo.width + (x - 1) ];
-            uint32_t pxHere = pixels[y * geo.width + (x    ) ];
+        for (int y = 1; y < height; ) {
+            uint32_t pxLeft = pixels[y * width + (x - 1) ];
+            uint32_t pxHere = pixels[y * width + (x    ) ];
             if (pxLeft == pxHere)
             {
                 y++;
@@ -438,9 +437,9 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
                 
             float startY = y;
             
-            while (y < geo.height && 
-                   pxLeft == pixels[y * geo.width + (x-1)] && 
-                   pxHere == pixels[y * geo.width + x])
+            while (y < height && 
+                   pxLeft == pixels[y * width + (x-1)] && 
+                   pxHere == pixels[y * width + x])
                 y++;
                 
             float endY = y;
@@ -449,25 +448,25 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
         }
     }
 
-    for (int y = 0; y < geo.height; y++)
-        for (int x = 0; x < geo.width; x++)
+    for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++)
     {
         int xStart = x;
-        uint32_t color = pixels[y * geo.width + x];
+        uint32_t color = pixels[y * width + x];
         if (color == INVALIDATED)
             continue;
         
-        while (x+1 < geo.width && pixels[y*geo.width + (x+1)] == color) 
+        while (x+1 < width && pixels[y*width + (x+1)] == color) 
             x++;
             
         int xEnd = x;
         
         int yEnd;
-        for (yEnd = y + 1; yEnd < geo.height; yEnd++)
+        for (yEnd = y + 1; yEnd < height; yEnd++)
         {
             bool rowWithIdenticalColor = true;
             for (int xi = xStart; xi <= xEnd && rowWithIdenticalColor; xi++)
-                rowWithIdenticalColor &= (pixels[yEnd * geo.width + xi] == color);
+                rowWithIdenticalColor &= (pixels[yEnd * width + xi] == color);
             
             if (! rowWithIdenticalColor)
                 break;
@@ -477,7 +476,7 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
 
         for (int yi = y; yi <= yEnd; yi++)
             for (int xi = xStart; xi <= xEnd; xi++)
-                pixels[yi * geo.width + xi] = INVALIDATED;
+                pixels[yi * width + xi] = INVALIDATED;
 
         yEnd +=1;   //cover the area to the end of the pixel, not just to the start
         xEnd +=1;        
@@ -526,27 +525,51 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
     vector<Rectangle> boxOut;
 */
 
-    rectangleVectorToArray(  wallsOut, geo.walls, geo.numWalls);
-    rectangleVectorToArray(  boxOut, geo.boxWalls, geo.numBoxWalls);
-    rectangleVectorToArray(  windowsOut, geo.windows, geo.numWindows);
-    rectangleVectorToArray(  lightsOut, geo.lights, geo.numLights);
+    rectangleVectorToArray(  wallsOut, geo->walls, geo->numWalls);
+    rectangleVectorToArray(  boxOut, geo->boxWalls, geo->numBoxWalls);
+    rectangleVectorToArray(  windowsOut, geo->windows, geo->numWindows);
+    rectangleVectorToArray(  lightsOut, geo->lights, geo->numLights);
     
-    return geo;
+    int numTexels = 0;
+    for ( int i = 0; i < geo->numWalls; i++)
+    {
+        geo->walls[i].lightmapSetup.s[0] = numTexels;
+        //objects[i].lightNumTiles = getNumTiles(&objects[i]);
+        numTexels += getNumTiles(&geo->walls[i]);
+    }
+    return numTexels;
 
 }
 
 
-Geometry parseLayout(const char* const filename, const float scaling)
+int parseLayout(const char* const filename, const float scaling, Geometry* geo)
 {
-   
+    assert(geo);
+    
     int colorType, width, height;
     uint8_t *pixelBuffer;
     read_png_file(filename, &width, &height, &colorType, (uint8_t**)&pixelBuffer );
     
-    Geometry res = parseLayoutCore(pixelBuffer, width, height, colorType, scaling);
+    int numTexels = parseLayoutCore(pixelBuffer, width, height, colorType, scaling, geo);
     free(pixelBuffer);
-    return res;
+    return numTexels;
 }
+
+int parseLayoutMem(const uint8_t *data, int dataSize, const float scaling, Geometry* geo)
+{
+    assert(geo);
+    
+    int colorType, width, height;
+    uint8_t *pixelBuffer;
+    read_png_from_memory(data, dataSize, &width, &height, &colorType, (uint8_t**)&pixelBuffer );
+    
+    int numTexels = parseLayoutCore(pixelBuffer, width, height, colorType, scaling, geo);
+    free(pixelBuffer);
+    return numTexels;
+
+}
+
+
 
 ostream& operator<<(ostream &os, const Vector3 &vec)
 {
@@ -595,7 +618,8 @@ void writeJsonOutput(Geometry geo, ostream &jsonGeometry)
 
 char* getJsonFromLayout(const char* const filename, float scaling)
 {
-    Geometry geo = parseLayout(filename, scaling);
+    Geometry geo;
+    parseLayout(filename, scaling, &geo);
     stringstream ss;
     writeJsonOutput(geo, ss);
 
@@ -614,7 +638,8 @@ char* getJsonFromLayoutMem(const uint8_t *data, int dataSize,float scaling)
     uint8_t *pixelBuffer;
     
     read_png_from_memory(data, dataSize, &width, &height, &colorType, &pixelBuffer );
-    Geometry geo = parseLayoutCore(pixelBuffer, width, height, colorType, scaling);
+    Geometry geo;
+    parseLayoutCore(pixelBuffer, width, height, colorType, scaling, &geo);
     free(pixelBuffer);
     stringstream ss;
     writeJsonOutput(geo, ss);

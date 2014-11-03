@@ -51,6 +51,15 @@ public:
         return true;
     }
 
+    bool anyEmptyNeighbor(int x, int y)
+    {
+        for (int dx = -1; dx <= +1; dx++)
+            for (int dy = -1; dy <= +1; dy++)
+                if (get(x+dx, y+dy) == 0)
+                    return true;
+        return false;
+    }
+
     unsigned int distanceTransform()
     {
 
@@ -59,15 +68,15 @@ public:
         for (int y = 0; y < height; y++)
             for (int x = 0; x < width; x++)
         {
-            if ( this->get(x,y) == distance)
+            if ( this->get(x,y) == distance && anyEmptyNeighbor(x, y))
                 openList.push_back(pair<int, int>(x,y));
         }
 
+        vector<pair<int, int>> newOpenList;
         while (openList.size())
         {
             //cout << "open list for distance " << distance << " contains " << openList.size() << " entries" << endl;
 
-            vector<pair<int, int>> newOpenList;
             for (unsigned int i = 0; i < openList.size(); i++)
             {
                 //int x = openList[i].first;
@@ -88,7 +97,8 @@ public:
             }
             
             
-            openList = newOpenList;
+            openList.swap(newOpenList);
+            newOpenList.clear();
             distance += 1;
         }
 

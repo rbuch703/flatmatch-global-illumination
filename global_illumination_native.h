@@ -5,10 +5,9 @@
 extern "C" {
 #endif
 
-
 #include "rectangle.h"
 
-void performGlobalIlluminationNative(Geometry geo, Vector3* lightColors, int numSamplesPerArea);
+void performGlobalIlluminationNative(Geometry *geo, Vector3* lightColors, int numSamplesPerArea);
 
 
 #ifdef __cplusplus

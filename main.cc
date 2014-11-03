@@ -39,16 +39,8 @@ void freeGeometry(Geometry geo)
 
 Geometry loadGeometry(string filename, float scale)
 {
-    Geometry geo = parseLayout(filename.c_str(), scale);
-    //vector<Rectangle> vWalls;
-    
-    numTexels = 0;
-    for ( int i = 0; i < geo.numWalls; i++)
-    {
-        geo.walls[i].lightmapSetup.s[0] = numTexels;
-        //objects[i].lightNumTiles = getNumTiles(&objects[i]);
-        numTexels += getNumTiles(&geo.walls[i]);
-    }
+    Geometry geo;
+    numTexels = parseLayout(filename.c_str(), scale, &geo);
 
     cout << "[DBG] allocating " << (numTexels * sizeof(Vector3)/1000000) << "MB for texels" << endl;
     if (numTexels * sizeof(Vector3) > 1000*1000*1000)
@@ -104,7 +96,7 @@ int main(int argc, const char** argv)
 
     int numSamplesPerArea = 1000000 * 0.1;   // rays per square meter of window/light surface
     //performGlobalIlluminationCl(geo, lightColors, numTexels, numSamplesPerArea);
-    performGlobalIlluminationNative(geo, lightColors, numSamplesPerArea);
+    performGlobalIlluminationNative(&geo, lightColors, numSamplesPerArea);
     
     for ( int i = 0; i < geo.numWalls; i++)
     {

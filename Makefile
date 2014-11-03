@@ -1,6 +1,6 @@
 
 SRC_C = png_helper.c rectangle.c vector3_cl.c photonmap.c
-SRC_CC = main.cc parseLayout.cc #global_illumination_cl.cc
+SRC_CC = main.cc parseLayout.cc #createJson.cc global_illumination_cl.cc 
 SRC = $(SRC_C) $(SRC_CC)
 
 OBJ_C  = $(patsubst %.c,build/c_%.o,$(SRC_C))
@@ -33,22 +33,24 @@ CCFLAGS = $(FLAGS) $(PROFILE) -std=c++11 -flto #$(OSX_INCLUDES)
 LD_FLAGS = $(PROFILE) $(OSX_LIBS) -lOpenCL -lm  $(OPT_FLAGS)  #-flto
 .PHONY: all clean
 
-all: make.dep globalIllumination tiles index.html
+all: make.dep globalIllumination tiles
 #	 @echo [ALL] $<
 
 globalIllumination: $(OBJ) build
 	@echo [LD] $@
 	@$(CPP) $(OBJ)  $(LD_FLAGS) -lpng -o $@
 
-index.html: $(BC)
+index.js: $(BC)
 	@echo [LD] $@
 	@$(EMCC) -Os $(BC) lib/*.bc \
     --embed-file 137.png \
-    -s EXPORTED_FUNCTIONS='["_main","_getJsonFromLayout", "_getJsonFromLayoutMem"]'\
-    -s ALLOW_MEMORY_GROWTH=1 \
+    -s EXPORTED_FUNCTIONS='["_main","_getJsonFromLayout", "_getJsonFromLayoutMem", "_performGlobalIlluminationNative","_parseLayoutMem", "_createGeometryObject"]'\
+    -s TOTAL_MEMORY=33554432\
     -s ASSERTIONS=1 \
     -s NO_EXIT_RUNTIME=1 \
     -o $@
+
+#    -s ALLOW_MEMORY_GROWTH=1 \
 	
 build: 
 	@echo [MKDIR] $@
@@ -83,7 +85,7 @@ clean:
 	@rm -rf *~
 	@rm -rf globalIllumination
 	@rm -rf coverage.info callgrind.out.*
-	@rm -f index.html index.html.mem index.js
+	@rm -f index.js.mem index.js
 
 make.dep: $(SRC_C) $(SRC_CC)
 	@echo [DEP]
