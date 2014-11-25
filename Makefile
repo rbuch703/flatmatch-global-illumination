@@ -1,6 +1,6 @@
 
 SRC_C = png_helper.c rectangle.c vector3_cl.c photonmap.c
-SRC_CC = main.cc parseLayout.cc #createJson.cc global_illumination_cl.cc 
+SRC_CC = main.cc parseLayout.cc global_illumination_cl.cc 
 SRC = $(SRC_C) $(SRC_CC)
 
 OBJ_C  = $(patsubst %.c,build/c_%.o,$(SRC_C))
@@ -30,7 +30,7 @@ PROFILE =
 
 CFLAGS = $(FLAGS) $(PROFILE) -std=c99 -flto #$(OSX_INCLUDES)
 CCFLAGS = $(FLAGS) $(PROFILE) -std=c++11 -flto #$(OSX_INCLUDES)
-LD_FLAGS = $(PROFILE) $(OSX_LIBS) -lOpenCL -lm  $(OPT_FLAGS)  #-flto
+LD_FLAGS = $(PROFILE) $(OSX_LIBS) -lOpenCL -lm  $(OPT_FLAGS) -flto
 .PHONY: all clean
 
 all: make.dep globalIllumination tiles

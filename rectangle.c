@@ -245,7 +245,7 @@ static uint8_t clamp(float d)
 }
 
 
-void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights)
+void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights, int tintExtra)
 {
     int baseIdx = rect->lightmapSetup.s[0];
     int hNumTiles = rect->lightmapSetup.s[1];//max( ceil(length(rect->width) / TILE_SIZE), 1);
@@ -274,12 +274,17 @@ void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights)
         for (int i = 0; i < hNumTiles * vNumTiles *3; i+=3)
         {
             //data[i+0]
+            
             data[i+1] *= 0.95;
             data[i+2] *= 0.9;
             
-            data[i+0] *= 1.0f;
-            data[i+1] *= 0.85f*0.95;
-            data[i+2] *= 0.7f*0.9;
+            
+            if (tintExtra)
+            {
+                data[i+0] *= 1.0f;
+                data[i+1] *= 0.85f;
+                data[i+2] *= 0.7f;
+            }
         }
     }
     

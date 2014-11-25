@@ -77,7 +77,7 @@ int main(int argc, const char** argv)
         exit(0);
     }
     
-    MODE illuminationMode = PHOTON_NATIVE;//AMBIENT_OCCLUSION;
+    MODE illuminationMode = AMBIENT_OCCLUSION;
     
     
     //string filename = (argc >= 2) ? argv[1] : "out.png" ;
@@ -117,6 +117,7 @@ int main(int argc, const char** argv)
     
     
     if (illuminationMode == PHOTON_NATIVE || illuminationMode == PHOTON_CL)
+    {
         for ( int i = 0; i < geo.numWalls; i++)
         {
             Rectangle &obj = geo.walls[i];
@@ -126,6 +127,7 @@ int main(int argc, const char** argv)
             for (int j = 0; j < getNumTiles(&obj); j++)
                 lightColors[baseIdx + j] = mul(lightColors[baseIdx +j], 0.35 * tilesPerSample);
         }    
+    }
 
     //write texture files
     char num[50];
@@ -133,7 +135,8 @@ int main(int argc, const char** argv)
     {
         snprintf(num, 49, "%d", i);
         string filename = string("tiles/tile_") + num;
-        saveAs(    &geo.walls[i], (filename + ".png").c_str(), lightColors);
+        saveAs(    &geo.walls[i], (filename + ".png").c_str(), lightColors,
+            illuminationMode == PHOTON_NATIVE || illuminationMode == AMBIENT_OCCLUSION);
         saveAsRaw( &geo.walls[i], (filename + ".raw").c_str(), lightColors);
     }
 

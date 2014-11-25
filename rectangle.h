@@ -10,7 +10,7 @@ extern "C" {
 //#include "color3.h"
 #include "assert.h"
 
-static const float TILE_SIZE = 1000/20.0f;   //lightmap texels per m²
+static const float TILE_SIZE = 1000/20.0f*0.1;   //lightmap texels per m²
 static const int   SUPER_SAMPLING = 1;
 
 
@@ -56,7 +56,7 @@ Vector3 getOrigin(const Rectangle *rect);
 Vector3 getWidthVector(const Rectangle *rect);
 Vector3 getHeightVector(const Rectangle *rect);
 Vector3 getTileCenter(const Rectangle *rect, int tileId);
-void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights);
+void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights, int tintExtra);
 void saveAsRaw(const Rectangle *rect, const char *filename, const Vector3 *lights);
 
 #ifdef __cplusplus
