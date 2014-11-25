@@ -23,6 +23,7 @@ Vector3 neg(const Vector3 v);
 Vector3 div_vec3(const Vector3 a, float b);
 
 Vector3 createVector3(float x, float y, float z);
+Vector3 vec3(float x, float y, float z);
 float dot(const Vector3 a, const Vector3 b);
 Vector3 cross(const Vector3 a, const Vector3 b);
 float squaredLength(const Vector3 a);

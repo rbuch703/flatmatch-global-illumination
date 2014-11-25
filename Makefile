@@ -20,7 +20,7 @@ EMPP=em++
 EMCC_FLAGS=-I./include -std=c99
 EMPP_FLAGS=-I./include -std=c++11
 
-OPT_FLAGS = #-O2
+OPT_FLAGS = -O2
 OSX_INCLUDES = #-I /usr/local/include -framework OpenCL
 OSX_LIBS = #-L /usr/local/lib -framework OpenCL
 FLAGS = -g -Wall -Wextra -msse3 $(OPT_FLAGS)

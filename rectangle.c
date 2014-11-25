@@ -118,6 +118,23 @@ float distanceToPlane( Vector3 planeNormal, Vector3 planePos, Vector3 ray_src, V
     return n;
 }*/
 
+Vector3 getTileCenter(const Rectangle *rect, int tileId)
+{
+    if (tileId  >= getNumTiles(rect)) return vec3(0,0,0);
+    
+    Vector3 vWidth = div_vec3( rect->width,  rect->lightmapSetup.s[1]);
+    Vector3 vHeight= div_vec3( rect->height, rect->lightmapSetup.s[2]);
+  
+    int tx = tileId % rect->lightmapSetup.s[1];
+    int ty = tileId / rect->lightmapSetup.s[1];
+    
+    return add3( rect->pos, mul(vWidth, tx+0.5), mul(vHeight, ty+0.5) );
+//        return ty * hNumTiles + tx;
+
+    
+}
+
+
 int getNumTiles(const Rectangle *rect)
 {
     
@@ -256,9 +273,13 @@ void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights)
     {
         for (int i = 0; i < hNumTiles * vNumTiles *3; i+=3)
         {
-            //data[0]
+            //data[i+0]
             data[i+1] *= 0.95;
             data[i+2] *= 0.9;
+            
+            data[i+0] *= 1.0f;
+            data[i+1] *= 0.85f*0.95;
+            data[i+2] *= 0.7f*0.9;
         }
     }
     

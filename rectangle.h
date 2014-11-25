@@ -55,6 +55,7 @@ Vector3 getDiffuseColor(const Rectangle *rect, const Vector3 pos);
 Vector3 getOrigin(const Rectangle *rect);
 Vector3 getWidthVector(const Rectangle *rect);
 Vector3 getHeightVector(const Rectangle *rect);
+Vector3 getTileCenter(const Rectangle *rect, int tileId);
 void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights);
 void saveAsRaw(const Rectangle *rect, const char *filename, const Vector3 *lights);
 

@@ -7,7 +7,8 @@ extern "C" {
 
 #include "rectangle.h"
 
-void performGlobalIlluminationNative(Geometry *geo, Vector3* lightColors, int numSamplesPerArea);
+void performPhotonMappingNative(Geometry *geo, Vector3* lightColors, int numSamplesPerArea);
+void performAmbientOcclusionNative(Geometry *geo, Vector3* lightColors);
 
 
 #ifdef __cplusplus

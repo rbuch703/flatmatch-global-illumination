@@ -60,6 +60,8 @@ Geometry loadGeometry(string filename, float scale)
     return geo;
 }
 
+enum MODE {PHOTON_NATIVE, PHOTON_CL, AMBIENT_OCCLUSION};
+
 int main(int argc, const char** argv)
 {
     //cout << "Rectangle size is " << sizeof(Rectangle) << " bytes" << endl;
@@ -74,6 +76,9 @@ int main(int argc, const char** argv)
         cout << endl;
         exit(0);
     }
+    
+    MODE illuminationMode = PHOTON_NATIVE;//AMBIENT_OCCLUSION;
+    
     
     //string filename = (argc >= 2) ? argv[1] : "out.png" ;
     
@@ -94,19 +99,33 @@ int main(int argc, const char** argv)
 
 
 
-    int numSamplesPerArea = 1000000 * 0.1;   // rays per square meter of window/light surface
-    //performGlobalIlluminationCl(geo, lightColors, numTexels, numSamplesPerArea);
-    performGlobalIlluminationNative(&geo, lightColors, numSamplesPerArea);
+    int numSamplesPerArea = 1000000 * 1;   // rays per square meter of window/light surface
     
-    for ( int i = 0; i < geo.numWalls; i++)
+    switch (illuminationMode)
     {
-        Rectangle &obj = geo.walls[i];
-        float tilesPerSample = getNumTiles(&obj) / (getArea(&obj) * numSamplesPerArea);  
-        int baseIdx = obj.lightmapSetup.s[0];
+        case PHOTON_NATIVE:
+            performPhotonMappingNative(&geo, lightColors, numSamplesPerArea);
+            break;
+            
+        case PHOTON_CL:
+            performGlobalIlluminationCl(geo, lightColors, numTexels, numSamplesPerArea);
+            break;
+        case AMBIENT_OCCLUSION:
+            performAmbientOcclusionNative(&geo, lightColors);
+            break;
+    }
+    
+    
+    if (illuminationMode == PHOTON_NATIVE || illuminationMode == PHOTON_CL)
+        for ( int i = 0; i < geo.numWalls; i++)
+        {
+            Rectangle &obj = geo.walls[i];
+            float tilesPerSample = getNumTiles(&obj) / ( getArea(&obj) * numSamplesPerArea);  
+            int baseIdx = obj.lightmapSetup.s[0];
 
-        for (int j = 0; j < getNumTiles(&obj); j++)
-            lightColors[baseIdx + j] = mul(lightColors[baseIdx +j], 0.35 * tilesPerSample);
-    }    
+            for (int j = 0; j < getNumTiles(&obj); j++)
+                lightColors[baseIdx + j] = mul(lightColors[baseIdx +j], 0.35 * tilesPerSample);
+        }    
 
     //write texture files
     char num[50];

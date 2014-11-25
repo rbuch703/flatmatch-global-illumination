@@ -55,15 +55,14 @@ Vector3 neg(const Vector3 v)
 }
 
 
-/*inline Vector3 diva(Vector3 a, float b) { 
-    __m128 tmp = _mm_load1_ps(&b);
-    return _mm_div_ps(a, tmp);
-}*/
-
 Vector3 createVector3(float _x, float _y, float _z)
 {
-    //__attribute__ ((aligned (16))) float tmp[4] = {x,y,z,0.0};
-    //return _mm_load_ps(tmp);
+    Vector3 res = {.s = {_x, _y, _z} };
+    return res;
+}
+
+Vector3 vec3(float _x, float _y, float _z)
+{
     Vector3 res = {.s = {_x, _y, _z} };
     return res;
 }
