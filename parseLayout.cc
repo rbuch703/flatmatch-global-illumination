@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <fstream>
 #include <string>
 #include <vector>
 //#include <list>
@@ -345,10 +346,11 @@ void rectangleVectorToArray( vector<Rectangle> rects, Rectangle* &rectsOut, cl_i
         rectsOut[i] = rects[i];
 }
 
-static int parseLayoutCore(uint8_t *src, int width, int height, int colorType, const float scaling, Geometry* geo)
+static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorType, const float scaling)
 {
-    geo->width = width;
-    geo->height= height;
+    Geometry geo;
+    geo.width = width;
+    geo.height= height;
 
     vector<Rectangle> wallsOut;
     vector<Rectangle> windowsOut;
@@ -390,8 +392,8 @@ static int parseLayoutCore(uint8_t *src, int width, int height, int colorType, c
     }
 
     pair<int, int> centralPos = getCentralPosition(pixelBuffer, width, height);
-    geo->startingPositionX = centralPos.first * scaling;
-    geo->startingPositionY = centralPos.second * scaling;
+    geo.startingPositionX = centralPos.first * scaling;
+    geo.startingPositionY = centralPos.second * scaling;
     
     createLights( Image(width, height, pixelBuffer), scaling, lightsOut);
     
@@ -525,48 +527,85 @@ static int parseLayoutCore(uint8_t *src, int width, int height, int colorType, c
     vector<Rectangle> boxOut;
 */
 
-    rectangleVectorToArray(  wallsOut, geo->walls, geo->numWalls);
-    rectangleVectorToArray(  boxOut, geo->boxWalls, geo->numBoxWalls);
-    rectangleVectorToArray(  windowsOut, geo->windows, geo->numWindows);
-    rectangleVectorToArray(  lightsOut, geo->lights, geo->numLights);
+    rectangleVectorToArray(  wallsOut, geo.walls, geo.numWalls);
+    rectangleVectorToArray(  boxOut, geo.boxWalls, geo.numBoxWalls);
+    rectangleVectorToArray(  windowsOut, geo.windows, geo.numWindows);
+    rectangleVectorToArray(  lightsOut, geo.lights, geo.numLights);
     
     int numTexels = 0;
-    for ( int i = 0; i < geo->numWalls; i++)
+    for ( int i = 0; i < geo.numWalls; i++)
     {
-        geo->walls[i].lightmapSetup.s[0] = numTexels;
+        geo.walls[i].lightmapSetup.s[0] = numTexels;
         //objects[i].lightNumTiles = getNumTiles(&objects[i]);
-        numTexels += getNumTiles(&geo->walls[i]);
+        numTexels += getNumTiles(&geo.walls[i]);
     }
-    return numTexels;
+    
+    geo.numTexels = numTexels;
+    
+    cout << "[DBG] allocating " << (geo.numTexels * sizeof(Vector3)/1000000) << "MB for texels" << endl;
+    if (geo.numTexels * sizeof(Vector3) > 1000*1000*1000)
+    {
+        cout << "[Err] Refusing to allocate more than 1GB for texels, this would crash most GPUs. Exiting ..." << endl;
+        exit(0);
+    }
 
+    if (0 != posix_memalign( (void**) &geo.texels, 16, geo.numTexels * sizeof(Vector3)))
+    {
+        cout << "[Err] aligned memory allocation failed, exiting ..." << endl;
+        exit(0);
+    }
+    
+    for (int i = 0; i < geo.numTexels; i++)
+        geo.texels[i] = vec3(0,0,0);
+    
+    return geo;
 }
 
 
-int parseLayout(const char* const filename, const float scaling, Geometry* geo)
+Geometry parseLayout(const char* const filename, const float scaling)
 {
-    assert(geo);
-    
     int colorType, width, height;
     uint8_t *pixelBuffer;
     read_png_file(filename, &width, &height, &colorType, (uint8_t**)&pixelBuffer );
     
-    int numTexels = parseLayoutCore(pixelBuffer, width, height, colorType, scaling, geo);
+    Geometry geo = parseLayoutCore(pixelBuffer, width, height, colorType, scaling);
     free(pixelBuffer);
-    return numTexels;
+    return geo;
 }
 
-int parseLayoutMem(const uint8_t *data, int dataSize, const float scaling, Geometry* geo)
+Geometry parseLayoutMem(const uint8_t *data, int dataSize, const float scaling)
 {
-    assert(geo);
-    
     int colorType, width, height;
     uint8_t *pixelBuffer;
     read_png_from_memory(data, dataSize, &width, &height, &colorType, (uint8_t**)&pixelBuffer );
     
-    int numTexels = parseLayoutCore(pixelBuffer, width, height, colorType, scaling, geo);
+    Geometry geo = parseLayoutCore(pixelBuffer, width, height, colorType, scaling);
     free(pixelBuffer);
-    return numTexels;
+    return geo;
+}
 
+Geometry* parseLayoutStatic(const char* filename, float scale)
+{
+    static Geometry geo = { .windows= NULL, .lights=NULL, .walls = NULL, .boxWalls = NULL,
+    .numWindows = 0, .numLights = 0, .numWalls = 0, .numBoxWalls = 0, .width = 0, .height = 0,
+    .startingPositionX = 0, .startingPositionY = 0, .numTexels= 0, .texels = NULL };
+    
+    freeGeometry(geo);  // in case of leftover data from a previous call to this method
+    geo = parseLayout(filename, scale);
+    
+    return &geo;
+}
+
+Geometry* parseLayoutStaticMem(const uint8_t* data, int dataSize, float scale)
+{
+    static Geometry geo = { .windows= NULL, .lights=NULL, .walls = NULL, .boxWalls = NULL,
+    .numWindows = 0, .numLights = 0, .numWalls = 0, .numBoxWalls = 0, .width = 0, .height = 0,
+    .startingPositionX = 0, .startingPositionY = 0, .numTexels= 0, .texels = NULL };
+    
+    freeGeometry(geo);  // in case of leftover data from a previous call to this method
+    geo = parseLayoutMem(data, dataSize, scale);
+    
+    return &geo;
 }
 
 
@@ -577,7 +616,7 @@ ostream& operator<<(ostream &os, const Vector3 &vec)
     return os;
 }
 
-void writeJsonOutput(Geometry geo, ostream &jsonGeometry)
+void writeJsonOutputStream(Geometry geo, ostream &jsonGeometry)
 {
 
     jsonGeometry << "{" << endl;
@@ -616,12 +655,18 @@ void writeJsonOutput(Geometry geo, ostream &jsonGeometry)
     jsonGeometry << "}" << endl;
 }
 
+void writeJsonOutput(Geometry geo, const char*filename)
+{
+    ofstream jsonGeometry(filename);
+    writeJsonOutputStream(geo, jsonGeometry);
+    jsonGeometry.close();
+}
+
 char* getJsonFromLayout(const char* const filename, float scaling)
 {
-    Geometry geo;
-    parseLayout(filename, scaling, &geo);
+    Geometry geo = parseLayout(filename, scaling);
     stringstream ss;
-    writeJsonOutput(geo, ss);
+    writeJsonOutputStream(geo, ss);
 
     free (geo.walls);
     free (geo.boxWalls);
@@ -638,11 +683,10 @@ char* getJsonFromLayoutMem(const uint8_t *data, int dataSize,float scaling)
     uint8_t *pixelBuffer;
     
     read_png_from_memory(data, dataSize, &width, &height, &colorType, &pixelBuffer );
-    Geometry geo;
-    parseLayoutCore(pixelBuffer, width, height, colorType, scaling, &geo);
+    Geometry geo = parseLayoutCore(pixelBuffer, width, height, colorType, scaling);
     free(pixelBuffer);
     stringstream ss;
-    writeJsonOutput(geo, ss);
+    writeJsonOutputStream(geo, ss);
     
     free (geo.walls);
     free (geo.boxWalls);

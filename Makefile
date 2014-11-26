@@ -1,6 +1,6 @@
 
-SRC_C = png_helper.c rectangle.c vector3_cl.c photonmap.c
-SRC_CC = main.cc parseLayout.cc global_illumination_cl.cc 
+SRC_C = main.c png_helper.c rectangle.c vector3_cl.c photonmap.c geoSphere.c
+SRC_CC = parseLayout.cc global_illumination_cl.cc 
 SRC = $(SRC_C) $(SRC_CC)
 
 OBJ_C  = $(patsubst %.c,build/c_%.o,$(SRC_C))

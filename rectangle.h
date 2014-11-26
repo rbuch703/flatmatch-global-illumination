@@ -28,20 +28,31 @@ typedef struct __attribute__ ((aligned(16))) Rectangle{
 } Rectangle;
 
 typedef struct Geometry {
-    Rectangle *windows, *lights, *walls, *boxWalls;
+    Rectangle  *windows, *lights, *walls, *boxWalls;
     cl_int     numWindows, numLights, numWalls, numBoxWalls; 
     cl_int     width, height;
-    float     startingPositionX, startingPositionY;
+    float      startingPositionX, startingPositionY;
+    cl_int     numTexels;
+    Vector3    *texels;
+
 } Geometry;
 
-// just for the emscripten/JavaScript interface
+void freeGeometry(Geometry geo);
+
+// the following methods are just for the emscripten/JavaScript interface
 Geometry* createGeometryObject();
+
+int geometryGetNumWalls(Geometry *geo);
+Rectangle* geometryGetRectanglePtr(Geometry *geo, int rectangleId);
+// end of emscripten interface
 
 Rectangle createRectangleV( const Vector3 _pos, const Vector3 _width, const Vector3 _height);
 Rectangle createRectangle( float px, float py, float pz,
                            float wx, float wy, float wz,
                            float hx, float hy, float hz);
 
+
+//Methods for the 'Rectangle' struct
 int getPosition(const Rectangle *plane, const Rectangle *rect);
 double getDistance(const Rectangle *plane, const Vector3 p);
 
@@ -57,6 +68,8 @@ Vector3 getWidthVector(const Rectangle *rect);
 Vector3 getHeightVector(const Rectangle *rect);
 Vector3 getTileCenter(const Rectangle *rect, int tileId);
 void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights, int tintExtra);
+int saveAsMemoryPng(const Rectangle *rect, const char *filename, const Vector3 *lights, int tintExtra, uint8_t**data);
+
 void saveAsRaw(const Rectangle *rect, const char *filename, const Vector3 *lights);
 
 #ifdef __cplusplus

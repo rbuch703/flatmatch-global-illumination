@@ -244,14 +244,15 @@ static uint8_t clamp(float d)
     return d;
 }
 
-
-void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights, int tintExtra)
+static void saveAs_core(const Rectangle *rect, const Vector3 *lights, int tintExtra, uint8_t** rawDataOut, int* rawSizeOut)
 {
     int baseIdx = rect->lightmapSetup.s[0];
     int hNumTiles = rect->lightmapSetup.s[1];//max( ceil(length(rect->width) / TILE_SIZE), 1);
     int vNumTiles = rect->lightmapSetup.s[2];//max( ceil(length(rect->height)/ TILE_SIZE), 1);
 
-    uint8_t *data = (uint8_t*) malloc( hNumTiles * vNumTiles * 3 * sizeof(uint8_t));
+    *rawSizeOut = hNumTiles * vNumTiles * 3 * sizeof(uint8_t);
+    *rawDataOut = (uint8_t*) malloc( *rawSizeOut );
+    uint8_t *data = *rawDataOut;
     
     for (int i = 0; i < hNumTiles*vNumTiles; i++)
     {
@@ -262,9 +263,7 @@ void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights, 
         data[3*i+2] = clamp( color.s[2] * 255 );
     }
         
-    /*
-    subsampleAndConvertToPerceptive( lights+baseIdx, data, hNumTiles, vNumTiles);
-    selectiveDilate(data, hNumTiles, vNumTiles);*/
+    // selectiveDilate(data, hNumTiles, vNumTiles);
 
     /*hack: make floor slightly brownish *after* the global illumination and thus
      *      after its brown color would cause too much color bleeding;
@@ -287,10 +286,37 @@ void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights, 
             }
         }
     }
-    
-    write_png_file(filename, hNumTiles, vNumTiles, PNG_COLOR_TYPE_RGB, data);
+
+}
+
+void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights, int tintExtra)
+{
+    uint8_t *data;
+    int     dataSize;
+    saveAs_core(rect, lights, tintExtra, &data, &dataSize);
+    write_png_file(filename, rect->lightmapSetup.s[1], rect->lightmapSetup.s[2],
+                   PNG_COLOR_TYPE_RGB, data);
     free (data);
 }
+
+int saveAsMemoryPng(const Rectangle *rect, const char *filename, const Vector3 *lights, int tintExtra, uint8_t**pngDataOut)
+{
+    uint8_t *rawData;
+    int      rawDataSize;
+    
+    saveAs_core(rect, lights, tintExtra, &rawData, &rawDataSize);
+    write_png_file(filename, rect->lightmapSetup.s[1], rect->lightmapSetup.s[2],
+                   PNG_COLOR_TYPE_RGB, rawData);
+ 
+    int  pngDataSize;
+    write_png_to_memory(pngDataOut, &pngDataSize, 
+                          rect->lightmapSetup.s[1], 
+                          rect->lightmapSetup.s[2],
+                          PNG_COLOR_TYPE_RGB, rawData);
+    free (rawData);
+    return pngDataSize;
+}
+
 
 typedef struct {
     int pixelWidth;
@@ -379,5 +405,22 @@ int getPosition(const Rectangle *plane, const Rectangle *rect)
 Geometry* createGeometryObject() 
 {
     return (Geometry*)malloc(sizeof(Geometry));
+}
+
+int geometryGetNumWalls(Geometry *geo) { return geo->numWalls;}
+
+Rectangle* geometryGetRectanglePtr(Geometry *geo, int rectangleId)
+{
+    return &geo->walls[rectangleId];
+}
+
+
+void freeGeometry(Geometry geo)
+{
+    free(geo.walls);
+    free(geo.boxWalls);
+    free(geo.lights);
+    free(geo.windows);
+    free(geo.texels);
 }
 

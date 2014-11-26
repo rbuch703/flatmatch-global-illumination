@@ -3,9 +3,7 @@
 
 #include "rectangle.h"
 
-void performGlobalIlluminationCl(Geometry geo, 
-                               Vector3* lightColors, cl_int numTexels,
-                               int numSamplesPerArea);
+void performGlobalIlluminationCl(Geometry geo, int numSamplesPerArea);
 
 
 
