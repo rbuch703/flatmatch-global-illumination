@@ -3,7 +3,7 @@
 #include <string.h> //for memcpy
 #include <math.h> //for sqrt()
 
-#include <set>
+//#include <set>
 
 #include <stdio.h>
 #include "parseLayout.h"
@@ -211,23 +211,19 @@ bool lessThan( Point2D a, Point2D b) { return a.x < b.x || (a.x == b.x && a.y < 
 
 int traverseRoom(Image *img, Image *visited, int x, int y, unsigned int *maxDist, Point2DArray *skeletalPoints)
 {
-    std::set< Point2D, bool(*)( Point2D a, Point2D b)>  candidates(lessThan);
-    std::set< Point2D, bool(*)( Point2D a, Point2D b)>  visitedPoints(lessThan);
-    
-    candidates.insert( (Point2D){x,y} );
+    Point2DArray candidates = initPoint2DArray();
+    insertIntoPoint2DArray(&candidates, x, y);
 
     int numPixels = 0;
 
-    while (! candidates.empty())
+    while (candidates.numItems)
     {
-        Point2D pos = * (candidates.begin());
+        Point2D pos = candidates.data[ --candidates.numItems];
         int x = pos.x;
         int y = pos.y;
-        visitedPoints.insert(pos);
-        candidates.erase(pos);
 
-        if (x < 0 || x >= img->width ) return 0;
-        if (y < 0 || y >= img->height ) return 0;
+        if (x < 0 || x >= img->width ) continue;
+        if (y < 0 || y >= img->height ) continue;
         assert( img->width  == visited->width  );
         assert( img->height == visited->height );
 
@@ -244,17 +240,18 @@ int traverseRoom(Image *img, Image *visited, int x, int y, unsigned int *maxDist
             insertIntoPoint2DArray(skeletalPoints, x, y);
             setImagePixel(visited, x, y, 3);
         }
-
         
         if ( getImagePixel(img, x, y) > *maxDist)
             *maxDist = getImagePixel(img, x, y);
         
-        if (visitedPoints.count( Point2D{x-1, y}) == 0) candidates.insert( Point2D{x-1,y });
-        if (visitedPoints.count( Point2D{x+1, y}) == 0) candidates.insert( Point2D{x+1,y });
-        if (visitedPoints.count( Point2D{x  , y-1}) == 0) candidates.insert( Point2D{x  ,y-1});
-        if (visitedPoints.count( Point2D{x  , y+1}) == 0) candidates.insert( Point2D{x  ,y+1});
+        if (! getImagePixel(visited, x-1,y)) insertIntoPoint2DArray(&candidates, x-1, y);
+        if (! getImagePixel(visited, x+1,y)) insertIntoPoint2DArray(&candidates, x+1, y);
+        if (! getImagePixel(visited, x,y-1)) insertIntoPoint2DArray(&candidates, x, y-1);
+        if (! getImagePixel(visited, x,y+1)) insertIntoPoint2DArray(&candidates, x, y+1);
+
     }
     
+    freePoint2DArray(&candidates);
     return numPixels;
 }
 
