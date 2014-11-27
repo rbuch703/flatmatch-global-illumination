@@ -2,163 +2,202 @@
 #define IMAGE_H
 
 #include <stdint.h>
-#include <set>
+#include <stdlib.h>
+
 #include "png_helper.h"
 
-using namespace std;
+int min(int x, int y ) { return x < y ? x : y;}
+int max(int x, int y ) { return x > y ? x : y;}
 
-class Image {
+typedef struct {
+    int x,y;
+} Point2D;
 
-public:
-    Image(const Image &other): Image(other.width, other.height, other.data)
-    {
-    }
-    
-    Image(int width, int height): width(width), height(height)
-    {
-        this->data = new uint32_t[width*height];
-        memset(this->data, 0, sizeof(uint32_t) * width * height);        
-    }
+typedef struct {
+    Point2D *data;
+    unsigned int numItems;
+    unsigned int maxNumItems;
+} Point2DArray;
 
+Point2DArray initPoint2DArray()
+{
+    Point2DArray res = {.data = (Point2D*)malloc ( sizeof(Point2D) * 64), 
+                        .numItems = 0, 
+                        .maxNumItems = 64};
+    return res;
+};
 
-    Image(int width, int height, uint32_t *data): width(width), height(height)
-    {
-        this->data = new uint32_t[width*height];
-        memcpy(this->data, data, sizeof(uint32_t) * width*height);
-    }
-    
-    ~Image()
-    {
-        delete [] data;
-    }
-    
-    
-    uint32_t get(int x, int y) const
-    {
-        x = max( min(x, width-1), 0);
-        y = max( min(y, height-1), 0);
-        return data[y*width+x];
-    }
+void resizePoint2DArray(Point2DArray *arr, int newSize)
+{
+    arr->data = (Point2D*)realloc(arr->data, newSize*sizeof(Point2D));
+    arr->maxNumItems = newSize;
+    if (arr->numItems > arr->maxNumItems)   // array was just shortened
+        arr->numItems = arr->maxNumItems;
+}
 
-    bool set(int x, int y, uint32_t val)
+void insertIntoPoint2DArray(Point2DArray *arr, int x, int y)
+{
+    if (arr->numItems == arr->maxNumItems)
     {
-        if ( x < 0) return false;
-        if ( x >= width) return false;
-        if ( y < 0) return false;
-        if ( y >= height) return false;
+        resizePoint2DArray( arr, arr->maxNumItems*2);
+    }
         
-        data[y*width+x] = val;
-        return true;
-    }
+    assert (arr->numItems < arr->maxNumItems);
+    arr->data[arr->numItems++] = ( Point2D ){.x = x, .y = y};
+}
 
-    bool anyEmptyNeighbor(int x, int y)
-    {
-        for (int dx = -1; dx <= +1; dx++)
-            for (int dy = -1; dy <= +1; dy++)
-                if (get(x+dx, y+dy) == 0)
-                    return true;
-        return false;
-    }
+void freePoint2DArray(Point2DArray *arr)
+{
+//    printf("freeing point2d list with %d entries\n", arr->maxNumItems);
+    free(arr->data);
+    arr->data = NULL;
+}
 
-    unsigned int distanceTransform()
-    {
-
-        vector<pair<int, int>> openList;
-        unsigned int distance = 1;
-        for (int y = 0; y < height; y++)
-            for (int x = 0; x < width; x++)
-        {
-            if ( this->get(x,y) == distance && anyEmptyNeighbor(x, y))
-                openList.push_back(pair<int, int>(x,y));
-        }
-
-        vector<pair<int, int>> newOpenList;
-        while (openList.size())
-        {
-            //cout << "open list for distance " << distance << " contains " << openList.size() << " entries" << endl;
-
-            for (unsigned int i = 0; i < openList.size(); i++)
-            {
-                //int x = openList[i].first;
-                //int y = openList[i].second;
-                
-                for (int x = max(openList[i].first-1, 0); x <= min(openList[i].first + 1, width - 1); x++)
-                    for (int y = max(openList[i].second - 1, 0); y <= min(openList[i].second + 1, height-1); y++)
-                    {
-                        if (x == openList[i].first && y == openList[i].second)
-                            continue;
-                            
-                        if ( this->get(x, y) == 0)
-                        {
-                            this->set(x, y, distance+1);
-                            newOpenList.push_back(pair<int, int>(x, y));
-                        }
-                    }
-            }
-            
-            
-            openList.swap(newOpenList);
-            newOpenList.clear();
-            distance += 1;
-        }
-
-        //the while loop loops until the open list for a distance is completely empty,
-        //i.e. until a distance is reached for which not a single pixel exists.
-        //so the actual maximum distance returned here is one less than the distance
-        //for which the loop terminated
-        return distance - 1;
-
-    }
-
-    void floodFill(int x, int y, uint32_t value, uint32_t background)
-    {
-        std::set< pair<int, int> > candidates;
-        
-        candidates.insert(pair<int, int>(x,y));
-        
-        while (! candidates.empty())
-        {
-            pair<int,int> pos = * (candidates.begin());
-            int x = pos.first;
-            int y = pos.second;
-            candidates.erase(pos);
-            if (x < 0 || x >= width) return;
-            if (y < 0 || y >= height) return;
-        
-            if (this->get(x, y) != background)
-                return;
-                
-            this->set(x, y, value);
-            
-            if (this->get(x - 1, y - 1) == background) candidates.insert(pair<int, int>( x - 1, y - 1) );
-            if (this->get(x    , y - 1) == background) candidates.insert(pair<int, int>( x    , y - 1) );
-            if (this->get(x + 1, y - 1) == background) candidates.insert(pair<int, int>( x + 1, y - 1) );
-
-            if (this->get(x - 1, y    ) == background) candidates.insert(pair<int, int>( x - 1, y    ) );
-          //if (this->get(x    , y    ) == background) candidates.insert(pair<int, int>( x    , y    ) );
-            if (this->get(x + 1, y    ) == background) candidates.insert(pair<int, int>( x + 1, y    ) );
-
-            if (this->get(x - 1, y + 1) == background) candidates.insert(pair<int, int>( x - 1, y + 1) );
-            if (this->get(x    , y + 1) == background) candidates.insert(pair<int, int>( x    , y + 1) );
-            if (this->get(x + 1, y + 1) == background) candidates.insert(pair<int, int>( x + 1, y + 1) );
-
-        }
-    }
-
-    void saveAs(const char* filename) const
-    {
-        write_png_file( filename, width, height, PNG_COLOR_TYPE_RGBA, (uint8_t*)data);
-    
-    }
-    
-    int getHeight() const { return height;}
-    int getWidth()  const { return width;}
-    
-private:
+typedef struct {
     int width, height;
     uint32_t *data;
+} Image;
 
-};
+void freeImage(Image *img)
+{
+    free(img->data);
+    img->data = NULL;
+}
+
+int clampInt(int val, int min, int max)
+{
+    assert(min <= max);
+    return val < min ? min : (val > max ? max : val);
+}
+    
+uint32_t getImagePixel(Image* img, int x, int y)
+{
+    x = clampInt(x, 0, img->width-1);
+    y = clampInt(y, 0, img->height-1);
+    return img->data[y*img->width+x];
+}
+
+int setImagePixel(Image* img, int x, int y, uint32_t val)
+{
+    if ( x < 0) return 0;
+    if ( x >= img->width) return 0;
+    if ( y < 0) return 0;
+    if ( y >= img->height) return 0;
+    
+    img->data[y*img->width+x] = val;
+    return 1;
+}
+
+int anyEmptyNeighbor(Image* img, int x, int y)
+{
+    for (int dx = -1; dx <= +1; dx++)
+        for (int dy = -1; dy <= +1; dy++)
+            if (getImagePixel(img, x+dx, y+dy) == 0)
+                return 1;
+    return 0;
+}
+
+unsigned int distanceTransform(Image *img)
+{
+
+    Point2DArray openList = initPoint2DArray();
+    unsigned int distance = 1;
+    for (int y = 0; y < img->height; y++)
+        for (int x = 0; x < img->width; x++)
+    {
+        if ( getImagePixel(img, x,y) == distance && anyEmptyNeighbor(img, x, y))
+            insertIntoPoint2DArray(&openList, x, y);
+    }
+
+    Point2DArray newOpenList = initPoint2DArray();
+    while (openList.numItems)
+    {
+        //cout << "open list for distance " << distance << " contains " << openList.size() << " entries" << endl;
+
+        for (unsigned int i = 0; i < openList.numItems; i++)
+        {
+            
+            int xTmp = openList.data[i].x;
+            int yTmp = openList.data[i].y;
+            
+            for (int x = max(xTmp-1, 0); x <= min(xTmp + 1, img->width - 1); x++)
+                for (int y = max(yTmp - 1, 0); y <= min(yTmp + 1, img->height-1); y++)
+                {
+                    if (x == xTmp && y == yTmp)
+                        continue;
+                        
+                    if ( getImagePixel(img, x, y) == 0)
+                    {
+                        setImagePixel(img, x, y, distance+1);
+                        insertIntoPoint2DArray(&newOpenList, x, y);
+                    }
+                }
+        }
+        
+        Point2DArray tmp = openList;
+        openList = newOpenList;
+        newOpenList = tmp;
+
+        newOpenList.numItems = 0;
+        distance += 1;
+    }
+    
+    free(openList.data);
+    free(newOpenList.data);
+
+    //the while loop loops until the open list for a distance is completely empty,
+    //i.e. until a distance is reached for which not a single pixel exists.
+    //so the actual maximum distance returned here is one less than the distance
+    //for which the loop terminated
+    return distance - 1;
+
+}
+
+void floodFillImage(Image *img, int x, int y, uint32_t value, uint32_t background)
+{
+    
+    Point2DArray candidates = initPoint2DArray();
+    insertIntoPoint2DArray(&candidates, x, y);    
+    
+    while (candidates.numItems)
+    {
+        int x = candidates.data[candidates.numItems-1].x;
+        int y = candidates.data[candidates.numItems-1].y;
+        candidates.numItems -= 1;
+
+        if (x < 0 || x >= img->width) continue;
+        if (y < 0 || y >= img->height) continue;
+    
+        if (getImagePixel(img, x, y) != background)
+            continue;
+            
+        setImagePixel(img, x, y, value);
+        
+        if (getImagePixel(img, x - 1, y - 1) == background) insertIntoPoint2DArray(&candidates, x - 1, y - 1 );
+        if (getImagePixel(img, x    , y - 1) == background) insertIntoPoint2DArray(&candidates, x    , y - 1 );
+        if (getImagePixel(img, x + 1, y - 1) == background) insertIntoPoint2DArray(&candidates, x + 1, y - 1 );
+
+        if (getImagePixel(img, x - 1, y    ) == background) insertIntoPoint2DArray(&candidates, x - 1, y     );
+        //if (getImagePixel(img, x   1, y - 1) == background) insertIntoPoint2DArray(&candidates, x    , y - 1 );
+        if (getImagePixel(img, x + 1, y    ) == background) insertIntoPoint2DArray(&candidates, x + 1, y     );
+
+        if (getImagePixel(img, x - 1, y + 1) == background) insertIntoPoint2DArray(&candidates, x - 1, y + 1 );
+        if (getImagePixel(img, x    , y + 1) == background) insertIntoPoint2DArray(&candidates, x    , y + 1 );
+        if (getImagePixel(img, x + 1, y + 1) == background) insertIntoPoint2DArray(&candidates, x + 1, y + 1 );
+
+    }
+    
+    freePoint2DArray(&candidates);
+}
+
+void saveImageAs(Image *img, const char* filename)
+{
+    write_png_file( filename, img->width, img->height, PNG_COLOR_TYPE_RGBA, (uint8_t*)img->data);
+}
+    
+/*int getHeight() const { return height;}
+int getWidth()  const { return width;}*/
+
 
 #endif
 

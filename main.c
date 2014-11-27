@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdio.h> //for snprintf
 #include <string.h> //for memset
+#include <stdlib.h>
 
 #include "global_illumination_cl.h"
 #include "global_illumination_native.h"
@@ -21,7 +22,7 @@ int main(int argc, const char** argv)
         printf("  - The <layout image> is the name of an existing 'png' image file.\n");
         printf("  - The optional <scale> is a floating point number in giving the image\n");
         printf("    scale in pixels/m. If none is given a default value of 30.0 is assumed.\n\n");
-        exit(0);
+        return -1;
     }
     
     MODE illuminationMode = AMBIENT_OCCLUSION;
@@ -41,7 +42,7 @@ int main(int argc, const char** argv)
     switch (illuminationMode)
     {
         case PHOTON_NATIVE: performPhotonMappingNative(geo, numSamplesPerArea); break;
-        case PHOTON_CL:    performGlobalIlluminationCl(geo, numSamplesPerArea); break;
+        case PHOTON_CL:    return -1;break;//performGlobalIlluminationCl(geo, numSamplesPerArea); break;
         case AMBIENT_OCCLUSION: performAmbientOcclusionNative(geo );            break;
     }
     

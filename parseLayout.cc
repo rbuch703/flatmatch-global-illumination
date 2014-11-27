@@ -3,18 +3,15 @@
 #include <string.h> //for memcpy
 #include <math.h> //for sqrt()
 
-#include <iostream>
-#include <sstream>
-#include <fstream>
-#include <string>
-#include <vector>
-//#include <list>
+#include <set>
 
+#include <stdio.h>
 #include "parseLayout.h"
 #include "png_helper.h"
 #include "image.h"
 
-using namespace std;
+#include <fstream>
+#include <sstream>
 
 static const uint8_t INVALIDATED = 0x0;
 static const uint8_t WALL = 0x1;
@@ -33,23 +30,67 @@ static const float WINDOW_HIGH = 2.30;
 //static const float WINDOW_HEIGHT = WINDOW_HIGH - WINDOW_LOW;
 //static const float TOP_WALL_HEIGHT = HEIGHT - WINDOW_HIGH;
 
+typedef struct {
+    Rectangle *data;
+    cl_int numItems;
+    cl_int maxNumItems;
+} RectangleArray;
 
-void addWall( vector<Rectangle> &segments, float startX, float startY, float dx, float dy, float min_z = 0.0f, float max_z = HEIGHT)
+
+RectangleArray initRectangleArray()
 {
-    segments.push_back(createRectangle( startX,startY,min_z,   dx, dy, 0,       0, 0, max_z - min_z));
+    RectangleArray res = {.data = (Rectangle*)malloc ( sizeof(Rectangle) * 64), 
+                        .numItems = 0, 
+                        .maxNumItems = 64};
+    return res;
+};
+
+void freeRectangleArray(RectangleArray *arr)
+{
+    free(arr->data);
+    arr->data = NULL;
 }
 
-void addHorizontalRect(vector<Rectangle> &segments, float startX, float startY, float dx, float dy, float z)
+void resizeRectangleArray(RectangleArray *arr, int newSize)
 {
-    segments.push_back(createRectangle( startX,startY,z,       dx, 0, 0,        0, dy, 0));
+    arr->data = (Rectangle*)realloc(arr->data, newSize*sizeof(Rectangle));
+    arr->maxNumItems = newSize;
+    if (arr->numItems > arr->maxNumItems)   // array was just shortened
+        arr->numItems = arr->maxNumItems;
 }
 
-void registerWall( vector<Rectangle> &walls, vector<Rectangle> &windows, vector<Rectangle> &box,
+void insertIntoRectangleArray(RectangleArray *arr, Rectangle rect)
+{
+    if (arr->numItems == arr->maxNumItems)
+        resizeRectangleArray( arr, arr->maxNumItems*2);
+        
+    arr->data[arr->numItems++] = rect;
+}
+
+
+
+
+void addWall( RectangleArray *arr, float startX, float startY, float dx, float dy, float min_z, float max_z)
+{
+    insertIntoRectangleArray(arr, createRectangle( startX,startY,min_z,   dx, dy, 0,       0, 0, max_z - min_z));
+}
+
+void addFullWall( RectangleArray *arr, float startX, float startY, float dx, float dy)
+{
+    addWall(arr, startX, startY, dx, dy, 0.0f, HEIGHT);
+}
+
+void addHorizontalRect(RectangleArray *arr, float startX, float startY, float dx, float dy, float z)
+{
+    insertIntoRectangleArray(arr, createRectangle( startX,startY,z,       dx, 0, 0,        0, dy, 0));
+}
+
+void registerWall( RectangleArray *walls, RectangleArray *windows, RectangleArray *box,
                    uint32_t col0, uint32_t col1, float x0, float y0, float x1, float y1)
 {
 
-    if      (col0 == WALL && col1 == EMPTY) addWall(walls, x0, y1, x1 - x0, y0 - y1); //transition from wall to inside area
-    else if (col0 == EMPTY && col1 == WALL) addWall(walls, x1, y0, x0 - x1, y1 - y0);// transition from inside area to wall
+    if      (col0 == WALL && col1 == EMPTY) addFullWall(walls, x0, y1, x1 - x0, y0 - y1); //transition from wall to inside area
+    else if (col0 == EMPTY && col1 == WALL) addFullWall(walls, x1, y0, x0 - x1, y1 - y0);// transition from inside area to wall
 
     else if (col0 == WALL && col1 == DOOR) addWall(walls, x0, y1, x1 - x0, y0 - y1, 0, DOOR_HEIGHT); //transition from wall to door frame
     else if (col0 == DOOR && col1 == WALL) addWall(walls, x1, y0, x0 - x1, y1 - y0, 0, DOOR_HEIGHT);// 
@@ -65,8 +106,8 @@ void registerWall( vector<Rectangle> &walls, vector<Rectangle> &windows, vector<
     else if (col0 == BALCONY_WINDOW && col1 == WALL) addWall(walls, x1, y0, x0 - x1, y1 - y0, WINDOW_LOW, HEIGHT); //transition from wall to window (frame)
 
 
-    else if (col0 == OUTSIDE  && col1 == EMPTY) addWall(walls, x0, y1, x1 - x0, y0 - y1); //transition from entrace to inside area
-    else if (col0 == EMPTY && col1 == OUTSIDE ) addWall(walls, x1, y0, x0 - x1, y1 - y0);// transition from entrace to inside area
+    else if (col0 == OUTSIDE  && col1 == EMPTY) addFullWall(walls, x0, y1, x1 - x0, y0 - y1); //transition from entrace to inside area
+    else if (col0 == EMPTY && col1 == OUTSIDE ) addFullWall(walls, x1, y0, x0 - x1, y1 - y0);// transition from entrace to inside area
 
     else if (col0 == DOOR && col1 == EMPTY) addWall(walls, x0, y1, x1 - x0, y0 - y1, DOOR_HEIGHT, HEIGHT); //transition from door frame to inside area
     else if (col0 == EMPTY && col1 == DOOR) addWall(walls, x1, y0, x0 - x1, y1 - y0, DOOR_HEIGHT, HEIGHT);// transition from door frame to inside area
@@ -127,83 +168,91 @@ void registerWall( vector<Rectangle> &walls, vector<Rectangle> &windows, vector<
 }
 
 
-pair<int, int> getCentralPosition(uint32_t *pixelBuffer, int width, int height)
+Point2D getCentralPosition(uint32_t *pixelBuffer, int width, int height)
 {
-    Image tmpData(width, height, pixelBuffer);
+    
+    Image img = {.width = width, .height=height, .data = (uint32_t*)malloc(width*height*sizeof(uint32_t))};
+    memcpy(img.data, pixelBuffer, width*height*sizeof(uint32_t));
 
     for (int y = 0; y < height; y++)
-        for (int x = 0; x < width; x++)    
+        for (int x = 0; x < width; x++)
     {
-        switch (tmpData.get(x,y))
+        switch (getImagePixel(&img, x,y))
         {
             case 0xFFFFFFFF: 
             case 0xFF00FF00: 
             case 0xFFDFDFDF: 
-                tmpData.set(x,y,0);
+                setImagePixel(&img, x,y,0);
                 break;
                 
             default: 
-                tmpData.set(x,y, 1); //walls, outside
+                setImagePixel(&img, x,y, 1); //walls, outside
                 break;
         }
     }
 
-    unsigned int maxDistance = tmpData.distanceTransform();
+    unsigned int maxDistance = distanceTransform(&img);
     
     
     for (int y = 0; y < height; y++)
         for (int x = 0; x < width; x++)
-            if (tmpData.get(x,y) == maxDistance-1)
+            if (getImagePixel(&img, x,y) == maxDistance-1)
             {
-                return pair<int, int>(x, y);
+                freeImage(&img);
+                return (Point2D){x, y};
             }
     
-    assert(false);
-    return pair<int, int>(-1, -1);
+    assert(0);
+    freeImage(&img);
+    return (Point2D){-1, -1};
 }
 
-int traverseRoom(Image &img, Image &visited, int x, int y, unsigned int &maxDist, vector<pair<int, int>> &skeletalPoints)
+bool lessThan( Point2D a, Point2D b) { return a.x < b.x || (a.x == b.x && a.y < b.y);}
+
+int traverseRoom(Image *img, Image *visited, int x, int y, unsigned int *maxDist, Point2DArray *skeletalPoints)
 {
-    std::set< pair<int, int> > candidates;
-    std::set< pair<int, int> > visitedPoints;
+    std::set< Point2D, bool(*)( Point2D a, Point2D b)>  candidates(lessThan);
+    std::set< Point2D, bool(*)( Point2D a, Point2D b)>  visitedPoints(lessThan);
     
-    candidates.insert(pair<int, int>(x,y));
+    candidates.insert( (Point2D){x,y} );
 
     int numPixels = 0;
 
     while (! candidates.empty())
     {
-        pair<int,int> pos = * (candidates.begin());
-        int x = pos.first;
-        int y = pos.second;
+        Point2D pos = * (candidates.begin());
+        int x = pos.x;
+        int y = pos.y;
         visitedPoints.insert(pos);
         candidates.erase(pos);
 
-        if (x < 0 || x >= img.getWidth() ) return 0;
-        if (y < 0 || y >= img.getHeight() ) return 0;
-        assert( img.getWidth () == visited.getWidth());
-        assert( img.getHeight() == visited.getHeight());
+        if (x < 0 || x >= img->width ) return 0;
+        if (y < 0 || y >= img->height ) return 0;
+        assert( img->width  == visited->width  );
+        assert( img->height == visited->height );
 
-        if (img.get(x, y) == 0) continue; //stepped on a wall
-        if (visited.get(x,y))   continue; //already been here
-        visited.set(x, y, 2);
+        if (getImagePixel(img, x, y) == 0) continue; //stepped on a wall
+        if (getImagePixel(visited, x,y))   continue; //already been here
+        setImagePixel(visited, x, y, 2);
         numPixels += 1;
 
-        if ( img.get(x,y) >= img.get(x+1, y) && img.get(x,y) >= img.get(x-1, y) &&
-             img.get(x,y) >= img.get(x, y+1) && img.get(x,y) >= img.get(x, y-1))
+        if ( getImagePixel(img, x,y) >= getImagePixel(img, x+1, y) && 
+             getImagePixel(img, x,y) >= getImagePixel(img, x-1, y) &&
+             getImagePixel(img, x,y) >= getImagePixel(img, x, y+1) && 
+             getImagePixel(img, x,y) >= getImagePixel(img, x, y-1))
         {
-                skeletalPoints.push_back( pair<int, int>(x, y));
-                visited.set(x, y, 3);
+            insertIntoPoint2DArray(skeletalPoints, x, y);
+            setImagePixel(visited, x, y, 3);
         }
 
         
-        if ( img.get(x, y) > maxDist)
-            maxDist = img.get(x, y);
+        if ( getImagePixel(img, x, y) > *maxDist)
+            *maxDist = getImagePixel(img, x, y);
         
-        if (visitedPoints.count(pair<int,int>(x-1, y  )) == 0) candidates.insert( pair<int, int>(x-1,y  ));
-        if (visitedPoints.count(pair<int,int>(x+1, y  )) == 0) candidates.insert( pair<int, int>(x+1,y  ));
-        if (visitedPoints.count(pair<int,int>(x  , y-1)) == 0) candidates.insert( pair<int, int>(x  ,y-1));
-        if (visitedPoints.count(pair<int,int>(x  , y+1)) == 0) candidates.insert( pair<int, int>(x  ,y+1));
+        if (visitedPoints.count( Point2D{x-1, y}) == 0) candidates.insert( Point2D{x-1,y });
+        if (visitedPoints.count( Point2D{x+1, y}) == 0) candidates.insert( Point2D{x+1,y });
+        if (visitedPoints.count( Point2D{x  , y-1}) == 0) candidates.insert( Point2D{x  ,y-1});
+        if (visitedPoints.count( Point2D{x  , y+1}) == 0) candidates.insert( Point2D{x  ,y+1});
     }
     
     return numPixels;
@@ -211,54 +260,56 @@ int traverseRoom(Image &img, Image &visited, int x, int y, unsigned int &maxDist
 
 int sqr(int a) { return a*a;}
 
-void createLightSourceInRoom(Image &img, Image &visited, int roomX, int roomY, float scaling, vector<Rectangle> &lightsOut)
+void createLightSourceInRoom(Image *img, Image *visited, int roomX, int roomY, float scaling, RectangleArray *lightsOut)
 {
-    assert( img.get(roomX, roomY) > 1);
+    assert( getImagePixel(img, roomX, roomY) > 1);
     
     unsigned int maxDist = 1;
 
-    vector<pair<int, int>> skeletalPoints;
-    int numPixels = traverseRoom(img, visited, roomX, roomY, maxDist, skeletalPoints);
-    assert(skeletalPoints.size() > 0);
+    Point2DArray skeletalPoints = initPoint2DArray();
+    int numPixels = traverseRoom(img, visited, roomX, roomY, &maxDist, &skeletalPoints);
+    assert(skeletalPoints.numItems > 0);
 
-    int min_x = skeletalPoints[0].first;
-    int max_x = skeletalPoints[0].first;
-    int min_y = skeletalPoints[0].second;
-    int max_y = skeletalPoints[0].second;
+    int min_x = skeletalPoints.data[0].x;
+    int max_x = skeletalPoints.data[0].x;
+    int min_y = skeletalPoints.data[0].y;
+    int max_y = skeletalPoints.data[0].y;
     
-    for (unsigned int i = 0; i < skeletalPoints.size(); i++)
+    for (unsigned int i = 0; i < skeletalPoints.numItems; i++)
     {
-        int x = skeletalPoints[i].first;
-        int y = skeletalPoints[i].second;
+        int x = skeletalPoints.data[i].x;
+        int y = skeletalPoints.data[i].y;
         if (x < min_x) min_x = x;
         if (x > max_x) max_x = x;
         if (y < min_y) min_y = y;
         if (y > max_y) max_y = y;
         
-        if ( img.get(x,y)  >= 0.9*maxDist)
-            visited.set(x,y,4);
+        if ( getImagePixel(img, x,y)  >= 0.9*maxDist)
+            setImagePixel(visited, x,y,4);
     }
     
     int mid_x = (min_x + max_x) / 2;
     int mid_y = (min_y + max_y) / 2;
     //cout << "Mid point is (" << mid_x << ", " << mid_y << ")" << endl;
     
-    pair<int, int> bestCenter = skeletalPoints[0];
-    int bestDist = ( sqr( bestCenter.first - mid_x) + sqr( bestCenter.second - mid_y));
-    for (unsigned int i = 0; i < skeletalPoints.size(); i++)
+    Point2D bestCenter = skeletalPoints.data[0];
+    int bestDist = ( sqr( bestCenter.x - mid_x) + sqr( bestCenter.y - mid_y));
+    for (unsigned int i = 0; i < skeletalPoints.numItems; i++)
     {
-        int x = skeletalPoints[i].first;
-        int y = skeletalPoints[i].second;
+        int x = skeletalPoints.data[i].x;
+        int y = skeletalPoints.data[i].y;
         int dist = ( sqr( x - mid_x) + sqr( y - mid_y));
         if (dist < bestDist)
         {
             bestDist = dist;
-            bestCenter = skeletalPoints[i];
+            bestCenter = skeletalPoints.data[i];
         }
     }    
-    visited.set( bestCenter.first, bestCenter.second, 5);
+    setImagePixel(visited, bestCenter.x, bestCenter.y, 5);
     
-    cout << "found room with center at (" << bestCenter.first << ", " << bestCenter.second << ") with distance " << maxDist << " and area " << numPixels << endl;
+    printf("found room with center at (%d, %d) with distance %d and area %d\n",
+           bestCenter.x, bestCenter.y, maxDist, numPixels);
+           
     float edgeHalfLength = sqrt(numPixels) / 10;//7;
 
     //maxDist is the maximum distance from maxPos for which it is guaranteed that there is no wall in any direction
@@ -266,12 +317,14 @@ void createLightSourceInRoom(Image &img, Image &visited, int roomX, int roomY, f
         edgeHalfLength = maxDist-1;
     
     edgeHalfLength *=scaling;
-    float px = bestCenter.first  * scaling;
-    float py = bestCenter.second * scaling;
+    float px = bestCenter.x  * scaling;
+    float py = bestCenter.y * scaling;
     
-    lightsOut.push_back(createRectangle( px - edgeHalfLength, py - edgeHalfLength, HEIGHT-0.001,
-                                          2*edgeHalfLength, 0, 0,
-                                          0, 2*edgeHalfLength, 0));
+    freePoint2DArray(&skeletalPoints);
+
+    insertIntoRectangleArray(lightsOut, 
+        createRectangle( px - edgeHalfLength, py - edgeHalfLength, HEIGHT-0.001,
+                         2*edgeHalfLength, 0, 0, 0, 2*edgeHalfLength, 0));
 
 }
 
@@ -288,74 +341,71 @@ void createLightSourceInRoom(Image &img, Image &visited, int roomX, int roomY, f
      3e. a light source is created at the center point with a size proportional to the room size;
  */
  
- /*Note: the Image is passed by value on purpose to force the compiler to create an Image copy for this destructive operation*/
-void createLights(Image img, float scaling, vector<Rectangle> &lightsOut)
+ /*Note: this operation is destructive on 'img' */
+void createLights(Image *img, float scaling, RectangleArray* lightsOut)
 {
 
     //Step 1: Flood-fill rooms adjacent to windows with window color, to mark them as not requiring additional lighting    
-    for (int y = 0; y < img.getHeight(); y++)
-        for (int x = 0; x < img.getWidth(); x++)
+    for (int y = 0; y < img->height; y++)
+        for (int x = 0; x < img->width; x++)
     {
-        if (img.get(x, y) == 0xFF00FF00) //window
+        if (getImagePixel(img,x, y) == 0xFF00FF00) //window
         {
-            if (img.get(x-1, y  ) == 0xFFFFFFFF) img.floodFill(x-1, y,   0xFF00FF00, 0xFFFFFFFF);
-            if (img.get(x+1, y  ) == 0xFFFFFFFF) img.floodFill(x+1, y,   0xFF00FF00, 0xFFFFFFFF);
-            if (img.get(x,   y-1) == 0xFFFFFFFF) img.floodFill(x,   y-1, 0xFF00FF00, 0xFFFFFFFF);
-            if (img.get(x,   y+1) == 0xFFFFFFFF) img.floodFill(x,   y+1, 0xFF00FF00, 0xFFFFFFFF);
+            if (getImagePixel(img,x-1, y  ) == 0xFFFFFFFF) floodFillImage(img, x-1, y,   0xFF00FF00, 0xFFFFFFFF);
+            if (getImagePixel(img,x+1, y  ) == 0xFFFFFFFF) floodFillImage(img, x+1, y,   0xFF00FF00, 0xFFFFFFFF);
+            if (getImagePixel(img,x,   y-1) == 0xFFFFFFFF) floodFillImage(img, x,   y-1, 0xFF00FF00, 0xFFFFFFFF);
+            if (getImagePixel(img,x,   y+1) == 0xFFFFFFFF) floodFillImage(img, x,   y+1, 0xFF00FF00, 0xFFFFFFFF);
         }
     }
-    img.saveAs("filled.png");
+    saveImageAs(img, "filled.png");
 
     //prepare map for distance transform: only empty space inside the apartment is considered ("0")
-    for (int y = 0; y < img.getHeight(); y++)
-        for (int x = 0; x < img.getWidth(); x++)
-            img.set(x, y, (img.get(x,y) == 0xFFFFFFFF) ? 0 : 1);
+    for (int y = 0; y < img->height; y++)
+        for (int x = 0; x < img->width; x++)
+            setImagePixel(img, x, y, (getImagePixel(img, x,y) == 0xFFFFFFFF) ? 0 : 1);
 
     //Step 2, the actual distance transform
-    img.distanceTransform();
+    distanceTransform(img);
 
     // prepare map of pixels that have already been considered for placing lights (initially only those not used in the distance transform
-    Image visited(img.getWidth(), img.getHeight());
-    for (int y = 0; y < img.getHeight(); y++)
-        for (int x = 0; x < img.getWidth(); x++)
-            if (img.get(x,y) == 1) //WALL
-                visited.set(x,y,1);
+    Image visited = {img->width, img->height, (uint32_t*)malloc(img->width * img->height * sizeof(uint32_t))};
+    for (int y = 0; y < img->height; y++)
+        for (int x = 0; x < img->width; x++)
+            setImagePixel(&visited, x,y, getImagePixel(img, x ,y) == 1 ? 1 : 0); //WALL
 
     // The actual steps 3a-e are performed by createLightSourceInRoom(), which also updates the 'visited' map
-    for (int y = 0; y < img.getHeight(); y++)
-        for (int x = 0; x < img.getWidth(); x++)
+    for (int y = 0; y < img->height; y++)
+        for (int x = 0; x < img->width; x++)
         {
-            if (img.get(x, y) > 1 && !visited.get(x, y))
-                createLightSourceInRoom(img, visited, x, y, scaling, lightsOut);
+            if (getImagePixel( img, x, y) > 1 && ! getImagePixel(&visited, x, y))
+                createLightSourceInRoom(img, &visited, x, y, scaling, lightsOut);
         }
 
+    freeImage(&visited);
 }
 
-void rectangleVectorToArray( vector<Rectangle> rects, Rectangle* &rectsOut, cl_int &numRectsOut)
+//these Rectangle arrays are to be passed to OpenCL --> have to be aligned to 16 byte boundary
+Rectangle* convertToAlignedArray( Rectangle* rectsIn, int numRects)
 {
-    numRectsOut = rects.size();
-
-    //these Rectangle arrays are to be passed to OpenCL --> have to be aligned to 16 byte boundary
-    if (0 != posix_memalign((void**)&rectsOut, 16, numRectsOut * sizeof(Rectangle))) 
+    
+    Rectangle* res;
+    if (0 != posix_memalign((void**)&res, 16, numRects * sizeof(Rectangle))) 
     {
-        cout << "[Err] aligned memory allocation failed, exiting ..." << endl;
+        printf("[Err] aligned memory allocation failed, exiting ...\n");
         exit(0);
     }
-    
-    for (int i = 0; i < numRectsOut; i++)
-        rectsOut[i] = rects[i];
+
+    memcpy(res, rectsIn, numRects * sizeof(Rectangle));
+    free(rectsIn);
+    return res;
 }
 
 static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorType, const float scaling)
 {
-    Geometry geo;
-    geo.width = width;
-    geo.height= height;
-
-    vector<Rectangle> wallsOut;
-    vector<Rectangle> windowsOut;
-    vector<Rectangle> lightsOut;
-    vector<Rectangle> boxOut;
+    RectangleArray wallsOut    = initRectangleArray();
+    RectangleArray windowsOut  = initRectangleArray();
+    RectangleArray lightsOut   = initRectangleArray();
+    RectangleArray boxOut      = initRectangleArray();
 
     
     uint32_t *pixelBuffer = (uint32_t*)src;
@@ -391,11 +441,13 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
         }
     }
 
-    pair<int, int> centralPos = getCentralPosition(pixelBuffer, width, height);
-    geo.startingPositionX = centralPos.first * scaling;
-    geo.startingPositionY = centralPos.second * scaling;
+    Point2D centralPos = getCentralPosition(pixelBuffer, width, height);
     
-    createLights( Image(width, height, pixelBuffer), scaling, lightsOut);
+    Image imgTmp = {width, height, (uint32_t*)malloc(width*height*sizeof(uint32_t))};
+    memcpy(imgTmp.data, pixelBuffer, width*height*sizeof(uint32_t));
+    
+    createLights( &imgTmp, scaling, &lightsOut);
+    freeImage(&imgTmp);
     
     if (pixelBuffer != (void*)src) //if they are equal, no memory was allocated for pixelBuffer, and none should be freed
         free (pixelBuffer);
@@ -421,7 +473,7 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
                 
             float endX = x;
             
-            registerWall(wallsOut, windowsOut, boxOut, pxAbove, pxHere, startX*scaling, y*scaling, endX*scaling, y*scaling);
+            registerWall(&wallsOut, &windowsOut, &boxOut, pxAbove, pxHere, startX*scaling, y*scaling, endX*scaling, y*scaling);
         }
     }
     //cout << "  == End of horizontal scan, beginning vertical scan ==" << endl;
@@ -446,7 +498,7 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
                 
             float endY = y;
             
-            registerWall(wallsOut, windowsOut, boxOut, pxLeft, pxHere, x*scaling, startY*scaling, x*scaling, endY*scaling);
+            registerWall(&wallsOut, &windowsOut, &boxOut, pxLeft, pxHere, x*scaling, startY*scaling, x*scaling, endY*scaling);
         }
     }
 
@@ -485,73 +537,74 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
         switch (color)
         {
             case WINDOW: //window --> create upper and lower window frame
-                addHorizontalRect(wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), WINDOW_LOW); 
-                addHorizontalRect(wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), WINDOW_HIGH); 
+                addHorizontalRect(&wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), WINDOW_LOW); 
+                addHorizontalRect(&wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), WINDOW_HIGH); 
                 break;
 
             case BALCONY_WINDOW: //window --> create upper and lower window frame
-                addHorizontalRect(wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), WINDOW_LOW); 
-                addHorizontalRect(wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), HEIGHT); 
+                addHorizontalRect(&wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), WINDOW_LOW); 
+                addHorizontalRect(&wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), HEIGHT); 
                 break;
 
 
             case EMPTY: //empty floor --> create floor and ceiling
-                addHorizontalRect(wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), 0); 
-                addHorizontalRect(wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), HEIGHT); 
+                addHorizontalRect(&wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), 0); 
+                addHorizontalRect(&wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), HEIGHT); 
                 break;
                 
             case DOOR: // --> create floor and upper door frame
-                addHorizontalRect(wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), 0); 
-                addHorizontalRect(wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), DOOR_HEIGHT); 
+                addHorizontalRect(&wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), 0); 
+                addHorizontalRect(&wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), DOOR_HEIGHT); 
                 break;
                 
             case BALCONY_DOOR: // --> create floor and upper door frame
-                addHorizontalRect(wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), 0); 
-                addHorizontalRect(wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), WINDOW_HIGH);
+                addHorizontalRect(&wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), 0); 
+                addHorizontalRect(&wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), WINDOW_HIGH);
                 break;
         }
         
         if (color != OUTSIDE)
         {
-            addHorizontalRect(boxOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), HEIGHT + 0.2); 
-            addHorizontalRect(boxOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), - 0.2); 
+            addHorizontalRect(&boxOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), HEIGHT + 0.2); 
+            addHorizontalRect(&boxOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), - 0.2); 
         }
     }
-    
 
     delete [] pixels;
-    //exit(0);
-/*    vector<Rectangle> wallsOut;
-    vector<Rectangle> windowsOut;
-    vector<Rectangle> lightsOut;
-    vector<Rectangle> boxOut;
-*/
 
-    rectangleVectorToArray(  wallsOut, geo.walls, geo.numWalls);
-    rectangleVectorToArray(  boxOut, geo.boxWalls, geo.numBoxWalls);
-    rectangleVectorToArray(  windowsOut, geo.windows, geo.numWindows);
-    rectangleVectorToArray(  lightsOut, geo.lights, geo.numLights);
-    
-    int numTexels = 0;
+    Geometry geo = { 
+        .windows  = convertToAlignedArray(windowsOut.data, windowsOut.numItems),
+        .lights   = convertToAlignedArray(lightsOut.data,  lightsOut.numItems),
+        .walls    = convertToAlignedArray(wallsOut.data,   wallsOut.numItems),
+        .boxWalls = convertToAlignedArray(boxOut.data,     boxOut.numItems),
+        .numWindows=  windowsOut.numItems,
+        .numLights =  lightsOut.numItems,
+        .numWalls =   wallsOut.numItems,
+        .numBoxWalls= boxOut.numItems,
+        .width = width, 
+        .height= height, 
+        .startingPositionX = centralPos.x * scaling,
+        .startingPositionY = centralPos.y * scaling,
+        .numTexels = 0,
+        .texels = NULL };
+
     for ( int i = 0; i < geo.numWalls; i++)
     {
-        geo.walls[i].lightmapSetup.s[0] = numTexels;
+        geo.walls[i].lightmapSetup.s[0] = geo.numTexels;
         //objects[i].lightNumTiles = getNumTiles(&objects[i]);
-        numTexels += getNumTiles(&geo.walls[i]);
+        geo.numTexels += getNumTiles(&geo.walls[i]);
     }
-    
-    geo.numTexels = numTexels;
-    
-    cout << "[DBG] allocating " << (geo.numTexels * sizeof(Vector3)/1000000) << "MB for texels" << endl;
+        
+    printf( "[DBG] allocating %fMB for texels\n", geo.numTexels * sizeof(Vector3)/1000000.0);
     if (geo.numTexels * sizeof(Vector3) > 1000*1000*1000)
     {
-        cout << "[Err] Refusing to allocate more than 1GB for texels, this would crash most GPUs. Exiting ..." << endl;
+        printf("[Err] Refusing to allocate more than 1GB for texels, this would crash most GPUs. Exiting ...\n");
         exit(0);
     }
 
     if (0 != posix_memalign( (void**) &geo.texels, 16, geo.numTexels * sizeof(Vector3)))
     {
-        cout << "[Err] aligned memory allocation failed, exiting ..." << endl;
+        printf("[Err] aligned memory allocation failed, exiting ...\n");
         exit(0);
     }
     
@@ -610,20 +663,20 @@ Geometry* parseLayoutStaticMem(const uint8_t* data, int dataSize, float scale)
 
 
 
-ostream& operator<<(ostream &os, const Vector3 &vec)
+std::ostream& operator<<(std::ostream &os, const Vector3 &vec)
 {
     os <<  "[" << vec.s[0] << ", " << vec.s[1] << ", " << vec.s[2] << "]";
     return os;
 }
 
-void writeJsonOutputStream(Geometry geo, ostream &jsonGeometry)
+void writeJsonOutputStream(Geometry geo, std::ostream &jsonGeometry)
 {
 
-    jsonGeometry << "{" << endl;
-    jsonGeometry << "\"startingPosition\" : [" << geo.startingPositionX << ", " << geo.startingPositionY << "]," <<  endl;
-    jsonGeometry << "\"layoutImageSize\" : [" << geo.width << ", " << geo.height << "]," <<  endl;
+    jsonGeometry << "{" << std::endl;
+    jsonGeometry << "\"startingPosition\" : [" << geo.startingPositionX << ", " << geo.startingPositionY << "]," <<  std::endl;
+    jsonGeometry << "\"layoutImageSize\" : [" << geo.width << ", " << geo.height << "]," <<  std::endl;
 
-    jsonGeometry << "\"geometry\" : [" << endl;
+    jsonGeometry << "\"geometry\" : [" << std::endl;
     for ( int i = 0; i < geo.numWalls; i++)
     {
         //{ pos: [1,2,3], width: [4,5,6], height: [7,8,9], texture_id: 10, isWindow: false};
@@ -633,12 +686,12 @@ void writeJsonOutputStream(Geometry geo, ostream &jsonGeometry)
                         ", \"textureId\": " << i << "}";
         if (i+1 < geo.numWalls)
             jsonGeometry << ", ";
-        jsonGeometry << endl;
+        jsonGeometry << std::endl;
         
     }
 
-    jsonGeometry << "]," << endl;
-    jsonGeometry << "\"box\": [" << endl;
+    jsonGeometry << "]," << std::endl;
+    jsonGeometry << "\"box\": [" << std::endl;
 
     for (int i = 0; i < geo.numBoxWalls; i++)
     {
@@ -647,17 +700,17 @@ void writeJsonOutputStream(Geometry geo, ostream &jsonGeometry)
                         ", \"height\": "<< geo.boxWalls[i].height << "}";
         if (i + 1 < geo.numBoxWalls)
             jsonGeometry << ", ";
-        jsonGeometry << endl;
+        jsonGeometry << std::endl;
     }
 
 
-    jsonGeometry << "]" << endl;
-    jsonGeometry << "}" << endl;
+    jsonGeometry << "]" << std::endl;
+    jsonGeometry << "}" << std::endl;
 }
 
 void writeJsonOutput(Geometry geo, const char*filename)
 {
-    ofstream jsonGeometry(filename);
+    std::ofstream jsonGeometry(filename);
     writeJsonOutputStream(geo, jsonGeometry);
     jsonGeometry.close();
 }
@@ -665,7 +718,7 @@ void writeJsonOutput(Geometry geo, const char*filename)
 char* getJsonFromLayout(const char* const filename, float scaling)
 {
     Geometry geo = parseLayout(filename, scaling);
-    stringstream ss;
+    std::stringstream ss;
     writeJsonOutputStream(geo, ss);
 
     free (geo.walls);
@@ -685,7 +738,7 @@ char* getJsonFromLayoutMem(const uint8_t *data, int dataSize,float scaling)
     read_png_from_memory(data, dataSize, &width, &height, &colorType, &pixelBuffer );
     Geometry geo = parseLayoutCore(pixelBuffer, width, height, colorType, scaling);
     free(pixelBuffer);
-    stringstream ss;
+    std::stringstream ss;
     writeJsonOutputStream(geo, ss);
     
     free (geo.walls);

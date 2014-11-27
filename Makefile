@@ -1,6 +1,6 @@
 
-SRC_C = main.c png_helper.c rectangle.c vector3_cl.c photonmap.c geoSphere.c
-SRC_CC = parseLayout.cc global_illumination_cl.cc 
+SRC_C = main.c png_helper.c rectangle.c vector3_cl.c photonmap.c geoSphere.c 
+SRC_CC = parseLayout.cc # global_illumination_cl.cc 
 SRC = $(SRC_C) $(SRC_CC)
 
 OBJ_C  = $(patsubst %.c,build/c_%.o,$(SRC_C))
@@ -17,10 +17,10 @@ CPP= g++#clang++
 
 EMCC=emcc
 EMPP=em++
-EMCC_FLAGS=-I./include -std=c99
-EMPP_FLAGS=-I./include -std=c++11
+EMCC_FLAGS=-I./include -std=c99 -O3
+EMPP_FLAGS=-I./include -std=c++11 -O3
 
-OPT_FLAGS = -O2
+OPT_FLAGS = #-O2
 OSX_INCLUDES = #-I /usr/local/include -framework OpenCL
 OSX_LIBS = #-L /usr/local/lib -framework OpenCL
 FLAGS = -g -Wall -Wextra -msse3 $(OPT_FLAGS)
@@ -30,7 +30,7 @@ PROFILE =
 
 CFLAGS = $(FLAGS) $(PROFILE) -std=c99 -flto #$(OSX_INCLUDES)
 CCFLAGS = $(FLAGS) $(PROFILE) -std=c++11 -flto #$(OSX_INCLUDES)
-LD_FLAGS = $(PROFILE) $(OSX_LIBS) -lOpenCL -lm  $(OPT_FLAGS) -flto
+LD_FLAGS = $(PROFILE) $(OSX_LIBS) -lOpenCL -lm  $(OPT_FLAGS) #-flto
 .PHONY: all clean
 
 all: make.dep globalIllumination tiles
@@ -63,7 +63,7 @@ build/c_%.o: %.c
 
 build/c_%.bc: %.c
 	@echo [EMCC] $<
-	@$(EMCC) $(EMCC_FLAGS) -O3 $< -o $@
+	@$(EMCC) $(EMCC_FLAGS) $< -o $@
 
 build/cc_%.o: %.cc 
 	@echo [CP] $<
@@ -71,7 +71,7 @@ build/cc_%.o: %.cc
 
 build/cc_%.bc: %.cc 
 	@echo [EM++] $<
-	@$(EMPP) $(EMPP_FLAGS) -O3 $< -o $@
+	@$(EMPP) $(EMPP_FLAGS) $< -o $@
 
 
 tiles:
