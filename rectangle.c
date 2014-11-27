@@ -471,7 +471,7 @@ Geometry* createGeometryObject()
 
 int geometryGetNumWalls(Geometry *geo) { return geo->numWalls;}
 
-Rectangle* geometryGetRectanglePtr(Geometry *geo, int rectangleId)
+Rectangle* geometryGetWallPtr(Geometry *geo, int rectangleId)
 {
     return &geo->walls[rectangleId];
 }

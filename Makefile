@@ -42,15 +42,16 @@ globalIllumination: $(OBJ) build
 
 index.js: $(BC)
 	@echo [LD] $@
-	@$(EMCC) -Os $(BC) lib/*.bc \
+	@$(EMCC) -O3 $(BC) lib/*.bc\
     --embed-file 137.png \
-    -s EXPORTED_FUNCTIONS='["_main","_getJsonFromLayout", "_getJsonFromLayoutMem", "_performGlobalIlluminationNative","_parseLayoutMem", "_createGeometryObject"]'\
+    -s EXPORTED_FUNCTIONS='["_parseLayoutStaticMem", "_geometryGetNumWalls", "_geometryGetWallPtr", "_buildBspTree", "_performAmbientOcclusionNativeOnWall", "_saveAsBase64Png", "_geometryGetTexelPtr"]'\
     -s TOTAL_MEMORY=33554432\
-    -s ASSERTIONS=1 \
     -s NO_EXIT_RUNTIME=1 \
     -o $@
 
 #    -s ALLOW_MEMORY_GROWTH=1 \
+#    -s ALIASING_FUNCTION_POINTERS=0 \
+#    -s ASSERTIONS=1 \
 	
 build: 
 	@echo [MKDIR] $@
@@ -62,7 +63,7 @@ build/c_%.o: %.c
 
 build/c_%.bc: %.c
 	@echo [EMCC] $<
-	@$(EMCC) $(EMCC_FLAGS) -O2 $< -o $@
+	@$(EMCC) $(EMCC_FLAGS) -O3 $< -o $@
 
 build/cc_%.o: %.cc 
 	@echo [CP] $<
@@ -70,7 +71,7 @@ build/cc_%.o: %.cc
 
 build/cc_%.bc: %.cc 
 	@echo [EM++] $<
-	@$(EMPP) $(EMPP_FLAGS) -O2 $< -o $@
+	@$(EMPP) $(EMPP_FLAGS) -O3 $< -o $@
 
 
 tiles:

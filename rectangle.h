@@ -43,7 +43,7 @@ void freeGeometry(Geometry geo);
 Geometry* createGeometryObject();
 
 int geometryGetNumWalls(Geometry *geo);
-Rectangle* geometryGetRectanglePtr(Geometry *geo, int rectangleId);
+Rectangle* geometryGetWallPtr(Geometry *geo, int rectangleId);
 Vector3*   geometryGetTexelPtr(Geometry *geo);
 // end of emscripten interface
 
