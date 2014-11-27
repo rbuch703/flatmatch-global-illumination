@@ -494,26 +494,29 @@ void freeBspTree(BspTreeNode *root)
     free(root->items);        
 }
 
-BspTreeNode buildBspTree( Rectangle* items, int numItems)
+BspTreeNode* buildBspTree( Rectangle* items, int numItems)
 {
-    BspTreeNode root = { .numItems = numItems, .left = NULL, .right=NULL };
-    root.items =  (Rectangle*)malloc(sizeof(Rectangle) * numItems);
-    memcpy( root.items, items, sizeof(Rectangle) * numItems);
+    BspTreeNode *root = (BspTreeNode*)malloc(sizeof(BspTreeNode));
+    root->numItems = numItems;
+    root->left = NULL;
+    root->right= NULL;
+    root->items =  (Rectangle*)malloc(sizeof(Rectangle) * numItems);
+    memcpy( root->items, items, sizeof(Rectangle) * numItems);
     
-    printf("root size: %d\n", root.numItems);
+    printf("root size: %d\n", root->numItems);
     
-    subdivideNode(&root, 0);
+    subdivideNode(root, 0);
 
-    int l = root.left ? root.left->numItems : 0;
-    int r = root.right ? root.right->numItems : 0;
+    int l = root->left ? root->left->numItems : 0;
+    int r = root->right ? root->right->numItems : 0;
     printf("node sizes (max/L/C/R): %d/%d/%d/%d\n", 
-        ( l > r ? l : r)+root.numItems,l, root.numItems, r);
+        ( l > r ? l : r)+root->numItems,l, root->numItems, r);
     return root;
 }
 
 void performPhotonMappingNative(Geometry geo, int numSamplesPerArea)
 {
-    BspTreeNode root = buildBspTree(geo.walls, geo.numWalls);
+    BspTreeNode *root = buildBspTree(geo.walls, geo.numWalls);
 
     for ( int i = 0; i < geo.numWindows; i++)
     {
@@ -523,7 +526,7 @@ void performPhotonMappingNative(Geometry geo, int numSamplesPerArea)
         float area = length(xDir) * length(yDir);
         uint64_t numSamples = (numSamplesPerArea * area);
         
-        photonmap(&geo.windows[i], &root, geo.texels, 1/*true*/, numSamples);
+        photonmap(&geo.windows[i], root, geo.texels, 1/*true*/, numSamples);
     }
 
     for ( int i = 0; i < geo.numLights; i++)
@@ -533,12 +536,13 @@ void performPhotonMappingNative(Geometry geo, int numSamplesPerArea)
         
         float area = length(xDir) * length(yDir);
         uint64_t numSamples = (numSamplesPerArea * area);
-        photonmap(&geo.lights[i], &root, geo.texels, 0/*false*/, numSamples);
+        photonmap(&geo.lights[i], root, geo.texels, 0/*false*/, numSamples);
     }
-    freeBspTree(&root);
+    freeBspTree(root);
+    free(root);
 }
 
-void performAmbientOcclusionNativeOnWall(Geometry *geo, Rectangle* wall)
+void performAmbientOcclusionNativeOnWall(Geometry* geo, const BspTreeNode *root, Rectangle* wall)
 {
     Vector3 b1, b2;
     createBase( wall->n, &b1, &b2);
@@ -559,15 +563,12 @@ void performAmbientOcclusionNativeOnWall(Geometry *geo, Rectangle* wall)
             assert(fabsf(length(dir) - 1.0f) < 1E-6);
             
             Vector3 pos = getTileCenter(wall, j);
+            pos = add(pos, mul(dir, 1E-5));
+
             float dist = INFINITY;
-            for (int i = 0; i < geo->numWalls; i++)
-            {
-                float distNew = intersects( &geo->walls[i], pos, dir, dist);
-                if (distNew > 0 && distNew < dist)
-                    dist = distNew;
-            }
-            
-            if (dist != INFINITY)    //hit a window/light source
+            Rectangle* target = NULL;
+            int hasHit = findClosestIntersection(pos, dir, root, &dist, 0, &target, 0);
+            if (!hasHit)    //hit a window/light source
             {
                 lightSum += fac;
                 dist = 10;
@@ -587,55 +588,13 @@ void performAmbientOcclusionNativeOnWall(Geometry *geo, Rectangle* wall)
 
 void performAmbientOcclusionNative(Geometry geo)
 {
-    BspTreeNode root = buildBspTree(geo.walls, geo.numWalls);
+    BspTreeNode* root = buildBspTree(geo.walls, geo.numWalls);
 
     for (int i = 0; i < geo.numWalls; i++)
     {
         printf("processing wall %d/%d\n", i+1, geo.numWalls);
-
-        Rectangle *wall = &geo.walls[i];
-        //printf("Position: %f, %f, %f\n", wall->pos.s[0],  wall->pos.s[1],   wall->pos.s[2]);
-        //printf("Width: %f, %f, %f\n", wall->width.s[0],   wall->width.s[1], wall->width.s[2]);
-        //printf("Height: %f, %f, %f\n", wall->height.s[0], wall->height.s[1],wall->height.s[2]);
-        //printf("numTiles: %d/%d\n", wall->lightmapSetup.s[1], wall->lightmapSetup.s[2]);
-
-        Vector3 b1, b2;
-        createBase( wall->n, &b1, &b2);
-
-        for (int j = 0; j < getNumTiles(wall); j++)
-        {        
-            geo.texels[wall->lightmapSetup.s[0] + j] = vec3(0,0,0);
-            //printf("normal: %f, %f, %f\n", wall->n.s[0], wall->n.s[1], wall->n.s[2]);
-
-            float distSum = 0;
-            
-            float lightSum= 0;
-            float facSum  = 0;
-            for (int k = 0; k < geoSphere4NumVectors; k++)
-            {
-                float fac = geoSphere4[k].s[2]; //== dot product between the vector and (0,0,1), == cosine between surface normal and light direction
-                Vector3 dir = transformToOrthoNormalBase( geoSphere4[k], b1, b2, wall->n);
-                assert(fabsf(length(dir) - 1.0f) < 1E-6);
-                
-                Vector3 pos = getTileCenter(wall, j);
-                float dist = INFINITY;
-                Rectangle* target = NULL;
-                int hasHit = findClosestIntersection(pos, dir, &root, &dist, 0, &target, 0);
-                if (!hasHit)    //hit a window/light source
-                {
-                    lightSum += fac;
-                    dist = 10;
-                }
-
-                distSum += /*dist / ( dist + 1 )*/dist * fac;
-                facSum += fac;
-                   
-            }
-
-            distSum /= (facSum*1.5);
-            geo.texels[wall->lightmapSetup.s[0] + j] = 
-                vec3( distSum, distSum, distSum);
-        }
+        performAmbientOcclusionNativeOnWall(&geo, root, &geo.walls[i]);
     }
-    freeBspTree(&root);
+    freeBspTree(root);
+    free(root);
 }

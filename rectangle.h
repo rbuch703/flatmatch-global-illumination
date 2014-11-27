@@ -44,6 +44,7 @@ Geometry* createGeometryObject();
 
 int geometryGetNumWalls(Geometry *geo);
 Rectangle* geometryGetRectanglePtr(Geometry *geo, int rectangleId);
+Vector3*   geometryGetTexelPtr(Geometry *geo);
 // end of emscripten interface
 
 Rectangle createRectangleV( const Vector3 _pos, const Vector3 _width, const Vector3 _height);
@@ -68,7 +69,8 @@ Vector3 getWidthVector(const Rectangle *rect);
 Vector3 getHeightVector(const Rectangle *rect);
 Vector3 getTileCenter(const Rectangle *rect, int tileId);
 void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights, int tintExtra);
-int saveAsMemoryPng(const Rectangle *rect, const char *filename, const Vector3 *lights, int tintExtra, uint8_t**data);
+int saveAsMemoryPng(const Rectangle *rect, const Vector3 *lights, int tintExtra, uint8_t**data);
+char* saveAsBase64Png(const Rectangle *rect, const Vector3 *lights, int tintExtra);
 
 void saveAsRaw(const Rectangle *rect, const char *filename, const Vector3 *lights);
 
