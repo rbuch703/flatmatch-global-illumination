@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include "rectangle.h"
+#include "geometry.h"
 
 struct BspTreeNode;
 //typedef struct BspTreeNode BspTreeNode;

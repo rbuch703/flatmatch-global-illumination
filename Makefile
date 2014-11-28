@@ -1,6 +1,6 @@
 
-SRC_C = main.c png_helper.c rectangle.c vector3_cl.c photonmap.c geoSphere.c 
-SRC_CC = parseLayout.cc # global_illumination_cl.cc 
+SRC_C = main.c png_helper.c rectangle.c geometry.c image.c vector3_cl.c photonmap.c geoSphere.c parseLayout.c
+SRC_CC =  # global_illumination_cl.cc 
 SRC = $(SRC_C) $(SRC_CC)
 
 OBJ_C  = $(patsubst %.c,build/c_%.o,$(SRC_C))
@@ -8,7 +8,7 @@ OBJ_CC = $(patsubst %.cc,build/cc_%.o,$(SRC_CC))
 OBJ    = $(OBJ_C) $(OBJ_CC)
 
 BC_C  = $(patsubst %.c,build/c_%.bc,$(SRC_C))
-BC_CC = $(patsubst %.cc,build/cc_%.bc,$(SRC_CC))
+#BC_CC = $(patsubst %.cc,build/cc_%.bc,$(SRC_CC))
 BC    = $(BC_C) $(BC_CC)
 
 
@@ -69,9 +69,9 @@ build/cc_%.o: %.cc
 	@echo [CP] $<
 	@$(CPP) $(CCFLAGS) $< -c -o $@
 
-build/cc_%.bc: %.cc 
-	@echo [EM++] $<
-	@$(EMPP) $(EMPP_FLAGS) $< -o $@
+#build/cc_%.bc: %.cc 
+#	@echo [EM++] $<
+#	@$(EMPP) $(EMPP_FLAGS) $< -o $@
 
 
 tiles:

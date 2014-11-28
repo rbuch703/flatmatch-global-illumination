@@ -8,13 +8,7 @@
 
 #include <math.h>
 #include <stdio.h>
-#include <stdlib.h>
-
-int max(int a, int b)
-{
-    return a > b ? a : b;
-}
-
+//#include <stdlib.h>
 
 Rectangle createRectangleV( const Vector3 _pos, const Vector3 _width, const Vector3 _height)
 {
@@ -463,32 +457,3 @@ int getPosition(const Rectangle *plane, const Rectangle *rect)
     
     return 0;    
 }
-
-Geometry* createGeometryObject() 
-{
-    return (Geometry*)malloc(sizeof(Geometry));
-}
-
-int geometryGetNumWalls(Geometry *geo) { return geo->numWalls;}
-
-Rectangle* geometryGetWallPtr(Geometry *geo, int rectangleId)
-{
-    return &geo->walls[rectangleId];
-}
-
-Vector3*   geometryGetTexelPtr(Geometry *geo)
-{
-    return geo->texels;
-}
-
-
-
-void freeGeometry(Geometry geo)
-{
-    free(geo.walls);
-    free(geo.boxWalls);
-    free(geo.lights);
-    free(geo.windows);
-    free(geo.texels);
-}
-

@@ -1,5 +1,6 @@
 
 #include "rectangle.h"
+#include "geometry.h"
 #include "parseLayout.h"
 
 #include <stdint.h>
@@ -72,7 +73,12 @@ int main(int argc, const char** argv)
         free(filename);
         //saveAsRaw( &geo.walls[i], (filename + ".raw").c_str(), geo.texels);
     }
-    writeJsonOutput(geo, "geometry.json");
+    
+    char* s = getJsonString(&geo);    
+    FILE* f = fopen("geometry.json", "wb");
+    fwrite(s, strlen(s), 1, f); //don't write zero-termination
+    fclose(f);
+    free(s);
 
     freeGeometry(geo);
 

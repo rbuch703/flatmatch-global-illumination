@@ -6,22 +6,21 @@
 //#include <set>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include "parseLayout.h"
 #include "png_helper.h"
 #include "image.h"
 
-#include <fstream>
-#include <sstream>
-
-static const uint8_t INVALIDATED = 0x0;
-static const uint8_t WALL = 0x1;
-static const uint8_t EMPTY = 0x2;
-static const uint8_t OUTSIDE =  0x3;
-static const uint8_t DOOR = 0x4;
-static const uint8_t WINDOW = 0x5;
-static const uint8_t BALCONY_WINDOW = 0x6;  //has no upper edge (ends at the ceiling)
-static const uint8_t BALCONY_DOOR = 0x7;    //upper edge is WINDOW_HIGH to match the window next to it
-
+enum ITEMS { 
+    INVALIDATED = 0x0, 
+    WALL = 0x1, 
+    EMPTY = 0x2, 
+    OUTSIDE =  0x3, 
+    DOOR = 0x4, 
+    WINDOW = 0x5,
+    BALCONY_WINDOW = 0x6,  //has no upper edge (ends at the ceiling)
+    BALCONY_DOOR = 0x7    //upper edge is WINDOW_HIGH to match the window next to it
+};
 
 static const float HEIGHT      = 2.60;
 static const float DOOR_HEIGHT = 2.00;
@@ -206,8 +205,6 @@ Point2D getCentralPosition(uint32_t *pixelBuffer, int width, int height)
     freeImage(&img);
     return (Point2D){-1, -1};
 }
-
-bool lessThan( Point2D a, Point2D b) { return a.x < b.x || (a.x == b.x && a.y < b.y);}
 
 int traverseRoom(Image *img, Image *visited, int x, int y, unsigned int *maxDist, Point2DArray *skeletalPoints)
 {
@@ -422,7 +419,7 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
 
     assert (colorType == PNG_COLOR_TYPE_RGBA);
 
-    uint8_t *pixels = new uint8_t[width * height];
+    uint8_t *pixels = malloc(width * height * sizeof(uint8_t));
     for (int i = 0; i < width * height; i++)
     {
         switch (pixelBuffer[i])
@@ -515,7 +512,7 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
         int yEnd;
         for (yEnd = y + 1; yEnd < height; yEnd++)
         {
-            bool rowWithIdenticalColor = true;
+            int rowWithIdenticalColor = 1;
             for (int xi = xStart; xi <= xEnd && rowWithIdenticalColor; xi++)
                 rowWithIdenticalColor &= (pixels[yEnd * width + xi] == color);
             
@@ -567,7 +564,7 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
         }
     }
 
-    delete [] pixels;
+    free( pixels);
 
     Geometry geo = { 
         .windows  = convertToAlignedArray(windowsOut.data, windowsOut.numItems),
@@ -657,92 +654,3 @@ Geometry* parseLayoutStaticMem(const uint8_t* data, int dataSize, float scale)
     
     return &geo;
 }
-
-
-
-std::ostream& operator<<(std::ostream &os, const Vector3 &vec)
-{
-    os <<  "[" << vec.s[0] << ", " << vec.s[1] << ", " << vec.s[2] << "]";
-    return os;
-}
-
-void writeJsonOutputStream(Geometry geo, std::ostream &jsonGeometry)
-{
-
-    jsonGeometry << "{" << std::endl;
-    jsonGeometry << "\"startingPosition\" : [" << geo.startingPositionX << ", " << geo.startingPositionY << "]," <<  std::endl;
-    jsonGeometry << "\"layoutImageSize\" : [" << geo.width << ", " << geo.height << "]," <<  std::endl;
-
-    jsonGeometry << "\"geometry\" : [" << std::endl;
-    for ( int i = 0; i < geo.numWalls; i++)
-    {
-        //{ pos: [1,2,3], width: [4,5,6], height: [7,8,9], texture_id: 10, isWindow: false};
-        jsonGeometry << "  { \"pos\": " << geo.walls[i].pos <<
-                        ", \"width\": " << geo.walls[i].width << 
-                        ", \"height\": "<< geo.walls[i].height <<
-                        ", \"textureId\": " << i << "}";
-        if (i+1 < geo.numWalls)
-            jsonGeometry << ", ";
-        jsonGeometry << std::endl;
-        
-    }
-
-    jsonGeometry << "]," << std::endl;
-    jsonGeometry << "\"box\": [" << std::endl;
-
-    for (int i = 0; i < geo.numBoxWalls; i++)
-    {
-        jsonGeometry << "  { \"pos\": " << geo.boxWalls[i].pos <<
-                        ", \"width\": " << geo.boxWalls[i].width << 
-                        ", \"height\": "<< geo.boxWalls[i].height << "}";
-        if (i + 1 < geo.numBoxWalls)
-            jsonGeometry << ", ";
-        jsonGeometry << std::endl;
-    }
-
-
-    jsonGeometry << "]" << std::endl;
-    jsonGeometry << "}" << std::endl;
-}
-
-void writeJsonOutput(Geometry geo, const char*filename)
-{
-    std::ofstream jsonGeometry(filename);
-    writeJsonOutputStream(geo, jsonGeometry);
-    jsonGeometry.close();
-}
-
-char* getJsonFromLayout(const char* const filename, float scaling)
-{
-    Geometry geo = parseLayout(filename, scaling);
-    std::stringstream ss;
-    writeJsonOutputStream(geo, ss);
-
-    free (geo.walls);
-    free (geo.boxWalls);
-    free (geo.windows);
-    free (geo.lights);
-
-    return strdup( ss.str().c_str());
-}
-
-
-char* getJsonFromLayoutMem(const uint8_t *data, int dataSize,float scaling)
-{
-    int width, height, colorType;
-    uint8_t *pixelBuffer;
-    
-    read_png_from_memory(data, dataSize, &width, &height, &colorType, &pixelBuffer );
-    Geometry geo = parseLayoutCore(pixelBuffer, width, height, colorType, scaling);
-    free(pixelBuffer);
-    std::stringstream ss;
-    writeJsonOutputStream(geo, ss);
-    
-    free (geo.walls);
-    free (geo.boxWalls);
-    free (geo.windows);
-    free (geo.lights);
-    
-    return strdup( ss.str().c_str());
-}
-

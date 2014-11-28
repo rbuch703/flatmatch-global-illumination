@@ -2,18 +2,13 @@
 #ifndef PARSELAYOUT_H
 #define PARSELAYOUT_H
 
-#include "rectangle.h"
-//#include <ostream>
-
-//using namespace std;
-
-//void writeJsonOutputStream(Geometry geo, ostream &jsonGeometry);
+#include "geometry.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void writeJsonOutput(Geometry geo, const char*filename);
+
 
 Geometry parseLayout(const char* const filename, const float scaling);
 Geometry parseLayoutMem(const uint8_t *data, int dataSize, const float scaling);
