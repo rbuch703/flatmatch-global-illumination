@@ -2,6 +2,7 @@
 
 importScripts('index.js'); 
 console.log("worker ready");
+postMessage({"reason": "ready"});
 
 onmessage = function (oEvent) {
 
@@ -17,23 +18,28 @@ onmessage = function (oEvent) {
 
 function buildLightmap(contents)
 {
-        console.log("contents: %o", contents);
+        //console.log("contents: %o", contents);
         //var buf = Module._malloc(myTypedArray.length*myTypedArray.BYTES_PER_ELEMENT);
         var fileData = _malloc( contents.byteLength);
         Module.HEAPU8.set(contents, fileData);
-        console.log("raw file data loaded");
+        //console.log("raw file data loaded");
         var geo = _parseLayoutStaticMem(fileData, contents.byteLength, 1/30.0);
         _free(fileData);
         
-        console.log("geometry object created at %s", geo);
+        var geoPtr = _getJsonString(geo);
+        var geoStr = Pointer_stringify(geoPtr);
+        _free(geoPtr);
+        postMessage({"reason": "geometry", "geometry": geoStr});
+        
+        //console.log("geometry object created at %s", geo);
         var numWalls = _geometryGetNumWalls(geo);
-        console.log("found %s walls", numWalls);
+        console.log("geometry consists of %s walls", numWalls);
         var bspRoot = _buildBspTree(_geometryGetWallPtr(geo, 0), numWalls);
         console.log("bspRoot at %s", bspRoot);
         
         for (var wallId = 0; wallId < numWalls; wallId++)
         {
-            console.log("processing wall %s", wallId);
+            //console.log("processing wall %s", wallId);
             var wall = _geometryGetWallPtr(geo, wallId);
             _performAmbientOcclusionNativeOnWall(geo, bspRoot, wall);
             var base64ptr = _saveAsBase64Png( 
@@ -47,6 +53,7 @@ function buildLightmap(contents)
             //console.log("base64 string is '%s'", base64str);
         }            
         _free(bspRoot);
+        postMessage({"reason": "done"});
         
 }
 

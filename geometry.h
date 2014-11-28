@@ -22,11 +22,10 @@ Geometry* createGeometryObject();
 int geometryGetNumWalls(Geometry *geo);
 Rectangle* geometryGetWallPtr(Geometry *geo, int rectangleId);
 Vector3*   geometryGetTexelPtr(Geometry *geo);
+// end of emscripten interface
 
-//void writeJsonOutput(Geometry geo, const char*filename);
 int writeJsonOutput( Geometry geo, char* out, int outSize);
 char* getJsonString(Geometry *geo);
 
-// end of emscripten interface
 
 #endif

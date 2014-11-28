@@ -301,8 +301,8 @@ void createLightSourceInRoom(Image *img, Image *visited, int roomX, int roomY, f
     }    
     setImagePixel(visited, bestCenter.x, bestCenter.y, 5);
     
-    printf("found room with center at (%d, %d) with distance %d and area %d\n",
-           bestCenter.x, bestCenter.y, maxDist, numPixels);
+    /*printf("found room with center at (%d, %d) with distance %d and area %d\n",
+           bestCenter.x, bestCenter.y, maxDist, numPixels);*/
            
     float edgeHalfLength = sqrt(numPixels) / 10;//7;
 
