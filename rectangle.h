@@ -10,8 +10,7 @@ extern "C" {
 //#include "color3.h"
 #include "assert.h"
 
-static const float TILE_SIZE = 1000/20.0f*0.1;   //lightmap texels per m²
-static const int   SUPER_SAMPLING = 1;
+//static const int   SUPER_SAMPLING = 1;
 
 
 /* Rectangle structure to be passed to OpenCL
@@ -34,10 +33,10 @@ typedef struct {
 } RectangleArray;
 
 
-Rectangle createRectangleV( const Vector3 _pos, const Vector3 _width, const Vector3 _height);
+Rectangle createRectangleV( const Vector3 _pos, const Vector3 _width, const Vector3 _height, const float TILE_SIZE);
 Rectangle createRectangle( float px, float py, float pz,
                            float wx, float wy, float wz,
-                           float hx, float hy, float hz);
+                           float hx, float hy, float hz, float TILE_SIZE);
 
 
 int getPosition(const Rectangle *plane, const Rectangle *rect);

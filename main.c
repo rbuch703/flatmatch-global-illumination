@@ -41,7 +41,8 @@ int main(int argc, const char** argv)
 
     /** scale is passed in the more human-readable pixel/m, 
         but the geometry loader needs it in m/pixel */
-    Geometry *geo = parseLayout(img, 1/scale);
+    const float TILE_SIZE = 1000/20.0f*0.1;   //lightmap texels per m²
+    Geometry *geo = parseLayout(img, 1/scale, TILE_SIZE);
     freeImage(img);
 
     char* s = getJsonString(geo);

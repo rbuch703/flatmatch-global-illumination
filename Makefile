@@ -44,7 +44,7 @@ index.js: $(BC)
 	@echo [LD] $@
 	@$(EMCC) -O3 $(BC) lib/*.bc\
     --embed-file 137.png \
-    -s EXPORTED_FUNCTIONS='["_parseLayout", "_geometryGetNumWalls", "_geometryGetWallPtr", "_buildBspTree", "_performAmbientOcclusionNativeOnWall", "_saveAsBase64Png", "_geometryGetTexelPtr", "_getJsonString", "_base64_encode", "_buildCollisionMap", "_freeImage", "_freeGeometry"]'\
+    -s EXPORTED_FUNCTIONS='["_parseLayout", "_geometryGetNumWalls", "_geometryGetWallPtr", "_buildBspTree", "_performAmbientOcclusionNativeOnWall", "_saveAsBase64Png", "_geometryGetTexelPtr", "_getJsonString", "_base64_encode", "_buildCollisionMap", "_loadImageFromMemory", "_freeImage", "_freeGeometry", "_getImageWidth", "_getImageHeight"]'\
     -s TOTAL_MEMORY=33554432\
     -s NO_EXIT_RUNTIME=1 \
     -o $@

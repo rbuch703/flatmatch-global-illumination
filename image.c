@@ -245,3 +245,7 @@ Image* cloneImage(const Image * const img)
 
 }
 
+int getImageWidth(Image* img) { return img->width;}
+
+int getImageHeight(Image* img) {return img->height;}
+

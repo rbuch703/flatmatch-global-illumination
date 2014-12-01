@@ -31,6 +31,8 @@ int setImagePixel(Image* img, int x, int y, uint32_t val);
 unsigned int distanceTransform(Image *img);
 void floodFillImage(Image *img, int x, int y, uint32_t value, uint32_t background);
 void saveImageAs(Image *img, const char* filename);
+int getImageWidth(Image* img);
+int getImageHeight(Image* img);
 
 
 Image* cloneImage(const Image * const img);

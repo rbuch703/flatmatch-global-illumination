@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-Rectangle createRectangleV( const Vector3 _pos, const Vector3 _width, const Vector3 _height)
+Rectangle createRectangleV( const Vector3 _pos, const Vector3 _width, const Vector3 _height, const float TILE_SIZE)
 {
 
     Rectangle res;
@@ -40,8 +40,8 @@ Rectangle createRectangleV( const Vector3 _pos, const Vector3 _width, const Vect
         tile_size = (res.lightmapSetup.s[1] * res.lightmapSetup.s[2]) / (width*height);
     }
     
-    res.lightmapSetup.s[1] *= SUPER_SAMPLING;
-    res.lightmapSetup.s[2] *= SUPER_SAMPLING;
+    //res.lightmapSetup.s[1] *= SUPER_SAMPLING;
+    //res.lightmapSetup.s[2] *= SUPER_SAMPLING;
     
     
     //HACK: cl_float3 is actually a float[4] to ensure 16 bytes alignment
@@ -57,9 +57,9 @@ Rectangle createRectangleV( const Vector3 _pos, const Vector3 _width, const Vect
 
 Rectangle createRectangle( float px, float py, float pz,
                            float wx, float wy, float wz,
-                           float hx, float hy, float hz)
+                           float hx, float hy, float hz, float TILE_SIZE)
 {
-    return createRectangleV (createVector3(px, py, pz), createVector3(wx, wy, wz), createVector3(hx, hy, hz));
+    return createRectangleV (createVector3(px, py, pz), createVector3(wx, wy, wz), createVector3(hx, hy, hz), TILE_SIZE);
 }
 
 

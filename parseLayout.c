@@ -30,98 +30,98 @@ static const float WINDOW_HIGH = 2.30;
 //static const float WINDOW_HEIGHT = WINDOW_HIGH - WINDOW_LOW;
 //static const float TOP_WALL_HEIGHT = HEIGHT - WINDOW_HIGH;
 
-void addWall( RectangleArray *arr, float startX, float startY, float dx, float dy, float min_z, float max_z)
+void addWall( RectangleArray *arr, float startX, float startY, float dx, float dy, float min_z, float max_z, const float TILE_SIZE)
 {
-    insertIntoRectangleArray(arr, createRectangle( startX,startY,min_z,   dx, dy, 0,       0, 0, max_z - min_z));
+    insertIntoRectangleArray(arr, createRectangle( startX,startY,min_z,   dx, dy, 0,       0, 0, max_z - min_z, TILE_SIZE));
 }
 
-void addFullWall( RectangleArray *arr, float startX, float startY, float dx, float dy)
+void addFullWall( RectangleArray *arr, float startX, float startY, float dx, float dy, const float TILE_SIZE)
 {
-    addWall(arr, startX, startY, dx, dy, 0.0f, HEIGHT);
+    addWall(arr, startX, startY, dx, dy, 0.0f, HEIGHT, TILE_SIZE);
 }
 
-void addHorizontalRect(RectangleArray *arr, float startX, float startY, float dx, float dy, float z)
+void addHorizontalRect(RectangleArray *arr, float startX, float startY, float dx, float dy, float z, const float TILE_SIZE)
 {
-    insertIntoRectangleArray(arr, createRectangle( startX,startY,z,       dx, 0, 0,        0, dy, 0));
+    insertIntoRectangleArray(arr, createRectangle( startX,startY,z,       dx, 0, 0,        0, dy, 0, TILE_SIZE));
 }
 
 void registerWall( RectangleArray *walls, RectangleArray *windows, RectangleArray *box,
-                   uint32_t col0, uint32_t col1, float x0, float y0, float x1, float y1)
+                   uint32_t col0, uint32_t col1, float x0, float y0, float x1, float y1, const float TILE_SIZE)
 {
 
-    if      (col0 == WALL && col1 == EMPTY) addFullWall(walls, x0, y1, x1 - x0, y0 - y1); //transition from wall to inside area
-    else if (col0 == EMPTY && col1 == WALL) addFullWall(walls, x1, y0, x0 - x1, y1 - y0);// transition from inside area to wall
+    if      (col0 == WALL && col1 == EMPTY) addFullWall(walls, x0, y1, x1 - x0, y0 - y1, TILE_SIZE); //transition from wall to inside area
+    else if (col0 == EMPTY && col1 == WALL) addFullWall(walls, x1, y0, x0 - x1, y1 - y0, TILE_SIZE);// transition from inside area to wall
 
-    else if (col0 == WALL && col1 == DOOR) addWall(walls, x0, y1, x1 - x0, y0 - y1, 0, DOOR_HEIGHT); //transition from wall to door frame
-    else if (col0 == DOOR && col1 == WALL) addWall(walls, x1, y0, x0 - x1, y1 - y0, 0, DOOR_HEIGHT);// 
+    else if (col0 == WALL && col1 == DOOR) addWall(walls, x0, y1, x1 - x0, y0 - y1, 0, DOOR_HEIGHT, TILE_SIZE); //transition from wall to door frame
+    else if (col0 == DOOR && col1 == WALL) addWall(walls, x1, y0, x0 - x1, y1 - y0, 0, DOOR_HEIGHT, TILE_SIZE);// 
 
-    else if (col0 == WALL && col1 == BALCONY_DOOR) addWall(walls, x0, y1, x1 - x0, y0 - y1, 0, WINDOW_HIGH); //transition from wall to door frame
-    else if (col0 == BALCONY_DOOR && col1 == WALL) addWall(walls, x1, y0, x0 - x1, y1 - y0, 0, WINDOW_HIGH);// 
-
-
-    else if (col0 == WALL && col1 == WINDOW) addWall(walls, x0, y1, x1 - x0, y0 - y1, WINDOW_LOW, WINDOW_HIGH); //transition from wall to window (frame)
-    else if (col0 == WINDOW && col1 == WALL) addWall(walls, x1, y0, x0 - x1, y1 - y0, WINDOW_LOW, WINDOW_HIGH); //transition from wall to window (frame)
-
-    else if (col0 == WALL && col1 == BALCONY_WINDOW) addWall(walls, x0, y1, x1 - x0, y0 - y1, WINDOW_LOW, HEIGHT); //transition from wall to window (frame)
-    else if (col0 == BALCONY_WINDOW && col1 == WALL) addWall(walls, x1, y0, x0 - x1, y1 - y0, WINDOW_LOW, HEIGHT); //transition from wall to window (frame)
+    else if (col0 == WALL && col1 == BALCONY_DOOR) addWall(walls, x0, y1, x1 - x0, y0 - y1, 0, WINDOW_HIGH, TILE_SIZE); //transition from wall to door frame
+    else if (col0 == BALCONY_DOOR && col1 == WALL) addWall(walls, x1, y0, x0 - x1, y1 - y0, 0, WINDOW_HIGH, TILE_SIZE);// 
 
 
-    else if (col0 == OUTSIDE  && col1 == EMPTY) addFullWall(walls, x0, y1, x1 - x0, y0 - y1); //transition from entrace to inside area
-    else if (col0 == EMPTY && col1 == OUTSIDE ) addFullWall(walls, x1, y0, x0 - x1, y1 - y0);// transition from entrace to inside area
+    else if (col0 == WALL && col1 == WINDOW) addWall(walls, x0, y1, x1 - x0, y0 - y1, WINDOW_LOW, WINDOW_HIGH, TILE_SIZE); //transition from wall to window (frame)
+    else if (col0 == WINDOW && col1 == WALL) addWall(walls, x1, y0, x0 - x1, y1 - y0, WINDOW_LOW, WINDOW_HIGH, TILE_SIZE); //transition from wall to window (frame)
 
-    else if (col0 == DOOR && col1 == EMPTY) addWall(walls, x0, y1, x1 - x0, y0 - y1, DOOR_HEIGHT, HEIGHT); //transition from door frame to inside area
-    else if (col0 == EMPTY && col1 == DOOR) addWall(walls, x1, y0, x0 - x1, y1 - y0, DOOR_HEIGHT, HEIGHT);// transition from door frame to inside area
-
-    else if (col0 == BALCONY_DOOR && col1 == EMPTY) addWall(walls, x0, y1, x1 - x0, y0 - y1, WINDOW_HIGH, HEIGHT); //transition from door frame to inside area
-    else if (col0 == EMPTY && col1 == BALCONY_DOOR) addWall(walls, x1, y0, x0 - x1, y1 - y0, WINDOW_HIGH, HEIGHT);// transition from door frame to inside area
+    else if (col0 == WALL && col1 == BALCONY_WINDOW) addWall(walls, x0, y1, x1 - x0, y0 - y1, WINDOW_LOW, HEIGHT, TILE_SIZE); //transition from wall to window (frame)
+    else if (col0 == BALCONY_WINDOW && col1 == WALL) addWall(walls, x1, y0, x0 - x1, y1 - y0, WINDOW_LOW, HEIGHT, TILE_SIZE); //transition from wall to window (frame)
 
 
-    else if (col0 == WALL    && col1 == OUTSIDE) addWall(box, x0, y1, x1 - x0, y0 - y1, -0.2, HEIGHT + 0.2); 
-    else if (col0 == OUTSIDE && col1 == WALL   ) addWall(box, x1, y0, x0 - x1, y1 - y0, -0.2, HEIGHT + 0.2); 
+    else if (col0 == OUTSIDE  && col1 == EMPTY) addFullWall(walls, x0, y1, x1 - x0, y0 - y1, TILE_SIZE); //transition from entrace to inside area
+    else if (col0 == EMPTY && col1 == OUTSIDE ) addFullWall(walls, x1, y0, x0 - x1, y1 - y0, TILE_SIZE);// transition from entrace to inside area
+
+    else if (col0 == DOOR && col1 == EMPTY) addWall(walls, x0, y1, x1 - x0, y0 - y1, DOOR_HEIGHT, HEIGHT, TILE_SIZE); //transition from door frame to inside area
+    else if (col0 == EMPTY && col1 == DOOR) addWall(walls, x1, y0, x0 - x1, y1 - y0, DOOR_HEIGHT, HEIGHT, TILE_SIZE);// transition from door frame to inside area
+
+    else if (col0 == BALCONY_DOOR && col1 == EMPTY) addWall(walls, x0, y1, x1 - x0, y0 - y1, WINDOW_HIGH, HEIGHT, TILE_SIZE); //transition from door frame to inside area
+    else if (col0 == EMPTY && col1 == BALCONY_DOOR) addWall(walls, x1, y0, x0 - x1, y1 - y0, WINDOW_HIGH, HEIGHT, TILE_SIZE);// transition from door frame to inside area
+
+
+    else if (col0 == WALL    && col1 == OUTSIDE) addWall(box, x0, y1, x1 - x0, y0 - y1, -0.2, HEIGHT + 0.2, TILE_SIZE); 
+    else if (col0 == OUTSIDE && col1 == WALL   ) addWall(box, x1, y0, x0 - x1, y1 - y0, -0.2, HEIGHT + 0.2, TILE_SIZE); 
 
 
     else if (col0 == WINDOW && col1 == EMPTY) { //transition from window to inside area
-        addWall(walls, x0, y1, x1 - x0, y0 - y1, 0, WINDOW_LOW); 
-        addWall(walls, x0, y1, x1 - x0, y0 - y1, WINDOW_HIGH, HEIGHT); 
+        addWall(walls, x0, y1, x1 - x0, y0 - y1, 0, WINDOW_LOW, TILE_SIZE); 
+        addWall(walls, x0, y1, x1 - x0, y0 - y1, WINDOW_HIGH, HEIGHT, TILE_SIZE); 
     }
     
     else if (col0 == EMPTY && col1 == WINDOW) {
-        addWall(walls, x1, y0, x0 - x1, y1 - y0, 0, WINDOW_LOW);
-        addWall(walls, x1, y0, x0 - x1, y1 - y0, WINDOW_HIGH, HEIGHT);
+        addWall(walls, x1, y0, x0 - x1, y1 - y0, 0, WINDOW_LOW, TILE_SIZE);
+        addWall(walls, x1, y0, x0 - x1, y1 - y0, WINDOW_HIGH, HEIGHT, TILE_SIZE);
     }
 
     else if (col0 == BALCONY_WINDOW && col1 == EMPTY) { //transition from window to inside area
-        addWall(walls, x0, y1, x1 - x0, y0 - y1, 0, WINDOW_LOW); 
+        addWall(walls, x0, y1, x1 - x0, y0 - y1, 0, WINDOW_LOW, TILE_SIZE); 
     }
     
     else if (col0 == EMPTY && col1 == BALCONY_WINDOW) {
-        addWall(walls, x1, y0, x0 - x1, y1 - y0, 0, WINDOW_LOW);
+        addWall(walls, x1, y0, x0 - x1, y1 - y0, 0, WINDOW_LOW, TILE_SIZE);
     }
 
 
     else if (col0 == OUTSIDE  && col1 == WINDOW) 
     {
-        addWall(box,     x1, y0, x0 - x1, y1 - y0, -0.2, WINDOW_LOW);
-        addWall(box,     x1, y0, x0 - x1, y1 - y0, WINDOW_HIGH, HEIGHT + 0.2);
-        addWall(windows, x0, y1, x1 - x0, y0 - y1, WINDOW_LOW, WINDOW_HIGH);
+        addWall(box,     x1, y0, x0 - x1, y1 - y0, -0.2, WINDOW_LOW, TILE_SIZE);
+        addWall(box,     x1, y0, x0 - x1, y1 - y0, WINDOW_HIGH, HEIGHT + 0.2, TILE_SIZE);
+        addWall(windows, x0, y1, x1 - x0, y0 - y1, WINDOW_LOW, WINDOW_HIGH, TILE_SIZE);
     }
     else if (col0 == WINDOW && col1 == OUTSIDE)  
     {
-        addWall(box,     x0, y1, x1 - x0, y0 - y1, -0.2, WINDOW_LOW);
-        addWall(box,     x0, y1, x1 - x0, y0 - y1, WINDOW_HIGH, HEIGHT + 0.2);
-        addWall(windows, x1, y0, x0 - x1, y1 - y0, WINDOW_LOW, WINDOW_HIGH);
+        addWall(box,     x0, y1, x1 - x0, y0 - y1, -0.2, WINDOW_LOW, TILE_SIZE);
+        addWall(box,     x0, y1, x1 - x0, y0 - y1, WINDOW_HIGH, HEIGHT + 0.2, TILE_SIZE);
+        addWall(windows, x1, y0, x0 - x1, y1 - y0, WINDOW_LOW, WINDOW_HIGH, TILE_SIZE);
     }
     else if (col0 == OUTSIDE  && col1 == BALCONY_WINDOW) 
     {
-        addWall(box,     x1, y0, x0 - x1, y1 - y0, -0.2, WINDOW_LOW);
-        addWall(windows, x0, y1, x1 - x0, y0 - y1, WINDOW_LOW, HEIGHT);
-        addWall(box,     x1, y0, x0 - x1, y1 - y0, HEIGHT, HEIGHT + 0.2);
+        addWall(box,     x1, y0, x0 - x1, y1 - y0, -0.2, WINDOW_LOW, TILE_SIZE);
+        addWall(windows, x0, y1, x1 - x0, y0 - y1, WINDOW_LOW, HEIGHT, TILE_SIZE);
+        addWall(box,     x1, y0, x0 - x1, y1 - y0, HEIGHT, HEIGHT + 0.2, TILE_SIZE);
     }
     else if (col0 == BALCONY_WINDOW && col1 == OUTSIDE)  
     {
-        addWall(box,     x0, y1, x1 - x0, y0 - y1, -0.2, WINDOW_LOW);
-        addWall(windows, x1, y0, x0 - x1, y1 - y0, WINDOW_LOW, HEIGHT);
-        addWall(box,     x0, y1, x1 - x0, y0 - y1, HEIGHT, HEIGHT + 0.2);
+        addWall(box,     x0, y1, x1 - x0, y0 - y1, -0.2, WINDOW_LOW, TILE_SIZE);
+        addWall(windows, x1, y0, x0 - x1, y1 - y0, WINDOW_LOW, HEIGHT, TILE_SIZE);
+        addWall(box,     x0, y1, x1 - x0, y0 - y1, HEIGHT, HEIGHT + 0.2, TILE_SIZE);
     }
 
 
@@ -277,7 +277,7 @@ void createLightSourceInRoom(Image *img, Image *visited, int roomX, int roomY, f
 
     insertIntoRectangleArray(lightsOut, 
         createRectangle( px - edgeHalfLength, py - edgeHalfLength, HEIGHT-0.001,
-                         2*edgeHalfLength, 0, 0, 0, 2*edgeHalfLength, 0));
+                         2*edgeHalfLength, 0, 0, 0, 2*edgeHalfLength, 0, 0));
 
 }
 
@@ -356,7 +356,7 @@ Rectangle* convertToAlignedArray( Rectangle* rectsIn, int numRects)
     return res;
 }
 
-Geometry* parseLayout(const Image* const src, const float scaling)
+Geometry* parseLayout(const Image* const src, const float scaling, const float TILE_SIZE)
 {
     Image* img = cloneImage(src);  //parseLayout is destructive on the original image, so take a copy
 
@@ -393,7 +393,7 @@ Geometry* parseLayout(const Image* const src, const float scaling)
                 
             float endX = x;
             
-            registerWall(&wallsOut, &windowsOut, &boxOut, pxAbove, pxHere, startX*scaling, y*scaling, endX*scaling, y*scaling);
+            registerWall(&wallsOut, &windowsOut, &boxOut, pxAbove, pxHere, startX*scaling, y*scaling, endX*scaling, y*scaling, TILE_SIZE);
         }
     }
     //cout << "  == End of horizontal scan, beginning vertical scan ==" << endl;
@@ -418,7 +418,7 @@ Geometry* parseLayout(const Image* const src, const float scaling)
                 
             float endY = y;
             
-            registerWall(&wallsOut, &windowsOut, &boxOut, pxLeft, pxHere, x*scaling, startY*scaling, x*scaling, endY*scaling);
+            registerWall(&wallsOut, &windowsOut, &boxOut, pxLeft, pxHere, x*scaling, startY*scaling, x*scaling, endY*scaling, TILE_SIZE);
         }
     }
 
@@ -457,36 +457,36 @@ Geometry* parseLayout(const Image* const src, const float scaling)
         switch (color)
         {
             case WINDOW: //window --> create upper and lower window frame
-                addHorizontalRect(&wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), WINDOW_LOW); 
-                addHorizontalRect(&wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), WINDOW_HIGH); 
+                addHorizontalRect(&wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), WINDOW_LOW, TILE_SIZE); 
+                addHorizontalRect(&wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), WINDOW_HIGH, TILE_SIZE); 
                 break;
 
             case BALCONY_WINDOW: //window --> create upper and lower window frame
-                addHorizontalRect(&wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), WINDOW_LOW); 
-                addHorizontalRect(&wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), HEIGHT); 
+                addHorizontalRect(&wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), WINDOW_LOW, TILE_SIZE); 
+                addHorizontalRect(&wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), HEIGHT, TILE_SIZE); 
                 break;
 
 
             case EMPTY: //empty floor --> create floor and ceiling
-                addHorizontalRect(&wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), 0); 
-                addHorizontalRect(&wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), HEIGHT); 
+                addHorizontalRect(&wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), 0, TILE_SIZE); 
+                addHorizontalRect(&wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), HEIGHT, TILE_SIZE); 
                 break;
                 
             case DOOR: // --> create floor and upper door frame
-                addHorizontalRect(&wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), 0); 
-                addHorizontalRect(&wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), DOOR_HEIGHT); 
+                addHorizontalRect(&wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), 0, TILE_SIZE); 
+                addHorizontalRect(&wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), DOOR_HEIGHT, TILE_SIZE); 
                 break;
                 
             case BALCONY_DOOR: // --> create floor and upper door frame
-                addHorizontalRect(&wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), 0); 
-                addHorizontalRect(&wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), WINDOW_HIGH);
+                addHorizontalRect(&wallsOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), 0, TILE_SIZE); 
+                addHorizontalRect(&wallsOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), WINDOW_HIGH, TILE_SIZE);
                 break;
         }
         
         if (color != OUTSIDE)
         {
-            addHorizontalRect(&boxOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), HEIGHT + 0.2); 
-            addHorizontalRect(&boxOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), - 0.2); 
+            addHorizontalRect(&boxOut, scaling*xEnd,   scaling*y, scaling*(xStart - xEnd), scaling*(yEnd - y), HEIGHT + 0.2, TILE_SIZE); 
+            addHorizontalRect(&boxOut, scaling*xStart, scaling*y, scaling*(xEnd - xStart), scaling*(yEnd - y), - 0.2, TILE_SIZE); 
         }
     }
 
