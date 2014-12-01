@@ -30,10 +30,23 @@ int main(int argc, const char** argv)
   
     //string filename = (argc >= 2) ? argv[1] : "out.png" ;
     float scale = argc < 3 ? 30 : atof(argv[2]);
-    
+
+    char* jsonCollisionMap = buildCollisionMap(argv[1]);
+    FILE* f = fopen("collisionMap.json", "wb");
+    fwrite( jsonCollisionMap, strlen(jsonCollisionMap), 1, f);
+    fclose(f);
+    free(jsonCollisionMap);
+
     /** scale is passed in the more human-readable pixel/m, 
         but the geometry loader needs it in m/pixel */
     Geometry geo = parseLayout(argv[1], 1/scale);
+
+    char* s = getJsonString(&geo);    
+    /*FILE**/ f = fopen("geometry.json", "wb");
+    fwrite(s, strlen(s), 1, f); //don't write zero-termination
+    fclose(f);
+    free(s);
+
 
     printf("[INF] Layout consists of %d walls (%fk texels) and %d windows\n", geo.numWalls, geo.numTexels/1000.0, geo.numWindows);
     
@@ -66,7 +79,7 @@ int main(int argc, const char** argv)
     {
         int numChars = snprintf(filename, 0, "tiles/tile_%d.png", i);
         filename = (char*) malloc (numChars+1); //plus zero-termination
-        snprintf(filename, numChars, "tiles/tile_%d.png", i);
+        snprintf(filename, numChars+1, "tiles/tile_%d.png", i);
         saveAs(    &geo.walls[i], filename, geo.texels,
             illuminationMode == PHOTON_NATIVE || illuminationMode == AMBIENT_OCCLUSION);
             
@@ -74,11 +87,6 @@ int main(int argc, const char** argv)
         //saveAsRaw( &geo.walls[i], (filename + ".raw").c_str(), geo.texels);
     }
     
-    char* s = getJsonString(&geo);    
-    FILE* f = fopen("geometry.json", "wb");
-    fwrite(s, strlen(s), 1, f); //don't write zero-termination
-    fclose(f);
-    free(s);
 
     freeGeometry(geo);
 

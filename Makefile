@@ -44,7 +44,7 @@ index.js: $(BC)
 	@echo [LD] $@
 	@$(EMCC) -O3 $(BC) lib/*.bc\
     --embed-file 137.png \
-    -s EXPORTED_FUNCTIONS='["_parseLayoutStaticMem", "_geometryGetNumWalls", "_geometryGetWallPtr", "_buildBspTree", "_performAmbientOcclusionNativeOnWall", "_saveAsBase64Png", "_geometryGetTexelPtr", "_getJsonString"]'\
+    -s EXPORTED_FUNCTIONS='["_parseLayoutStaticMem", "_geometryGetNumWalls", "_geometryGetWallPtr", "_buildBspTree", "_performAmbientOcclusionNativeOnWall", "_saveAsBase64Png", "_geometryGetTexelPtr", "_getJsonString", "_base64_encode"]'\
     -s TOTAL_MEMORY=33554432\
     -s NO_EXIT_RUNTIME=1 \
     -o $@
@@ -91,7 +91,7 @@ clean:
 make.dep: $(SRC_C) $(SRC_CC)
 	@echo [DEP]
 	@$(CC)  -MM -I /usr/local/include $(SRC_C) | sed "s/\([[:graph:]]*\)\.o/build\/c_\\1.o/g" > make.dep
-	@$(CPP) -MM -I /usr/local/include $(SRC_CC)| sed "s/\([[:graph:]]*\)\.o/build\/cc_\\1.o/g" >> make.dep
+#	@$(CPP) -MM -I /usr/local/include $(SRC_CC)| sed "s/\([[:graph:]]*\)\.o/build\/cc_\\1.o/g" >> make.dep
 
 include make.dep
 

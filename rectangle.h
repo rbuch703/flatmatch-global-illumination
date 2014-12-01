@@ -52,6 +52,7 @@ Vector3 getTileCenter(const Rectangle *rect, int tileId);
 void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights, int tintExtra);
 int saveAsMemoryPng(const Rectangle *rect, const Vector3 *lights, int tintExtra, uint8_t**data);
 char* saveAsBase64Png(const Rectangle *rect, const Vector3 *lights, int tintExtra);
+char* base64_encode(const unsigned char *data, size_t input_length);
 
 void saveAsRaw(const Rectangle *rect, const char *filename, const Vector3 *lights);
 

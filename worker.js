@@ -22,6 +22,12 @@ function buildLightmap(contents)
         //var buf = Module._malloc(myTypedArray.length*myTypedArray.BYTES_PER_ELEMENT);
         var fileData = _malloc( contents.byteLength);
         Module.HEAPU8.set(contents, fileData);
+        
+        base64ptr = _base64_encode(fileData, contents.byteLength);
+        var base64str = Pointer_stringify(base64ptr);
+        _free(base64ptr);
+        postMessage({"reason": "layout", "layout": base64str});
+        
         //console.log("raw file data loaded");
         var geo = _parseLayoutStaticMem(fileData, contents.byteLength, 1/30.0);
         _free(fileData);

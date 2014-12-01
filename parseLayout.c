@@ -3,6 +3,8 @@
 #include <string.h> //for memcpy
 #include <math.h> //for sqrt()
 
+#include <stdarg.h>
+
 //#include <set>
 
 #include <stdio.h>
@@ -653,4 +655,127 @@ Geometry* parseLayoutStaticMem(const uint8_t* data, int dataSize, float scale)
     geo = parseLayoutMem(data, dataSize, scale);
     
     return &geo;
+}
+
+static int max(int a, int b) { return a > b ? a : b; }
+
+static int print( char* dst, int *dstPos, int dstSize, const char* fmt, ...)
+{
+	va_list argp;
+	va_start(argp, fmt);    
+	
+	int nChars = vsnprintf( dst ? &dst[*dstPos] : NULL, 
+	                     dst? max(dstSize - *dstPos, 0) : 0, 
+	                     fmt, argp);
+    va_end(argp);
+    
+    *dstPos += nChars;
+        
+    return nChars;
+}
+
+static int toJsonString(int width, int height, uint8_t *collisionMap, char *out, int outSize)
+{
+    #define PRINT( ...) print(out, &outPos, outSize, __VA_ARGS__)
+    int outPos = 0;
+    int runLength = 0;
+    int runIsPassable = 0; /* The first run is specified to be impassable.*/
+    int count = 0;
+
+    PRINT("[");
+    
+    for (int i = 0; i < width*height; i++)
+    {
+        int isPassable = (collisionMap[i] != 0x00);
+                          
+        if (isPassable == runIsPassable)
+        {
+            runLength++;
+            continue;    
+        }
+        
+        PRINT("%d,", runLength);
+        if (++count % 30 == 0)
+            PRINT("\n");
+        
+        runLength = 1;
+        runIsPassable = isPassable;
+    }
+
+    PRINT("%d]\n", runLength);    
+    #undef PRINT
+    return outPos;
+}
+
+
+/*output format: This method outputs the collision map as a b/w image. Black pixels are impassable, white ones
+ *               are traversable. To save storage space and transfer bandwith, the map is RLE-encoded as follows:
+ *               - the result is a single array on run lengths
+ *               - each run is given just by its length
+ *               - run indices are zero-based (corresponding to the Javascript array indices)
+ *               - every run with an even run index is impassable, those with odd indices are traversable
+ */
+
+void dilate(int width, int height, uint8_t *collisionMap, int radius)
+{
+
+    uint8_t *tmp = (uint8_t*) malloc(width*height *sizeof(uint8_t));
+    memcpy(tmp, collisionMap, width*height *sizeof(uint8_t));
+    
+    // dilate the impassable (numerical value 0) area by 'radius' pixels
+    
+    for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++)
+    {
+        if (tmp[y*width + x])
+            continue;
+            
+        for (int dy = -radius; dy <= radius; dy++)
+            for (int dx = -radius; dx <= radius; dx++)
+                if (y+dy >= 0 && y+dy < height &&
+                    x+dx >= 0 && x+dx < width)
+                    collisionMap[ (y+dy)*width + (x+dx)] = 0;
+    }
+        
+    
+    free(tmp);
+}
+
+char* buildCollisionMap(const char* filename)
+{
+    int width, height, colorType;
+    uint8_t *src;
+
+    read_png_file(filename, &width, &height, &colorType, &src );
+
+    uint8_t *collisionMap = (uint8_t*) malloc(width*height *sizeof(uint8_t));
+    assert(colorType == PNG_COLOR_TYPE_RGB || (colorType == PNG_COLOR_TYPE_RGBA));
+
+    uint32_t* srcRGBA = (uint32_t*) src;
+
+    for (int i = 0; i < width * height; i++)
+    {
+        uint32_t val = (colorType == PNG_COLOR_TYPE_RGB) ?
+            0xFF000000 | src[i*3] | (src[i*3+1] << 8) | (src[i*3+2] << 16) :
+            srcRGBA[i];
+            
+        // EMPTY, DOOR, and BALCONY_DOOR are passable
+        collisionMap[i] = (val == 0xFFFFFFFF || val == 0xFFDFDFDF || val == 0xFFFF0000) ?
+            255 : 0;
+    }
+    free(src);
+
+    dilate(width, height, collisionMap, 5);
+    /*
+    FILE* f = fopen("collision.raw", "wb");
+    fwrite(collisionMap, width*height*sizeof(uint8_t), 1, f);
+    fclose(f);*/
+    
+    int nBytes = toJsonString(width, height, collisionMap, NULL, 0) + 1;
+    char* str = (char*)malloc(nBytes);
+    toJsonString(width, height, collisionMap, str, nBytes);
+    
+    free(collisionMap);
+    
+    return str;
 }
