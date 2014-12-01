@@ -3,25 +3,24 @@
 #include <string.h> //for memcpy
 #include <math.h> //for sqrt()
 
-#include <stdarg.h>
-
 //#include <set>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include "parseLayout.h"
-#include "png_helper.h"
+//#include "png_helper.h"
 #include "image.h"
+#include "helpers.h"
 
 enum ITEMS { 
-    INVALIDATED = 0x0, 
-    WALL = 0x1, 
-    EMPTY = 0x2, 
-    OUTSIDE =  0x3, 
-    DOOR = 0x4, 
-    WINDOW = 0x5,
-    BALCONY_WINDOW = 0x6,  //has no upper edge (ends at the ceiling)
-    BALCONY_DOOR = 0x7    //upper edge is WINDOW_HIGH to match the window next to it
+    INVALIDATED = 0x00000000, 
+    WALL = 0xFF000000, 
+    EMPTY = 0xFFFFFFFF, 
+    OUTSIDE =  0xFF7F7F7F, 
+    DOOR = 0xFFDFDFDF, 
+    WINDOW = 0xFF00FF00,
+    BALCONY_WINDOW = 0xFFFF7F00,  //has no upper edge (ends at the ceiling)
+    BALCONY_DOOR = 0xFFFF0000    //upper edge is WINDOW_HIGH to match the window next to it
 };
 
 static const float HEIGHT      = 2.60;
@@ -30,46 +29,6 @@ static const float WINDOW_LOW  = 0.85;
 static const float WINDOW_HIGH = 2.30;
 //static const float WINDOW_HEIGHT = WINDOW_HIGH - WINDOW_LOW;
 //static const float TOP_WALL_HEIGHT = HEIGHT - WINDOW_HIGH;
-
-typedef struct {
-    Rectangle *data;
-    cl_int numItems;
-    cl_int maxNumItems;
-} RectangleArray;
-
-
-RectangleArray initRectangleArray()
-{
-    RectangleArray res = {.data = (Rectangle*)malloc ( sizeof(Rectangle) * 64), 
-                        .numItems = 0, 
-                        .maxNumItems = 64};
-    return res;
-};
-
-void freeRectangleArray(RectangleArray *arr)
-{
-    free(arr->data);
-    arr->data = NULL;
-}
-
-void resizeRectangleArray(RectangleArray *arr, int newSize)
-{
-    arr->data = (Rectangle*)realloc(arr->data, newSize*sizeof(Rectangle));
-    arr->maxNumItems = newSize;
-    if (arr->numItems > arr->maxNumItems)   // array was just shortened
-        arr->numItems = arr->maxNumItems;
-}
-
-void insertIntoRectangleArray(RectangleArray *arr, Rectangle rect)
-{
-    if (arr->numItems == arr->maxNumItems)
-        resizeRectangleArray( arr, arr->maxNumItems*2);
-        
-    arr->data[arr->numItems++] = rect;
-}
-
-
-
 
 void addWall( RectangleArray *arr, float startX, float startY, float dx, float dy, float min_z, float max_z)
 {
@@ -169,42 +128,40 @@ void registerWall( RectangleArray *walls, RectangleArray *windows, RectangleArra
 }
 
 
-Point2D getCentralPosition(uint32_t *pixelBuffer, int width, int height)
+Point2D getCentralPosition(const Image *img)
 {
-    
-    Image img = {.width = width, .height=height, .data = (uint32_t*)malloc(width*height*sizeof(uint32_t))};
-    memcpy(img.data, pixelBuffer, width*height*sizeof(uint32_t));
+    Image* tmp = cloneImage(img);
 
-    for (int y = 0; y < height; y++)
-        for (int x = 0; x < width; x++)
+    for (int y = 0; y < img->height; y++)
+        for (int x = 0; x < img->width; x++)
     {
-        switch (getImagePixel(&img, x,y))
+        switch (getImagePixel(tmp, x,y))
         {
             case 0xFFFFFFFF: 
             case 0xFF00FF00: 
             case 0xFFDFDFDF: 
-                setImagePixel(&img, x,y,0);
+                setImagePixel(tmp, x,y,0);
                 break;
                 
             default: 
-                setImagePixel(&img, x,y, 1); //walls, outside
+                setImagePixel(tmp, x,y, 1); //walls, outside
                 break;
         }
     }
 
-    unsigned int maxDistance = distanceTransform(&img);
+    unsigned int maxDistance = distanceTransform(tmp);
     
     
-    for (int y = 0; y < height; y++)
-        for (int x = 0; x < width; x++)
-            if (getImagePixel(&img, x,y) == maxDistance-1)
+    for (int y = 0; y < img->height; y++)
+        for (int x = 0; x < img->width; x++)
+            if (getImagePixel(tmp, x,y) == maxDistance-1)
             {
-                freeImage(&img);
+                freeImage(tmp);
                 return (Point2D){x, y};
             }
     
     assert(0);
-    freeImage(&img);
+    freeImage(tmp);
     return (Point2D){-1, -1};
 }
 
@@ -338,8 +295,9 @@ void createLightSourceInRoom(Image *img, Image *visited, int roomX, int roomY, f
  */
  
  /*Note: this operation is destructive on 'img' */
-void createLights(Image *img, float scaling, RectangleArray* lightsOut)
+void createLights(const Image *src, float scaling, RectangleArray* lightsOut)
 {
+    Image* img = cloneImage(src);
 
     //Step 1: Flood-fill rooms adjacent to windows with window color, to mark them as not requiring additional lighting    
     for (int y = 0; y < img->height; y++)
@@ -364,20 +322,22 @@ void createLights(Image *img, float scaling, RectangleArray* lightsOut)
     distanceTransform(img);
 
     // prepare map of pixels that have already been considered for placing lights (initially only those not used in the distance transform
-    Image visited = {img->width, img->height, (uint32_t*)malloc(img->width * img->height * sizeof(uint32_t))};
+    Image *visited = cloneImage(img);
+    
     for (int y = 0; y < img->height; y++)
         for (int x = 0; x < img->width; x++)
-            setImagePixel(&visited, x,y, getImagePixel(img, x ,y) == 1 ? 1 : 0); //WALL
+            setImagePixel(visited, x,y, getImagePixel(img, x ,y) == 1 ? 1 : 0); //WALL
 
     // The actual steps 3a-e are performed by createLightSourceInRoom(), which also updates the 'visited' map
     for (int y = 0; y < img->height; y++)
         for (int x = 0; x < img->width; x++)
         {
-            if (getImagePixel( img, x, y) > 1 && ! getImagePixel(&visited, x, y))
-                createLightSourceInRoom(img, &visited, x, y, scaling, lightsOut);
+            if (getImagePixel( img, x, y) > 1 && ! getImagePixel(visited, x, y))
+                createLightSourceInRoom(img, visited, x, y, scaling, lightsOut);
         }
 
-    freeImage(&visited);
+    freeImage(visited);
+    freeImage(img);
 }
 
 //these Rectangle arrays are to be passed to OpenCL --> have to be aligned to 16 byte boundary
@@ -396,64 +356,28 @@ Rectangle* convertToAlignedArray( Rectangle* rectsIn, int numRects)
     return res;
 }
 
-static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorType, const float scaling)
+Geometry* parseLayout(const Image* const src, const float scaling)
 {
+    Image* img = cloneImage(src);  //parseLayout is destructive on the original image, so take a copy
+
     RectangleArray wallsOut    = initRectangleArray();
     RectangleArray windowsOut  = initRectangleArray();
     RectangleArray lightsOut   = initRectangleArray();
     RectangleArray boxOut      = initRectangleArray();
 
+    Point2D centralPos = getCentralPosition(img);
     
-    uint32_t *pixelBuffer = (uint32_t*)src;
-    if (colorType == PNG_COLOR_TYPE_RGB)
-    {
-        //uint8_t *src = (uint8_t*)pixelBuffer;
-        pixelBuffer = (uint32_t*)malloc( width * height * sizeof(uint32_t));
-        
-        for (int i = 0; i < width * height; i++)
-            pixelBuffer[i] =
-                0xFF000000 | src[i*3] | (src[i*3+1] << 8) | (src[i*3+2] << 16);
-        
-        //free(src);
-        colorType = PNG_COLOR_TYPE_RGBA;
-    } else
-
-
-    assert (colorType == PNG_COLOR_TYPE_RGBA);
-
-    uint8_t *pixels = malloc(width * height * sizeof(uint8_t));
-    for (int i = 0; i < width * height; i++)
-    {
-        switch (pixelBuffer[i])
-        {
-            case 0x00000000: pixels[i] = INVALIDATED; break;
-            case 0xFF000000: pixels[i] = WALL; break;
-            case 0xFFFFFFFF: pixels[i] = EMPTY; break;
-            case 0xFF7F7F7F: pixels[i] = OUTSIDE; break;
-            case 0xFF00FF00: pixels[i] = WINDOW; break;
-            case 0xFFDFDFDF: pixels[i] = DOOR; break;
-            case 0xFFFF0000: pixels[i] = BALCONY_DOOR; break;
-            case 0xFFFF7F00: pixels[i] = BALCONY_WINDOW; break;
-        }
-    }
-
-    Point2D centralPos = getCentralPosition(pixelBuffer, width, height);
+    Image* imgTmp = cloneImage(img);
     
-    Image imgTmp = {width, height, (uint32_t*)malloc(width*height*sizeof(uint32_t))};
-    memcpy(imgTmp.data, pixelBuffer, width*height*sizeof(uint32_t));
+    createLights( imgTmp, scaling, &lightsOut);
+    freeImage(imgTmp);
     
-    createLights( &imgTmp, scaling, &lightsOut);
-    freeImage(&imgTmp);
-    
-    if (pixelBuffer != (void*)src) //if they are equal, no memory was allocated for pixelBuffer, and none should be freed
-        free (pixelBuffer);
-    
-    for (int y = 1; y < height; y++)
+    for (int y = 1; y < img->height; y++)
     {
         //cout << "scanning row " << y << endl;
-        for (int x = 1; x < width;) {
-            uint32_t pxAbove = pixels[(y-1) * width + (x)];
-            uint32_t pxHere =  pixels[(y  ) * width + (x)];
+        for (int x = 1; x < img->width;) {
+            uint32_t pxAbove = getImagePixel(img, x, y-1);
+            uint32_t pxHere =  getImagePixel(img, x, y  );
             if (pxAbove == pxHere)
             {
                 x++;
@@ -462,9 +386,9 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
                 
             float startX = x;
             
-            while ( x < width && 
-                   pxAbove == pixels[(y-1) * width + (x)] && 
-                   pxHere == pixels[(y) * width + (x)])
+            while ( x < img->width && 
+                   pxAbove == getImagePixel(img, x, y-1) && 
+                   pxHere ==  getImagePixel(img, x, y) )
                 x++;
                 
             float endX = x;
@@ -474,11 +398,11 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
     }
     //cout << "  == End of horizontal scan, beginning vertical scan ==" << endl;
 
-    for (int x = 1; x < width; x++)
+    for (int x = 1; x < img->width; x++)
     {
-        for (int y = 1; y < height; ) {
-            uint32_t pxLeft = pixels[y * width + (x - 1) ];
-            uint32_t pxHere = pixels[y * width + (x    ) ];
+        for (int y = 1; y < img->height; ) {
+            uint32_t pxLeft = getImagePixel(img, x-1, y);
+            uint32_t pxHere = getImagePixel(img, x, y);
             if (pxLeft == pxHere)
             {
                 y++;
@@ -487,9 +411,9 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
                 
             float startY = y;
             
-            while (y < height && 
-                   pxLeft == pixels[y * width + (x-1)] && 
-                   pxHere == pixels[y * width + x])
+            while (y < img->height && 
+                   pxLeft == getImagePixel(img, x-1, y)  && 
+                   pxHere == getImagePixel(img, x, y) )
                 y++;
                 
             float endY = y;
@@ -498,25 +422,25 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
         }
     }
 
-    for (int y = 0; y < height; y++)
-        for (int x = 0; x < width; x++)
+    for (int y = 0; y < img->height; y++)
+        for (int x = 0; x < img->width; x++)
     {
         int xStart = x;
-        uint32_t color = pixels[y * width + x];
+        uint32_t color = getImagePixel(img, x, y);
         if (color == INVALIDATED)
             continue;
         
-        while (x+1 < width && pixels[y*width + (x+1)] == color) 
+        while (x+1 < img->width && getImagePixel(img, x+1, y) == color) 
             x++;
             
         int xEnd = x;
         
         int yEnd;
-        for (yEnd = y + 1; yEnd < height; yEnd++)
+        for (yEnd = y + 1; yEnd < img->height; yEnd++)
         {
             int rowWithIdenticalColor = 1;
             for (int xi = xStart; xi <= xEnd && rowWithIdenticalColor; xi++)
-                rowWithIdenticalColor &= (pixels[yEnd * width + xi] == color);
+                rowWithIdenticalColor &= (getImagePixel(img, xi, yEnd) == color);
             
             if (! rowWithIdenticalColor)
                 break;
@@ -526,7 +450,7 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
 
         for (int yi = y; yi <= yEnd; yi++)
             for (int xi = xStart; xi <= xEnd; xi++)
-                pixels[yi * width + xi] = INVALIDATED;
+                setImagePixel(img, xi, yi, INVALIDATED);
 
         yEnd +=1;   //cover the area to the end of the pixel, not just to the start
         xEnd +=1;        
@@ -566,9 +490,8 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
         }
     }
 
-    free( pixels);
-
-    Geometry geo = { 
+    Geometry *geo = (Geometry*)malloc(sizeof(Geometry));
+    *geo = (Geometry){ 
         .windows  = convertToAlignedArray(windowsOut.data, windowsOut.numItems),
         .lights   = convertToAlignedArray(lightsOut.data,  lightsOut.numItems),
         .walls    = convertToAlignedArray(wallsOut.data,   wallsOut.numItems),
@@ -577,101 +500,39 @@ static Geometry parseLayoutCore(uint8_t *src, int width, int height, int colorTy
         .numLights =  lightsOut.numItems,
         .numWalls =   wallsOut.numItems,
         .numBoxWalls= boxOut.numItems,
-        .width = width, 
-        .height= height, 
+        .width = img->width, 
+        .height= img->height, 
         .startingPositionX = centralPos.x * scaling,
         .startingPositionY = centralPos.y * scaling,
         .numTexels = 0,
         .texels = NULL };
 
-    for ( int i = 0; i < geo.numWalls; i++)
+    freeImage(img);
+
+    for ( int i = 0; i < geo->numWalls; i++)
     {
-        geo.walls[i].lightmapSetup.s[0] = geo.numTexels;
+        geo->walls[i].lightmapSetup.s[0] = geo->numTexels;
         //objects[i].lightNumTiles = getNumTiles(&objects[i]);
-        geo.numTexels += getNumTiles(&geo.walls[i]);
+        geo->numTexels += getNumTiles(&geo->walls[i]);
     }
         
-    printf( "[DBG] allocating %fMB for texels\n", geo.numTexels * sizeof(Vector3)/1000000.0);
-    if (geo.numTexels * sizeof(Vector3) > 1000*1000*1000)
+    printf( "[DBG] allocating %fMB for texels\n", geo->numTexels * sizeof(Vector3)/1000000.0);
+    if (geo->numTexels * sizeof(Vector3) > 1000*1000*1000)
     {
         printf("[Err] Refusing to allocate more than 1GB for texels, this would crash most GPUs. Exiting ...\n");
         exit(0);
     }
 
-    if (0 != posix_memalign( (void**) &geo.texels, 16, geo.numTexels * sizeof(Vector3)))
+    if (0 != posix_memalign( (void**) &geo->texels, 16, geo->numTexels * sizeof(Vector3)))
     {
         printf("[Err] aligned memory allocation failed, exiting ...\n");
         exit(0);
     }
     
-    for (int i = 0; i < geo.numTexels; i++)
-        geo.texels[i] = vec3(0,0,0);
+    for (int i = 0; i < geo->numTexels; i++)
+        geo->texels[i] = vec3(0,0,0);
     
     return geo;
-}
-
-
-Geometry parseLayout(const char* const filename, const float scaling)
-{
-    int colorType, width, height;
-    uint8_t *pixelBuffer;
-    read_png_file(filename, &width, &height, &colorType, (uint8_t**)&pixelBuffer );
-    
-    Geometry geo = parseLayoutCore(pixelBuffer, width, height, colorType, scaling);
-    free(pixelBuffer);
-    return geo;
-}
-
-Geometry parseLayoutMem(const uint8_t *data, int dataSize, const float scaling)
-{
-    int colorType, width, height;
-    uint8_t *pixelBuffer;
-    read_png_from_memory(data, dataSize, &width, &height, &colorType, (uint8_t**)&pixelBuffer );
-    
-    Geometry geo = parseLayoutCore(pixelBuffer, width, height, colorType, scaling);
-    free(pixelBuffer);
-    return geo;
-}
-
-Geometry* parseLayoutStatic(const char* filename, float scale)
-{
-    static Geometry geo = { .windows= NULL, .lights=NULL, .walls = NULL, .boxWalls = NULL,
-    .numWindows = 0, .numLights = 0, .numWalls = 0, .numBoxWalls = 0, .width = 0, .height = 0,
-    .startingPositionX = 0, .startingPositionY = 0, .numTexels= 0, .texels = NULL };
-    
-    freeGeometry(geo);  // in case of leftover data from a previous call to this method
-    geo = parseLayout(filename, scale);
-    
-    return &geo;
-}
-
-Geometry* parseLayoutStaticMem(const uint8_t* data, int dataSize, float scale)
-{
-    static Geometry geo = { .windows= NULL, .lights=NULL, .walls = NULL, .boxWalls = NULL,
-    .numWindows = 0, .numLights = 0, .numWalls = 0, .numBoxWalls = 0, .width = 0, .height = 0,
-    .startingPositionX = 0, .startingPositionY = 0, .numTexels= 0, .texels = NULL };
-    
-    freeGeometry(geo);  // in case of leftover data from a previous call to this method
-    geo = parseLayoutMem(data, dataSize, scale);
-    
-    return &geo;
-}
-
-static int max(int a, int b) { return a > b ? a : b; }
-
-static int print( char* dst, int *dstPos, int dstSize, const char* fmt, ...)
-{
-	va_list argp;
-	va_start(argp, fmt);    
-	
-	int nChars = vsnprintf( dst ? &dst[*dstPos] : NULL, 
-	                     dst? max(dstSize - *dstPos, 0) : 0, 
-	                     fmt, argp);
-    va_end(argp);
-    
-    *dstPos += nChars;
-        
-    return nChars;
 }
 
 static int toJsonString(int width, int height, uint8_t *collisionMap, char *out, int outSize)
@@ -741,39 +602,28 @@ void dilate(int width, int height, uint8_t *collisionMap, int radius)
     free(tmp);
 }
 
-char* buildCollisionMap(const char* filename)
+char* buildCollisionMap(const Image* const img)
 {
-    int width, height, colorType;
-    uint8_t *src;
-
-    read_png_file(filename, &width, &height, &colorType, &src );
-
-    uint8_t *collisionMap = (uint8_t*) malloc(width*height *sizeof(uint8_t));
-    assert(colorType == PNG_COLOR_TYPE_RGB || (colorType == PNG_COLOR_TYPE_RGBA));
-
-    uint32_t* srcRGBA = (uint32_t*) src;
-
-    for (int i = 0; i < width * height; i++)
+    uint8_t *collisionMap = (uint8_t*) malloc(img->width * img->height *sizeof(uint8_t));
+    for (int i = 0; i < img->width * img->height; i++)
     {
-        uint32_t val = (colorType == PNG_COLOR_TYPE_RGB) ?
-            0xFF000000 | src[i*3] | (src[i*3+1] << 8) | (src[i*3+2] << 16) :
-            srcRGBA[i];
+        uint32_t val = img->data[i];
             
         // EMPTY, DOOR, and BALCONY_DOOR are passable
         collisionMap[i] = (val == 0xFFFFFFFF || val == 0xFFDFDFDF || val == 0xFFFF0000) ?
             255 : 0;
     }
-    free(src);
 
-    dilate(width, height, collisionMap, 5);
+    dilate(img->width, img->height, collisionMap, 5);
     /*
     FILE* f = fopen("collision.raw", "wb");
     fwrite(collisionMap, width*height*sizeof(uint8_t), 1, f);
     fclose(f);*/
     
-    int nBytes = toJsonString(width, height, collisionMap, NULL, 0) + 1;
+    int nBytes = toJsonString(img->width, img->height, collisionMap, NULL, 0) + 1;
     char* str = (char*)malloc(nBytes);
-    toJsonString(width, height, collisionMap, str, nBytes);
+    str[0] = '\0';
+    toJsonString(img->width, img->height, collisionMap, str, nBytes);
     
     free(collisionMap);
     

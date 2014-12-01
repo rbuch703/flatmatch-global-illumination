@@ -514,29 +514,29 @@ BspTreeNode* buildBspTree( Rectangle* items, int numItems)
     return root;
 }
 
-void performPhotonMappingNative(Geometry geo, int numSamplesPerArea)
+void performPhotonMappingNative(Geometry *geo, int numSamplesPerArea)
 {
-    BspTreeNode *root = buildBspTree(geo.walls, geo.numWalls);
+    BspTreeNode *root = buildBspTree(geo->walls, geo->numWalls);
 
-    for ( int i = 0; i < geo.numWindows; i++)
+    for ( int i = 0; i < geo->numWindows; i++)
     {
-        Vector3 xDir= getWidthVector(  &geo.windows[i]);
-        Vector3 yDir= getHeightVector( &geo.windows[i]);
+        Vector3 xDir= getWidthVector(  &geo->windows[i]);
+        Vector3 yDir= getHeightVector( &geo->windows[i]);
         
         float area = length(xDir) * length(yDir);
         uint64_t numSamples = (numSamplesPerArea * area);
         
-        photonmap(&geo.windows[i], root, geo.texels, 1/*true*/, numSamples);
+        photonmap(&geo->windows[i], root, geo->texels, 1/*true*/, numSamples);
     }
 
-    for ( int i = 0; i < geo.numLights; i++)
+    for ( int i = 0; i < geo->numLights; i++)
     {
-        Vector3 xDir= getWidthVector(  &geo.lights[i]);
-        Vector3 yDir= getHeightVector( &geo.lights[i]);
+        Vector3 xDir= getWidthVector(  &geo->lights[i]);
+        Vector3 yDir= getHeightVector( &geo->lights[i]);
         
         float area = length(xDir) * length(yDir);
         uint64_t numSamples = (numSamplesPerArea * area);
-        photonmap(&geo.lights[i], root, geo.texels, 0/*false*/, numSamples);
+        photonmap(&geo->lights[i], root, geo->texels, 0/*false*/, numSamples);
     }
     freeBspTree(root);
     free(root);
@@ -586,14 +586,14 @@ void performAmbientOcclusionNativeOnWall(Geometry* geo, const BspTreeNode *root,
 }
 
 
-void performAmbientOcclusionNative(Geometry geo)
+void performAmbientOcclusionNative(Geometry *geo)
 {
-    BspTreeNode* root = buildBspTree(geo.walls, geo.numWalls);
+    BspTreeNode* root = buildBspTree(geo->walls, geo->numWalls);
 
-    for (int i = 0; i < geo.numWalls; i++)
+    for (int i = 0; i < geo->numWalls; i++)
     {
-        printf("processing wall %d/%d\n", i+1, geo.numWalls);
-        performAmbientOcclusionNativeOnWall(&geo, root, &geo.walls[i]);
+        printf("processing wall %d/%d\n", i+1, geo->numWalls);
+        performAmbientOcclusionNativeOnWall(geo, root, &geo->walls[i]);
     }
     freeBspTree(root);
     free(root);

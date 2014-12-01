@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <string.h>
 
 #include "png_helper.h"
 
@@ -48,6 +49,7 @@ void freeImage(Image *img)
 {
     free(img->data);
     img->data = NULL;
+    free(img);
 }
 
 int clampInt(int val, int min, int max)
@@ -56,7 +58,7 @@ int clampInt(int val, int min, int max)
     return val < min ? min : (val > max ? max : val);
 }
     
-uint32_t getImagePixel(Image* img, int x, int y)
+uint32_t getImagePixel(const Image* const img, int x, int y)
 {
     x = clampInt(x, 0, img->width-1);
     y = clampInt(y, 0, img->height-1);
@@ -184,4 +186,62 @@ void saveImageAs(Image *img, const char* filename)
 /*int getHeight() const { return height;}
 int getWidth()  const { return width;}*/
 
+static uint32_t* convertRgbToRgba(uint8_t *rgbData, int numElements)
+{
+    //uint8_t *src = (uint8_t*)pixelBuffer;
+    uint32_t *data = (uint32_t*)malloc( numElements * sizeof(uint32_t) );
+    
+    for (int i = 0; i < numElements; i++)
+        data[i] =
+            0xFF000000 | rgbData[i*3] | (rgbData[i*3+1] << 8) | (rgbData[i*3+2] << 16);
+    
+    return data;
+}
+
+Image* loadImage(const char* filename)
+{
+    int colorType, width, height;
+    uint8_t *pixelBuffer;
+    read_png_file(filename, &width, &height, &colorType, (uint8_t**)&pixelBuffer );
+    
+        
+    uint32_t *data = (uint32_t*)pixelBuffer;
+    if (colorType == PNG_COLOR_TYPE_RGB)
+    {
+        data = convertRgbToRgba(pixelBuffer, width * height);
+        free(pixelBuffer);
+    } 
+    
+    Image *res = (Image*)malloc(sizeof(Image));
+    *res = (Image){.width = width, .height = height, .data = data};
+    return res;
+}
+
+Image* loadImageFromMemory(const uint8_t *const pngData, int pngDataSize)
+{
+    int colorType;
+    Image *res = (Image*)malloc(sizeof(Image));
+    read_png_from_memory(pngData, pngDataSize, &res->width, &res->height, &colorType, (uint8_t**)&res->data );
+
+    if (colorType == PNG_COLOR_TYPE_RGB)
+    {
+        uint32_t *data = convertRgbToRgba( (uint8_t*)res->data, res->width * res->height);
+        free(res->data);
+        res->data = data;
+    } 
+    
+    return res;
+}
+
+
+Image* cloneImage(const Image * const img)
+{
+    Image *res = (Image*)malloc(sizeof(Image));
+    *res = (Image){ .width = img->width, .height= img->height, 
+                    .data = (uint32_t*)malloc( img->width * img->height * sizeof(uint32_t))};
+                    
+    memcpy(res->data, img->data, img->width * img->height * sizeof(uint32_t));
+    return res;
+
+}
 

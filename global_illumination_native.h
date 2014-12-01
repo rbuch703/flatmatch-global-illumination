@@ -11,8 +11,8 @@ extern "C" {
 struct BspTreeNode;
 //typedef struct BspTreeNode BspTreeNode;
 
-void performPhotonMappingNative(Geometry geo, int numSamplesPerArea);
-void performAmbientOcclusionNative(Geometry geo);
+void performPhotonMappingNative(Geometry *geo, int numSamplesPerArea);
+void performAmbientOcclusionNative(Geometry *geo);
 void performAmbientOcclusionNativeOnWall(Geometry* geo, const struct BspTreeNode *root, Rectangle* wall);
 struct BspTreeNode* buildBspTree( Rectangle* items, int numItems);
 void freeBspTree(struct BspTreeNode *root);

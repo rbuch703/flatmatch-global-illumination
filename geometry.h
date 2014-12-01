@@ -14,18 +14,15 @@ typedef struct Geometry {
 
 } Geometry;
 
-void freeGeometry(Geometry geo);
+void freeGeometry(Geometry *geo);
 
 // the following methods are just for the emscripten/JavaScript interface
 Geometry* createGeometryObject();
-
+char* getJsonString(Geometry *geo);
 int geometryGetNumWalls(Geometry *geo);
 Rectangle* geometryGetWallPtr(Geometry *geo, int rectangleId);
 Vector3*   geometryGetTexelPtr(Geometry *geo);
-// end of emscripten interface
 
-int writeJsonOutput( Geometry geo, char* out, int outSize);
-char* getJsonString(Geometry *geo);
 
 
 #endif

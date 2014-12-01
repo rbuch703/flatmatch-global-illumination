@@ -1,5 +1,5 @@
 
-SRC_C = main.c png_helper.c rectangle.c geometry.c image.c vector3_cl.c photonmap.c geoSphere.c parseLayout.c
+SRC_C = main.c png_helper.c rectangle.c geometry.c image.c vector3_cl.c photonmap.c geoSphere.c parseLayout.c helpers.c
 SRC_CC =  # global_illumination_cl.cc 
 SRC = $(SRC_C) $(SRC_CC)
 
@@ -44,7 +44,7 @@ index.js: $(BC)
 	@echo [LD] $@
 	@$(EMCC) -O3 $(BC) lib/*.bc\
     --embed-file 137.png \
-    -s EXPORTED_FUNCTIONS='["_parseLayoutStaticMem", "_geometryGetNumWalls", "_geometryGetWallPtr", "_buildBspTree", "_performAmbientOcclusionNativeOnWall", "_saveAsBase64Png", "_geometryGetTexelPtr", "_getJsonString", "_base64_encode"]'\
+    -s EXPORTED_FUNCTIONS='["_parseLayout", "_geometryGetNumWalls", "_geometryGetWallPtr", "_buildBspTree", "_performAmbientOcclusionNativeOnWall", "_saveAsBase64Png", "_geometryGetTexelPtr", "_getJsonString", "_base64_encode", "_buildCollisionMap", "_freeImage", "_freeGeometry"]'\
     -s TOTAL_MEMORY=33554432\
     -s NO_EXIT_RUNTIME=1 \
     -o $@

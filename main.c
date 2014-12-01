@@ -30,8 +30,10 @@ int main(int argc, const char** argv)
   
     //string filename = (argc >= 2) ? argv[1] : "out.png" ;
     float scale = argc < 3 ? 30 : atof(argv[2]);
+    Image* img = loadImage(argv[1]);
+    
 
-    char* jsonCollisionMap = buildCollisionMap(argv[1]);
+    char* jsonCollisionMap = buildCollisionMap(img);
     FILE* f = fopen("collisionMap.json", "wb");
     fwrite( jsonCollisionMap, strlen(jsonCollisionMap), 1, f);
     fclose(f);
@@ -39,16 +41,17 @@ int main(int argc, const char** argv)
 
     /** scale is passed in the more human-readable pixel/m, 
         but the geometry loader needs it in m/pixel */
-    Geometry geo = parseLayout(argv[1], 1/scale);
+    Geometry *geo = parseLayout(img, 1/scale);
+    freeImage(img);
 
-    char* s = getJsonString(&geo);    
+    char* s = getJsonString(geo);
     /*FILE**/ f = fopen("geometry.json", "wb");
     fwrite(s, strlen(s), 1, f); //don't write zero-termination
     fclose(f);
     free(s);
 
 
-    printf("[INF] Layout consists of %d walls (%fk texels) and %d windows\n", geo.numWalls, geo.numTexels/1000.0, geo.numWindows);
+    printf("[INF] Layout consists of %d walls (%fk texels) and %d windows\n", geo->numWalls, geo->numTexels/1000.0, geo->numWindows);
     
 
     int numSamplesPerArea = 1000000 * 1;   // rays per square meter of window/light surface
@@ -62,25 +65,25 @@ int main(int argc, const char** argv)
     
     if (illuminationMode == PHOTON_NATIVE || illuminationMode == PHOTON_CL)
     {
-        for ( int i = 0; i < geo.numWalls; i++)
+        for ( int i = 0; i < geo->numWalls; i++)
         {
-            Rectangle *obj = &geo.walls[i];
+            Rectangle *obj = &geo->walls[i];
             float tilesPerSample = getNumTiles(obj) / ( getArea(obj) * numSamplesPerArea);  
             int baseIdx = obj->lightmapSetup.s[0];
 
             for (int j = 0; j < getNumTiles(obj); j++)
-                geo.texels[baseIdx + j] = mul(geo.texels[baseIdx +j], 0.35 * tilesPerSample);
+                geo->texels[baseIdx + j] = mul(geo->texels[baseIdx +j], 0.35 * tilesPerSample);
         }    
     }
 
     //write texture files
     char *filename;
-    for ( int i = 0; i < geo.numWalls; i++)
+    for ( int i = 0; i < geo->numWalls; i++)
     {
         int numChars = snprintf(filename, 0, "tiles/tile_%d.png", i);
         filename = (char*) malloc (numChars+1); //plus zero-termination
         snprintf(filename, numChars+1, "tiles/tile_%d.png", i);
-        saveAs(    &geo.walls[i], filename, geo.texels,
+        saveAs(    &geo->walls[i], filename, geo->texels,
             illuminationMode == PHOTON_NATIVE || illuminationMode == AMBIENT_OCCLUSION);
             
         free(filename);

@@ -2,33 +2,12 @@
 #ifndef PARSELAYOUT_H
 #define PARSELAYOUT_H
 
+#include "image.h"
 #include "geometry.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+Geometry* parseLayout(const Image* const img, const float scaling);
 
-
-
-Geometry parseLayout(const char* const filename, const float scaling);
-Geometry parseLayoutMem(const uint8_t *pngData, int dataSize, const float scaling);
-
-/* these methods exist mostly for the emscripten interface. The returned pointer 
- * refers to a static object without parseLayoutStatic (hence the method's name).
- * The caller does not own the resulting Geometry object and thus does not have 
- * to free it */
-Geometry* parseLayoutStatic(const char* filename, float scale);
-Geometry* parseLayoutStaticMem(const uint8_t* pngData, int dataSize, float scale);
-
-char* getJsonFromLayout(const char* const filename,float scaling);
-char* getJsonFromLayoutMem( const uint8_t *data, int dataSize, float scaling);
-
-char* buildCollisionMap(const char* filename);
-
-#ifdef __cplusplus
-}
-#endif
-
+char* buildCollisionMap(const Image* const img);
 
 #endif
 

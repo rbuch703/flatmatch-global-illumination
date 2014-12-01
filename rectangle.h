@@ -27,6 +27,12 @@ typedef struct __attribute__ ((aligned(16))) Rectangle{
 //    float 
 } Rectangle;
 
+typedef struct {
+    Rectangle *data;
+    cl_int numItems;
+    cl_int maxNumItems;
+} RectangleArray;
+
 
 Rectangle createRectangleV( const Vector3 _pos, const Vector3 _width, const Vector3 _height);
 Rectangle createRectangle( float px, float py, float pz,
@@ -34,7 +40,6 @@ Rectangle createRectangle( float px, float py, float pz,
                            float hx, float hy, float hz);
 
 
-//Methods for the 'Rectangle' struct
 int getPosition(const Rectangle *plane, const Rectangle *rect);
 double getDistance(const Rectangle *plane, const Vector3 p);
 
@@ -52,9 +57,16 @@ Vector3 getTileCenter(const Rectangle *rect, int tileId);
 void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights, int tintExtra);
 int saveAsMemoryPng(const Rectangle *rect, const Vector3 *lights, int tintExtra, uint8_t**data);
 char* saveAsBase64Png(const Rectangle *rect, const Vector3 *lights, int tintExtra);
-char* base64_encode(const unsigned char *data, size_t input_length);
 
 void saveAsRaw(const Rectangle *rect, const char *filename, const Vector3 *lights);
+
+
+RectangleArray initRectangleArray();
+void freeRectangleArray(RectangleArray *arr);
+void resizeRectangleArray(RectangleArray *arr, int newSize);
+void insertIntoRectangleArray(RectangleArray *arr, Rectangle rect);
+
+
 
 #ifdef __cplusplus
 }

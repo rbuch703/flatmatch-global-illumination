@@ -25,12 +25,17 @@ typedef struct {
     uint32_t *data;
 } Image;
 
-void freeImage(Image *img);
-uint32_t getImagePixel(Image* img, int x, int y);
+void freeImage(Image *img); //frees the image data, as well as the image pointer itself (not safe for stack allocation)
+uint32_t getImagePixel(const Image* const img, int x, int y);
 int setImagePixel(Image* img, int x, int y, uint32_t val);
 unsigned int distanceTransform(Image *img);
 void floodFillImage(Image *img, int x, int y, uint32_t value, uint32_t background);
 void saveImageAs(Image *img, const char* filename);
+
+
+Image* cloneImage(const Image * const img);
+Image* loadImage(const char* filename);
+Image* loadImageFromMemory(const uint8_t *const pngData, int pngDataSize);
 
 #endif
 

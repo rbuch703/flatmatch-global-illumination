@@ -13,6 +13,7 @@ tiles
 tiles.bak
 
 geometry.json
+collisionMap.json
 
 # output of emscripten
 *.html

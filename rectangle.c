@@ -3,6 +3,7 @@
 //#include <stdlib.h> // for rand()
 //#include <math.h>
 #include "png_helper.h"
+#include "helpers.h"
 
 //#include "imageProcessing.h"
 
@@ -311,46 +312,6 @@ int saveAsMemoryPng(const Rectangle *rect, const Vector3 *lights, int tintExtra,
     return pngDataSize;
 }
 
-static char encoding_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
-                                'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
-                                'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
-                                'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f',
-                                'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
-                                'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
-                                'w', 'x', 'y', 'z', '0', '1', '2', '3',
-                                '4', '5', '6', '7', '8', '9', '+', '/'};
-//static char *decoding_table = NULL;
-static int mod_table[] = {0, 2, 1};
-
-char *base64_encode(const unsigned char *data, size_t input_length) {
-
-    int output_length = 4 * ((input_length + 2) / 3);
-
-    char *encoded_data = malloc(output_length + 1);
-    if (encoded_data == NULL) return NULL;
-
-    for (uint32_t i = 0, j = 0; i < input_length;) {
-
-        uint32_t octet_a = i < input_length ? (unsigned char)data[i++] : 0;
-        uint32_t octet_b = i < input_length ? (unsigned char)data[i++] : 0;
-        uint32_t octet_c = i < input_length ? (unsigned char)data[i++] : 0;
-
-        uint32_t triple = (octet_a << 0x10) + (octet_b << 0x08) + octet_c;
-
-        encoded_data[j++] = encoding_table[(triple >> 3 * 6) & 0x3F];
-        encoded_data[j++] = encoding_table[(triple >> 2 * 6) & 0x3F];
-        encoded_data[j++] = encoding_table[(triple >> 1 * 6) & 0x3F];
-        encoded_data[j++] = encoding_table[(triple >> 0 * 6) & 0x3F];
-    }
-
-    for (int i = 0; i < mod_table[input_length % 3]; i++)
-        encoded_data[output_length - 1 - i] = '=';
-        
-    encoded_data[output_length] = '\0';
-
-    return encoded_data;
-}
-
 
 char* saveAsBase64Png(const Rectangle *rect, const Vector3 *lights, int tintExtra)
 {
@@ -457,3 +418,34 @@ int getPosition(const Rectangle *plane, const Rectangle *rect)
     
     return 0;    
 }
+
+RectangleArray initRectangleArray()
+{
+    RectangleArray res = {.data = (Rectangle*)malloc ( sizeof(Rectangle) * 64), 
+                        .numItems = 0, 
+                        .maxNumItems = 64};
+    return res;
+};
+
+void freeRectangleArray(RectangleArray *arr)
+{
+    free(arr->data);
+    arr->data = NULL;
+}
+
+void resizeRectangleArray(RectangleArray *arr, int newSize)
+{
+    arr->data = (Rectangle*)realloc(arr->data, newSize*sizeof(Rectangle));
+    arr->maxNumItems = newSize;
+    if (arr->numItems > arr->maxNumItems)   // array was just shortened
+        arr->numItems = arr->maxNumItems;
+}
+
+void insertIntoRectangleArray(RectangleArray *arr, Rectangle rect)
+{
+    if (arr->numItems == arr->maxNumItems)
+        resizeRectangleArray( arr, arr->maxNumItems*2);
+        
+    arr->data[arr->numItems++] = rect;
+}
+
