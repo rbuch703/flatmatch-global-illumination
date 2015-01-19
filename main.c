@@ -26,7 +26,7 @@ int main(int argc, const char** argv)
         return -1;
     }
     
-    MODE illuminationMode = AMBIENT_OCCLUSION;
+    MODE illuminationMode = PHOTON_CL;
   
     //string filename = (argc >= 2) ? argv[1] : "out.png" ;
     float scale = argc < 3 ? 30 : atof(argv[2]);
@@ -41,7 +41,7 @@ int main(int argc, const char** argv)
 
     /** scale is passed in the more human-readable pixel/m, 
         but the geometry loader needs it in m/pixel */
-    const float TILE_SIZE = 1000/20.0f*0.1;   //lightmap texels per m²
+    const float TILE_SIZE = 500;   //lightmap texels per m²
     Geometry *geo = parseLayout(img, 1/scale, TILE_SIZE);
     freeImage(img);
 
@@ -52,15 +52,15 @@ int main(int argc, const char** argv)
     free(s);
 
 
-    printf("[INF] Layout consists of %d walls (%fk texels) and %d windows\n", geo->numWalls, geo->numTexels/1000.0, geo->numWindows);
+    printf("[INF] Layout consists of %d walls (%.2fk texels) %d windows, %d lights\n", geo->numWalls, geo->numTexels/1000.0, geo->numWindows, geo->numLights);
     
 
-    int numSamplesPerArea = 1000000 * 1;   // rays per square meter of window/light surface
+    int numSamplesPerArea = 1000 * 1000 * 100;   // rays per square meter of window/light surface
     
     switch (illuminationMode)
     {
         case PHOTON_NATIVE: performPhotonMappingNative(geo, numSamplesPerArea); break;
-        case PHOTON_CL:    return -1;break;//performGlobalIlluminationCl(geo, numSamplesPerArea); break;
+        case PHOTON_CL:    performGlobalIlluminationCl(geo, numSamplesPerArea); break;
         case AMBIENT_OCCLUSION: performAmbientOcclusionNative(geo );            break;
     }
     
@@ -85,7 +85,7 @@ int main(int argc, const char** argv)
         filename = (char*) malloc (numChars+1); //plus zero-termination
         snprintf(filename, numChars+1, "tiles/tile_%d.png", i);
         saveAs(    &geo->walls[i], filename, geo->texels,
-            illuminationMode == PHOTON_NATIVE || illuminationMode == AMBIENT_OCCLUSION);
+            illuminationMode == AMBIENT_OCCLUSION || illuminationMode == PHOTON_NATIVE);
             
         free(filename);
         //saveAsRaw( &geo.walls[i], (filename + ".raw").c_str(), geo.texels);

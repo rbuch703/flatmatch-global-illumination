@@ -331,7 +331,10 @@ static void tracePhoton(const Rectangle *window, const BspTreeNode *root, Vector
         //printf("work_item %d, hit_pos (%f,%f,%f), new_dir (%f,%f,%f) \n", get_global_id(0), pos.s0, pos.s1, pos.s2, ray_dir.s0, ray_dir.s1, ray_dir.s2);
         
         /* Russian roulette for type of reflection: perfect or diffuse (floor is slightly reflective, everything else is diffuse*/
-        if (pos.s[2] > 0.0005 || rand()/(double)RAND_MAX > 0.75)
+        if (pos.s[2] < 0.0005 && rand()/(double)RAND_MAX < 0.75)
+        {   //perfect reflection
+            ray_dir = sub(ray_dir, mul(hitObj->n, 2* (dot(hitObj->n,ray_dir))));
+        } else
         {   //diffuse reflection
             ray_dir = getCosineDistributedRandomRay(hitObj->n);
 
@@ -340,15 +343,14 @@ static void tracePhoton(const Rectangle *window, const BspTreeNode *root, Vector
             {
                 //printf("%s\n", "Beep");
                 //lightColor.s0 *= 0.0f;
+                /*lightColor.s[0] *= 1.0f;
+                lightColor.s[1] *= 0.95f;
+                lightColor.s[2] *= 0.9f;*/
                 lightColor.s[0] *= 1.0f;
                 lightColor.s[1] *= 0.85f;
                 lightColor.s[2] *= 0.7f;
             }
             lightColor = mul( lightColor, 0.9f);
-        } else
-        {   //perfect reflection
-        
-            ray_dir = sub(ray_dir, mul(hitObj->n, 2* (dot(hitObj->n,ray_dir))));
         }
 
         //FIXME: make this increment atomic
@@ -367,11 +369,11 @@ void photonmap( const Rectangle *window, const BspTreeNode* root, Vector3 *light
 {
 
     //printf("kernel supplied with %d rectangles\n", numRects);
-    
-    for (int i = 0; i < numSamples; i++)
+    printf("tracing %s\n", isWindow ? "window" : "light");
+    for (int i = 1; i <= numSamples; i++)
     {
-        if (i % 100000 == 0)
-            printf("%d samples, %f %% done.\n", i, (i/(double)numSamples*100));
+        if ( i % 1000000 == 0)
+            printf("%dk samples, %.1f %% done.\n", i/1000, (i/(double)numSamples*100));
         tracePhoton(window, root, lightColors, isWindow);
     }
 }

@@ -276,8 +276,8 @@ static void saveAs_core(const Rectangle *rect, const Vector3 *lights, int tintEx
             if (tintExtra)
             {
                 data[i+0] *= 1.0f;
-                data[i+1] *= 0.85f;
-                data[i+2] *= 0.7f;
+                data[i+1] *= 0.95f;
+                data[i+2] *= 0.9f;
             }
         }
     }

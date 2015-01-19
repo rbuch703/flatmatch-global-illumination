@@ -1,11 +1,17 @@
 #ifndef GLOBAL_ILLUMINATION_CL
 #define GLOBAL_ILLUMINATION_CL
 
-#include "rectangle.h"
+#include "geometry.h"
 
-void performGlobalIlluminationCl(Geometry geo, int numSamplesPerArea);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
+void performGlobalIlluminationCl(Geometry *geo, int numSamplesPerArea);
 
+#ifdef __cplusplus
+}
+#endif
 
 
 #endif

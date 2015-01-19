@@ -13,6 +13,8 @@
 #include <vector>
 
 #include "rectangle.h"
+#include "geometry.h"
+#include "global_illumination_cl.h"
 
 using namespace std;
 
@@ -245,8 +247,8 @@ void photonMapLightSource(cl_context ctx, cl_command_queue queue, cl_kernel kern
 
 }
 
-void performGlobalIlluminationCl(Geometry geo, Vector3* lightColors, cl_int numTexels,
-                               int numSamplesPerArea)
+
+void performGlobalIlluminationCl(Geometry *geo, int numSamplesPerArea)
 {
     cl_context ctx;
     cl_device_id device;
@@ -261,12 +263,12 @@ void performGlobalIlluminationCl(Geometry geo, Vector3* lightColors, cl_int numT
     free(program_str);
 
 
-    cl_mem rectBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY |CL_MEM_COPY_HOST_PTR, geo.numWalls * sizeof(Rectangle),(void *) geo.walls, NULL);
+    cl_mem rectBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY |CL_MEM_COPY_HOST_PTR, geo->numWalls * sizeof(Rectangle),(void *) geo->walls, NULL);
 
     cl_int st = 0;
     cl_int status = 0;
 
-    cl_mem lightColorsBuffer = clCreateBuffer(ctx, CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR, numTexels * sizeof(cl_float3),(void *) lightColors, &st);
+    cl_mem lightColorsBuffer = clCreateBuffer(ctx, CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR, geo->numTexels * sizeof(cl_float3),(void *) geo->texels, &st);
     status |= st;
     
     size_t maxWorkGroupSize = 0;
@@ -275,15 +277,15 @@ void performGlobalIlluminationCl(Geometry geo, Vector3* lightColors, cl_int numT
     //clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(maxWorkGroupSize), &maxWorkGroupSize, NULL);
     //cout << "Maximum workgroup size for this kernel on this device is " << maxWorkGroupSize << endl;
 
-    for ( int i = 0; i < geo.numWindows; i++)
-        photonMapLightSource(ctx, queue, kernel, geo.windows[i], numSamplesPerArea, true, maxWorkGroupSize, rectBuffer, lightColorsBuffer, geo.numWalls);
+    for ( int i = 0; i < geo->numWindows; i++)
+        photonMapLightSource(ctx, queue, kernel, geo->windows[i], numSamplesPerArea, true, maxWorkGroupSize, rectBuffer, lightColorsBuffer, geo->numWalls);
 
-    for ( int i = 0; i < geo.numLights; i++)
-        photonMapLightSource(ctx, queue, kernel, geo.lights[i], numSamplesPerArea, false, maxWorkGroupSize, rectBuffer, lightColorsBuffer, geo.numWalls);
+    for ( int i = 0; i < geo->numLights; i++)
+        photonMapLightSource(ctx, queue, kernel, geo->lights[i], numSamplesPerArea, false, maxWorkGroupSize, rectBuffer, lightColorsBuffer, geo->numWalls);
 
     
     clFinish(queue);
-    clEnqueueReadBuffer(queue, lightColorsBuffer, CL_TRUE, 0, numTexels * sizeof(cl_float3),  (void *) lightColors, 0, NULL, NULL);
+    clEnqueueReadBuffer(queue, lightColorsBuffer, CL_TRUE, 0, geo->numTexels * sizeof(cl_float3),  (void *) geo->texels, 0, NULL, NULL);
 
     clFinish(queue);
     clReleaseKernel(kernel);

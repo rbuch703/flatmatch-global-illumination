@@ -263,7 +263,7 @@ void createLightSourceInRoom(Image *img, Image *visited, int roomX, int roomY, f
     /*printf("found room with center at (%d, %d) with distance %d and area %d\n",
            bestCenter.x, bestCenter.y, maxDist, numPixels);*/
            
-    float edgeHalfLength = sqrt(numPixels) / 10;//7;
+    float edgeHalfLength = sqrt(numPixels) / 9;//7;
 
     //maxDist is the maximum distance from maxPos for which it is guaranteed that there is no wall in any direction
     if (edgeHalfLength > maxDist-1)
@@ -516,7 +516,7 @@ Geometry* parseLayout(const Image* const src, const float scaling, const float T
         geo->numTexels += getNumTiles(&geo->walls[i]);
     }
         
-    printf( "[DBG] allocating %fMB for texels\n", geo->numTexels * sizeof(Vector3)/1000000.0);
+    printf( "[DBG] allocating %.2fMB for texels\n", geo->numTexels * sizeof(Vector3)/1000000.0);
     if (geo->numTexels * sizeof(Vector3) > 1000*1000*1000)
     {
         printf("[Err] Refusing to allocate more than 1GB for texels, this would crash most GPUs. Exiting ...\n");
