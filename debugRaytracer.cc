@@ -41,7 +41,7 @@ Rectangle* findClosestIntersectionLinear(Vector3 rayPos, Vector3 rayDir, Rectang
         if (dist_new < 0)
             continue;
             
-        if (dist_new < *dist) {
+        if (dist_new <= *dist) {
                 hitObj = target;
             *dist = dist_new;
         }
@@ -72,7 +72,7 @@ Rectangle* findClosestIntersectionSorted(Vector3 rayPos, Vector3 rayDir, RectInf
         if (dist_new < 0)
             continue;
             
-        if (dist_new < *dist) {
+        if (dist_new <= *dist) {
                 hitObj = &target->rect;
             *dist = dist_new;
         }
@@ -118,13 +118,6 @@ int compareRectInfo( const void* a, const void* b)
 
 int main()
 {
-    /*
-    Rectangle r = createRectangleV( vec3(0,0,0), vec3(1,0,1), vec3(0,1,1), 500);
-    Vector3 p = vec3( 2,3,1);
-    float res = getShortestDistanceRectToPoint( &r, p);
-    cout << "distance is " << res << endl;
-    exit(0);*/
-
     Image* img = loadImage("137.png");
     Geometry *geo = parseLayout(img, /*scale*/1/30.0, 500);
     colorRects(geo->walls, geo->numWalls);
@@ -135,23 +128,23 @@ int main()
     
     
     //BspTreeNode *root = buildBspTree(geo->walls, geo->numWalls);
-    /*
+
     Vector3 camPos = createVector3(1+4, 1.2+4, 1.6);
     Vector3 camDir = normalized(createVector3(1, 1, 0));
     Vector3 screenCenter = add( camPos, camDir);
     Vector3 camUp  = createVector3(0, 0, 1);
-    Vector3 camRight = cross(camDir, camUp );*/
+    Vector3 camRight = cross(camDir, camUp );
 
-    
+    /*
     Vector3 camPos = createVector3(10, 7, 20);
     Vector3 camDir = normalized(createVector3(0, 0, -1));
     Vector3 screenCenter = add( camPos, camDir);
     Vector3 camUp  = createVector3(0, 1, 0);
-    Vector3 camRight = cross(camDir, camUp );
+    Vector3 camRight = cross(camDir, camUp );*/
     //cout << "camRight: (" << camRight.s[0] << ", " << camRight.s[1] << ", " << camRight.s[2] << ")" << endl;
 
 
-    RectangleArray arFloorCeiling = initRectangleArray();
+    //RectangleArray arFloorCeiling = initRectangleArray();
     RectangleArray potentialHits= initRectangleArray();
 /*    Rectangle ceilingPlane = createRectangleV( 
         vec3( 0, 0, 2.6), vec3( 1, 0, 0), vec3( 0, 1, 0), 500);
@@ -159,12 +152,11 @@ int main()
     Rectangle floorPlane = createRectangleV( 
         vec3( 0, 0, 0), vec3( 0, 1, 0), vec3( 1, 0, 0), 500);*/
 
-    //int numSkipableWalls = 0;
     for (int i = 0; i < geo->numWalls; i++)
     {
         Rectangle *wall = &(geo->walls[i]);
         
-        if ( dot(wall->n, camDir) > 0)         continue; // backface --> cannot be hit
+        if ( dot(wall->n, sub(wall->pos, camPos)) > 0)         continue; // backface --> cannot be hit
         if (isBehindRay(wall, camPos, camDir)) continue; // behind the camera --> cannot be hit
 
          //is a ceiling or floor rect, if its height is at 0.0 or 2.6m and its normal is pointing
@@ -174,11 +166,6 @@ int main()
 
         //insertIntoRectangleArray(isFloorOrCeiling ? &arFloorCeiling : &potentialHits, *wall);
         insertIntoRectangleArray(&potentialHits, *wall);
-
-        //cout << wall->pos  << "\t" << wall->n << endl;
-        
-        //wall->lightmapSetup = { .s = {255, 255, 255} };
-        //numSkipableWalls += 1;
     }
     
     int numRects = potentialHits.numItems;
@@ -187,34 +174,25 @@ int main()
         rects[i] = {.rect = potentialHits.data[i], 
                     .minDistance = getShortestDistanceRectToPoint(&potentialHits.data[i], camPos)};
     qsort(rects, numRects, sizeof(RectInfo), compareRectInfo);
-/*    for (int i = 0; i < numRects; i++)
-        for (int j = i+1; j < numRects; j++)
-        {
-            if (compareRectInfo( &rects[i], &rects[j]) > 0)
-            {
-                RectInfo tmp = rects[i];
-                rects[i] = rects[j];
-                rects[j] = tmp;
-            }
-        }*/
-    for (int i = 0; i < numRects; i++)
-        printf("%d\t %f\n", i, rects[i].minDistance);
-    
-    
-    cout << "potential hits: " << potentialHits.numItems << endl;
-    cout << "floor/ceiling rects: " << arFloorCeiling.numItems << endl;
 
+/*    for (int i = 0; i < numRects; i++)
+        printf("%d\t %f - %d, %d, %d\n", i, rects[i].minDistance,
+            rects[i].rect.lightmapSetup.s[0], rects[i].rect.lightmapSetup.s[1],  rects[i].rect.lightmapSetup.s[2]);*/
+        
+    cout << "potential hits: " << potentialHits.numItems << endl;
+    //cout << "floor/ceiling rects: " << arFloorCeiling.numItems << endl;
     
-    const float dx = 1/1000.0;
-    const float dy = 1/1000.0;
+    const float dx = 1/250.0;
+    const float dy = 1/250.0;
     
-/*    int y = 281;
-    for (int x = 660; x <= 690; x++)*/
+    /*int y = 361;
+    for (int x = 47; x <= 60; x++)*/
     for (int y = 0; y < img->height; y++)
         for (int x = 0; x < img->width; x++)
     {
         Vector3 screenPos = add3( screenCenter, mul(camRight, dx*(x- img->width/2)), mul(camUp, -dy*(y-img->height/2))) ;
         Vector3 rayDir = normalized(sub(screenPos, camPos));
+        assert(dot(rayDir, camDir) >= 0);
         
         float ceilingOrFloorDistance = INFINITY;
         /*if (rayDir.s[2] < 0)
@@ -230,14 +208,16 @@ int main()
 
 /*        if (!findClosestIntersection(camPos, rayDir, root, &dist, 0, &targetOut, 0) )*/
 //        if (!findClosestIntersectionLinear(camPos, rayDir, geo->walls, geo->numWalls, &dist, &targetOut) )
-        if (! (hitObj = findClosestIntersectionSorted(camPos, rayDir, rects,numRects, &dist)) )
 //        if (! (hitObj = findClosestIntersectionLinear(camPos, rayDir, potentialHits.data, potentialHits.numItems, &dist)) )
+        if (! (hitObj = findClosestIntersectionSorted(camPos, rayDir, rects,numRects, &dist)) )
             continue;
 
         setImagePixel(img, x, y, toRgba32(hitObj->lightmapSetup));
     }
 
     saveImageAs(img, "image.png");
+    free(rects);
+    freeRectangleArray(&potentialHits);
     freeImage(img);
         
     //freeBspTree(root);

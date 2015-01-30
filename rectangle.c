@@ -414,7 +414,7 @@ float getShortestDistanceRectToPoint( const Rectangle *rect, const Vector3 p)
     Vector3 vProjectedDistance = mul(rect->n, dot(vDist, rect->n));
     
     Vector3 vProjectedPointOnPlane = sub(p, vProjectedDistance);
-    assert( fabs(getDistanceToPlane(rect, vProjectedPointOnPlane)) < 1E-6);
+    assert( fabs(getDistanceToPlane(rect, vProjectedPointOnPlane)) < 1E-5);
     
     // distance vector from rectangle origin to projected "p"
     Vector3 vProjectedDist = sub( vProjectedPointOnPlane, rect->pos);
