@@ -66,7 +66,7 @@ v5 = (sin( 360 / 180 * pi), cos(360 / 180 * pi), 0);
 #v3 = (sin( 240 / 180 * pi), cos(240 / 180 * pi), 0);
 #v4 = (sin( 360 / 180 * pi), cos(360 / 180 * pi), 0);
 
-numIterations = 4;
+numIterations = 5;
 
 subdivide(v1, v2, v3, numIterations);
 subdivide(v1, v3, v4, numIterations);

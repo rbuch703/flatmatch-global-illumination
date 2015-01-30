@@ -9,6 +9,14 @@
 Vector3 add(Vector3 a, Vector3 b) { Vector3 res = { .s = {a.s[0]+b.s[0], a.s[1]+b.s[1], a.s[2]+b.s[2]} }; return res;}
 Vector3 sub(Vector3 a, Vector3 b) { Vector3 res = { .s = {a.s[0]-b.s[0], a.s[1]-b.s[1], a.s[2]-b.s[2]} }; return res;}
 
+void inc(Vector3 *a, const Vector3 b)
+{
+    (*a).s[0] += b.s[0];
+    (*a).s[1] += b.s[1];
+    (*a).s[2] += b.s[2];
+}
+
+
 Vector3 add3(const Vector3 a, const Vector3 b, const Vector3 c)
 {
     Vector3 res = { .s = {a.s[0] + b.s[0] + c.s[0], 

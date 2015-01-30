@@ -27,7 +27,7 @@ Rectangle createRectangleV( const Vector3 _pos, const Vector3 _width, const Vect
     float width = length(_width);
     float height = length(_height);
     float tile_size = ((float)res.lightmapSetup.s[1] * res.lightmapSetup.s[2]) / (width*height);
-    while (tile_size < TILE_SIZE) 
+    while (tile_size < TILE_SIZE)
     {
         float width_res = res.lightmapSetup.s[1] / width;
         float height_res= res.lightmapSetup.s[2] / height;
@@ -81,8 +81,7 @@ float intersects( const Rectangle *rect, Vector3 ray_src, Vector3 ray_dir, float
     if (closestDist * closestDist < squaredLength(ray) )
         return -1;
     
-    Vector3 p = add(ray_src, ray);
-    Vector3 pDir = sub(p, rect->pos);
+    Vector3 pDir = sub( add(ray_src, ray), rect->pos);
     
     float width_len  = length(rect->width);
     float height_len = length(rect->height);

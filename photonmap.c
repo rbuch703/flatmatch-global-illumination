@@ -116,43 +116,6 @@ Vector3 transformToOrthoNormalBase( const Vector3 in, const Vector3 b0, const Ve
     return res;
 }
 
-/*
-float intersects( const Rectangle *rect, const Vector3 ray_src, const Vector3 ray_dir, const float closestDist) 
-{
-    //if (dot(ray_dir,n) > 0) return -1; //backface culling
-    float denom = dot(rect->n, ray_dir);
-    if (denom >= 0) // == 0 > ray lies on plane; >0 --> is a backface
-        return -1;
-        
-    //float fac = n.dot( pos - ray_src ) / denom;
-    float fac = dot(rect->n, sub(rect->pos, ray_src)) / denom;
-    if (fac < 0) 
-        return -1;    //is behind camera, cannot be hit
-    
-    Vector3 ray = mul(ray_dir, fac);
-    
-    //early termination: if further away than the closest hit (so far), we can ignore this hit
-    //N.B.: dot(a,a) = squaredLength(a);
-    if (closestDist * closestDist < dot(ray, ray) )
-        return -1;
-    
-    Vector3 pDir = sub( add(ray_src, ray), rect->pos);
-    
-    float widthLength = length(rect->width);
-    float dx = dot( div_vec3(rect->width, widthLength),  pDir);
-    if (dx < 0 || dx > widthLength)
-        return -1;
-        
-    float heightLength= length(rect->height);
-    float dy = dot( div_vec3(rect->height, heightLength), pDir);
-    if  ( dy < 0 || dy > heightLength )
-        return -1;
-        
-    return fac;
-
-    //return select(-1.0f, fac,dx == clamp(dx, 0.0f, widthLength) && dy == clamp(dy, 0.0f, heightLength));
-
-}*/
 
 //#define DEBUG(X) {X;}
 #define DEBUG(X) {}
@@ -482,18 +445,13 @@ void subdivideNode( BspTreeNode *node, int depth )
 void freeBspTree(BspTreeNode *root)
 {
     if (root->left)
-    {
         freeBspTree(root->left);
-        free(root->left);
-    }
         
     if (root->right)
-    {
         freeBspTree(root->right);
-        free(root->right);
-    }
 
     free(root->items);        
+    free(root);
 }
 
 BspTreeNode* buildBspTree( Rectangle* items, int numItems)
@@ -541,7 +499,7 @@ void performPhotonMappingNative(Geometry *geo, int numSamplesPerArea)
         photonmap(&geo->lights[i], root, geo->texels, 0/*false*/, numSamples);
     }
     freeBspTree(root);
-    free(root);
+//    free(root);
 }
 
 void performAmbientOcclusionNativeOnWall(Geometry* geo, const BspTreeNode *root, Rectangle* wall)
@@ -598,5 +556,244 @@ void performAmbientOcclusionNative(Geometry *geo)
         performAmbientOcclusionNativeOnWall(geo, root, &geo->walls[i]);
     }
     freeBspTree(root);
-    free(root);
+//    free(root);
 }
+
+void pertubeGeoSphere(Vector3* geoSphere, int numVectors) {
+    float arc = rand() / (float)RAND_MAX;
+    for (int i = 0; i < numVectors; i++)
+    {
+        Vector3 v = geoSphere[i];
+        
+        float x = cos(arc) * v.s[0] - sin(arc) * v.s[1];
+        v.s[1]  = sin(arc) * v.s[0] + cos(arc) * v.s[1];
+        
+        v.s[0] = x;
+        geoSphere[i] = normalized(v);
+        
+    }
+}
+
+
+void performRadiosityNative(Geometry *geo)
+{
+    /*
+    for (int i = 0; i < 100; i++)
+    {
+        Vector3 v = getCosineDistributedRandomRay( vec3(0,0,1));
+        printf("%f, %f, %f\n", v.s[0], v.s[1], v.s[2]);
+    }
+    exit(0);*/
+    int numRects = geo->numWalls + geo->numWindows + geo->numLights;
+    Rectangle* rects = malloc( numRects * sizeof(Rectangle));
+    memcpy(rects,                 geo->walls,   geo->numWalls *   sizeof(Rectangle));
+    memcpy(&rects[geo->numWalls], geo->windows, geo->numWindows * sizeof(Rectangle));
+    memcpy(&rects[geo->numWalls+geo->numWindows], geo->lights, geo->numLights * sizeof(Rectangle));
+    int numTexels = geo->numTexels;
+    for (int i = geo->numWalls; i < geo->numWalls + geo->numWindows; i++)
+    {
+        rects[i].lightmapSetup.s[0] = numTexels;
+        numTexels += getNumTiles(&rects[i]);
+    }
+    int firstWindowTexel = geo->numTexels;
+    int firstLightTexel  = numTexels;
+
+    for (int i = geo->numWalls+ geo->numWindows; i < geo->numWalls + geo->numWindows + geo->numLights; i++)
+    {
+        rects[i].lightmapSetup.s[0] = numTexels;
+        numTexels += getNumTiles(&rects[i]);
+    }
+    
+    
+    printf("%d/%d texels\n", geo->numTexels, numTexels);
+    
+    Vector3 *srcTexels = malloc( numTexels * sizeof(Vector3));
+    Vector3 *destTexels = malloc( numTexels * sizeof(Vector3));
+    
+    
+    for (int i = 0; i < numTexels; i++)
+    {
+        if (i < firstWindowTexel) //is a wall texel
+            srcTexels[i] = vec3(0,0,0);
+        else if (i < firstLightTexel) //is a window texel
+            srcTexels[i] = vec3(30,30,30);
+        else
+            srcTexels[i] = vec3(28,28,32);
+        
+        destTexels[i] = vec3(0,0,0);
+    }
+        
+    
+    BspTreeNode* root = buildBspTree(rects, numRects);
+
+
+    int geoSphereNumVectors = 100;
+    
+    printf("\n\e[1A\e7");
+    //while(1);
+    
+    for (int depth = 0; depth < 8; depth++)
+    {
+        for (int i = 0; i < geo->numWalls; i++)
+        {
+            if ( (i+1)% 10 == 0)
+                printf("\e8processing wall #%d %d/%d\e[K\n", depth, i+1, geo->numWalls);
+            Rectangle* wall = &geo->walls[i];
+
+            Vector3 b1, b2;
+            createBase( wall->n, &b1, &b2);
+
+
+            for (int j = 0; j < getNumTiles(wall); j++)
+            {        
+
+                int texelIdx = wall->lightmapSetup.s[0] + j;
+                geo->texels[texelIdx] = vec3(0,0,0);
+                //printf("normal: %f, %f, %f\n", wall->n.s[0], wall->n.s[1], wall->n.s[2]);
+
+                for (int k = 0; k < geoSphereNumVectors; k++)
+                {
+                    Vector3 dir = getCosineDistributedRandomRay(wall->n);
+                    //float fac = dot(dir, wall->n);
+
+                    assert(fabsf(length(dir) - 1.0f) < 1E-6);
+                    
+                    Vector3 pos = getTileCenter(wall, j);
+                    pos = add(pos, mul(dir, 1E-5));
+
+                    float dist = INFINITY;
+                    Rectangle* target = NULL;
+                    int hasHit = findClosestIntersection(pos, dir, root, &dist, 0, &target, 0);
+                    assert(hasHit);
+                    if (!hasHit)
+                        continue;
+                        
+                    //float fac = -dot(target->n, dir);
+                    //assert(fac >= 0);
+
+                    assert(target);
+                        
+                    Vector3 hitPos = add (pos, mul(dir, dist));
+                    int srcTexelId = target->lightmapSetup.s[0] + getTileIdAt( target, hitPos);
+
+                    //printf("target is %d\n", srcTexelId);
+                    //printf("%d\n", srcTexelId);
+                    //if (target->lightmapSetup.s[0] > geo->numTexels)
+                    //    printf("#\n");
+
+                    inc( &destTexels[texelIdx], 
+                         mul( srcTexels[srcTexelId], 0.5 * 1.0/geoSphereNumVectors) );
+                }
+            }
+        }
+        for (int i = 0; i < numTexels; i++)
+        {
+            srcTexels[i] = add( mul(srcTexels[i], 0.5), destTexels[i]);
+            destTexels[i] = vec3(0,0,0);
+        }
+
+    }
+    
+    // copy back only those texels corresponding to the walls (omitted window texels)
+    for (int i = 0; i < geo->numTexels; i++)
+        geo->texels[i] = srcTexels[i];
+        
+    free(rects);
+    free(srcTexels);
+    free(destTexels);
+    
+#if 0
+    Vector3* texels2 = malloc(geo->numTexels * sizeof(Vector3));
+    for (int i = 0; i < geo->numTexels; i++)
+        texels2[i] = vec3(0,0,0);
+
+    
+    for (int depth = 0; depth < 1; depth++)
+    {
+        for (int i = 0; i < geo->numWalls; i++)
+        {
+            if (! (i % 10))
+                printf("processing wall %d/%d\n", i+1, geo->numWalls);
+            Rectangle* wall = &geo->walls[i];
+
+            Vector3 b1, b2;
+            createBase( wall->n, &b1, &b2);
+
+            for (int j = 0; j < getNumTiles(wall); j++)
+            {        
+                /*int geoSphereNumVectors = geoSphere3NumVectors;
+                Vector3 *geoSphere = malloc( geoSphereNumVectors * sizeof(Vector3));
+                memcpy( geoSphere, geoSphere3, geoSphereNumVectors * sizeof(Vector3));
+
+                float scaleFactor = 0;
+                for (int i = 0; i < geoSphereNumVectors; i++)
+                    scaleFactor += geoSphere[i].s[2]; //== dot product between the vector and (0,0,1), == cosine between surface normal and light direction
+                
+                scaleFactor = 1/scaleFactor;
+
+                pertubeGeoSphere( geoSphere, geoSphereNumVectors);*/
+
+
+
+                int texelIdx = wall->lightmapSetup.s[0] + j;
+                //printf("normal: %f, %f, %f\n", wall->n.s[0], wall->n.s[1], wall->n.s[2]);
+
+                for (int k = 0; k < geoSphereNumVectors; k++)
+                {
+                    Vector3 dir = getCosineDistributedRandomRay(wall->n);
+                    //float fac;// = dot(dir, wall->n);
+
+                    assert(fabsf(length(dir) - 1.0f) < 1E-6);
+                    
+                    Vector3 pos = getTileCenter(wall, j);
+                    pos = add(pos, mul(dir, 1E-5));
+
+                    float dist = INFINITY;
+                    Rectangle* target = NULL;
+                    int hasHit = findClosestIntersection(pos, dir, root, &dist, 0, &target, 0);
+                    
+                    //int hasWindowHit = findClosestIntersection(pos, dir, rootWindows, &dist, 0, &target, 0);
+                    
+                    if (!hasHit)
+                        continue;
+                        
+                    float fac = -dot(target->n, dir);
+                    //if (fac < 0)
+                    //    continue;
+                    assert(fac >= 0);
+
+                    assert(target);
+                    Vector3 hitPos = add (pos, mul(dir, dist));
+                    
+                    int srcTexelId = getTileIdAt( target, hitPos);
+                    
+                    texels2[texelIdx] = add(texels2[texelIdx], vec3(1.0/geoSphereNumVectors, 1.0/geoSphereNumVectors, 1.0/geoSphereNumVectors));
+                    //add(texels2[texelIdx],
+                    //        mul( geo->texels[srcTexelId], fac/geoSphereNumVectors));
+                }
+                
+                //free (geoSphere);
+
+
+            }
+        }
+
+        for (int i = 0; i < geo->numTexels; i++)
+        {
+            geo->texels[i] = texels2[i];/*add( geo->texels[i], texels2[i]);
+            texels2[i] = vec3(0,0,0);*/
+        }
+     
+    }        
+    free (texels2);
+
+    freeBspTree(rootWindows);
+
+    free(rootWindows);
+#endif
+
+    freeBspTree(root);
+//    free(root);
+
+}
+

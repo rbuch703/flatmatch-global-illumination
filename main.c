@@ -11,7 +11,7 @@
 #include "global_illumination_cl.h"
 #include "global_illumination_native.h"
 
-typedef enum MODE {PHOTON_NATIVE, PHOTON_CL, AMBIENT_OCCLUSION} MODE;
+typedef enum MODE {PHOTON_NATIVE, PHOTON_CL, AMBIENT_OCCLUSION, RADIOSITY_NATIVE} MODE;
 
 
 int main(int argc, const char** argv)
@@ -26,7 +26,7 @@ int main(int argc, const char** argv)
         return -1;
     }
     
-    MODE illuminationMode = PHOTON_CL;
+    MODE illuminationMode = RADIOSITY_NATIVE;
   
     //string filename = (argc >= 2) ? argv[1] : "out.png" ;
     float scale = argc < 3 ? 30 : atof(argv[2]);
@@ -62,6 +62,7 @@ int main(int argc, const char** argv)
         case PHOTON_NATIVE: performPhotonMappingNative(geo, numSamplesPerArea); break;
         case PHOTON_CL:    performGlobalIlluminationCl(geo, numSamplesPerArea); break;
         case AMBIENT_OCCLUSION: performAmbientOcclusionNative(geo );            break;
+        case RADIOSITY_NATIVE: performRadiosityNative(geo); break;
     }
     
     if (illuminationMode == PHOTON_NATIVE || illuminationMode == PHOTON_CL)
@@ -85,7 +86,9 @@ int main(int argc, const char** argv)
         filename = (char*) malloc (numChars+1); //plus zero-termination
         snprintf(filename, numChars+1, "tiles/tile_%d.png", i);
         saveAs(    &geo->walls[i], filename, geo->texels,
-            illuminationMode == AMBIENT_OCCLUSION || illuminationMode == PHOTON_NATIVE);
+            illuminationMode == AMBIENT_OCCLUSION || 
+            illuminationMode == PHOTON_NATIVE ||
+            illuminationMode == RADIOSITY_NATIVE);
             
         free(filename);
         //saveAsRaw( &geo.walls[i], (filename + ".raw").c_str(), geo.texels);

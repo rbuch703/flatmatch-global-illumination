@@ -1,6 +1,10 @@
 #ifndef IMAGE_H
 #define IMAGE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 
 typedef struct {
@@ -34,10 +38,15 @@ void saveImageAs(Image *img, const char* filename);
 int getImageWidth(Image* img);
 int getImageHeight(Image* img);
 
-
+Image* createImage(int width, int height);
 Image* cloneImage(const Image * const img);
 Image* loadImage(const char* filename);
 Image* loadImageFromMemory(const uint8_t *const pngData, int pngDataSize);
+
+#ifdef __cplusplus
+}
+#endif
+
 
 #endif
 

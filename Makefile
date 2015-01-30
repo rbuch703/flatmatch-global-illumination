@@ -1,6 +1,6 @@
 
-SRC_C = main.c png_helper.c rectangle.c geometry.c image.c vector3_cl.c photonmap.c geoSphere.c parseLayout.c helpers.c
-SRC_CC =  global_illumination_cl.cc 
+SRC_C = png_helper.c rectangle.c geometry.c image.c vector3_cl.c photonmap.c geoSphere.c parseLayout.c helpers.c
+SRC_CC = debugRaytracer.cc global_illumination_cl.cc 
 SRC = $(SRC_C) $(SRC_CC)
 
 OBJ_C  = $(patsubst %.c,build/c_%.o,$(SRC_C))
@@ -20,7 +20,7 @@ EMPP=em++
 EMCC_FLAGS=-I./include -std=c99 -O3
 EMPP_FLAGS=-I./include -std=c++11 -O3
 
-OPT_FLAGS = -O2
+OPT_FLAGS = #-O2
 OSX_INCLUDES = #-I /usr/local/include -framework OpenCL
 OSX_LIBS = #-L /usr/local/lib -framework OpenCL
 FLAGS = -g -Wall -Wextra -msse3 $(OPT_FLAGS)
@@ -28,8 +28,8 @@ PROFILE =
 #PROFILE = -fprofile-generate
 #PROFILE = -fprofile-use
 
-CFLAGS = $(FLAGS) $(PROFILE) -std=c99 -flto #$(OSX_INCLUDES)
-CCFLAGS = $(FLAGS) $(PROFILE) -std=c++11 -flto #$(OSX_INCLUDES)
+CFLAGS = $(FLAGS) $(PROFILE) -std=c99 #-flto -DNDEBUG#$(OSX_INCLUDES)
+CCFLAGS = $(FLAGS) $(PROFILE) -std=c++11 #-flto #$(OSX_INCLUDES)
 LD_FLAGS = $(PROFILE) $(OSX_LIBS) -lOpenCL -lm  $(OPT_FLAGS) -flto
 .PHONY: all clean
 
@@ -37,11 +37,11 @@ all: make.dep globalIllumination tiles
 #	 @echo [ALL] $<
 
 globalIllumination: $(OBJ) build
-	@echo [LD] $@
+	@echo [LNK] $@
 	@$(CPP) $(OBJ)  $(LD_FLAGS) -lpng -o $@
 
 index.js: $(BC)
-	@echo [LD] $@
+	@echo [LNK] $@
 	@$(EMCC) -O3 $(BC) lib/*.bc\
     --embed-file 137.png \
     -s EXPORTED_FUNCTIONS='["_parseLayout", "_geometryGetNumWalls", "_geometryGetWallPtr", "_buildBspTree", "_performAmbientOcclusionNativeOnWall", "_saveAsBase64Png", "_geometryGetTexelPtr", "_getJsonString", "_base64_encode", "_buildCollisionMap", "_loadImageFromMemory", "_freeImage", "_freeGeometry", "_getImageWidth", "_getImageHeight"]'\
@@ -58,7 +58,7 @@ build:
 	@echo mkdir -p $@
 
 build/c_%.o: %.c
-	@echo [CC] $<
+	@echo [CPP] $<
 	@$(CC) $(CFLAGS) $< -c -o $@
 
 build/c_%.bc: %.c
@@ -66,7 +66,7 @@ build/c_%.bc: %.c
 	@$(EMCC) $(EMCC_FLAGS) $< -o $@
 
 build/cc_%.o: %.cc 
-	@echo [CP] $<
+	@echo [CXX] $<
 	@$(CPP) $(CCFLAGS) $< -c -o $@
 
 #build/cc_%.bc: %.cc 

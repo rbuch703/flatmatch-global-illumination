@@ -22,6 +22,8 @@ Vector3 mul(const Vector3 b, float a);
 Vector3 neg(const Vector3 v);
 Vector3 div_vec3(const Vector3 a, float b);
 
+void inc(Vector3 *a, const Vector3 b);  //increment
+
 Vector3 createVector3(float x, float y, float z);
 Vector3 vec3(float x, float y, float z);
 float dot(const Vector3 a, const Vector3 b);

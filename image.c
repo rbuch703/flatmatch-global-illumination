@@ -198,6 +198,15 @@ static uint32_t* convertRgbToRgba(uint8_t *rgbData, int numElements)
     return data;
 }
 
+Image* createImage(int width, int height)
+{
+    Image* img = (Image*)malloc(sizeof(Image));
+    *img = (Image){.width = width, .height = height, .data = malloc(width*height*sizeof(uint32_t)) };
+    memset(img->data, 0, width*height*sizeof(uint32_t));
+    return img;
+}
+
+
 Image* loadImage(const char* filename)
 {
     int colorType, width, height;
