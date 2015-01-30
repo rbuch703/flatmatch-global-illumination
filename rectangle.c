@@ -93,16 +93,36 @@ float intersects( const Rectangle *rect, Vector3 ray_src, Vector3 ray_dir, float
     return fac;
 }
 
-float distanceToPlane( Vector3 planeNormal, Vector3 planePos, Vector3 ray_src, Vector3 ray_dir)
+int isBehindRay(const Rectangle *rect, Vector3 raySrc, Vector3 rayDir)
+{
+    Vector3 v1 = rect->pos;
+    Vector3 v2 = add (rect->pos, rect->width);
+    Vector3 v3 = add (rect->pos, rect->height);
+    Vector3 v4 = add3(rect->pos, rect->width, rect->height);
+    
+    Vector3 d1 = sub(v1, raySrc);
+    Vector3 d2 = sub(v2, raySrc);
+    Vector3 d3 = sub(v3, raySrc);
+    Vector3 d4 = sub(v4, raySrc);
+    
+    return  dot(d1, rayDir) < 0 && 
+            dot(d2, rayDir) < 0 && 
+            dot(d3, rayDir) < 0 && 
+            dot(d4, rayDir) < 0;
+}
+
+
+#warning changed semantics, and did not yet test results for all callers
+float distanceOfIntersectionWithPlane( Vector3 raySrc, Vector3 rayDir, Vector3 planeNormal, Vector3 planePos)
 {
     //if (dot(ray_dir,n) > 0) return -1; //backface culling
-    float denom = dot(planeNormal, ray_dir);
+    float denom = dot(planeNormal, rayDir);
     if (denom == 0) // == 0 > ray lies on plane or is parallel to it
         return -1;
         
     //float fac = n.dot( pos - ray_src ) / denom;
-    float fac = dot(planeNormal, sub(planePos, ray_src)) / denom;
-    if (fac < 0) 
+    float fac = dot(planeNormal, sub(planePos, raySrc)) / denom;
+    if (fac < 0)
         return -1;    //is behind camera, cannot be hit
     
     return fac;
@@ -379,12 +399,45 @@ Vector3 getOrigin(const Rectangle *rect) { return rect->pos; }
 Vector3 getWidthVector(const Rectangle *rect) { return rect->width; }
 Vector3 getHeightVector(const Rectangle *rect) { return rect->height;}
 
-double getDistance(const Rectangle *plane, const Vector3 p)
+float getDistanceToPlane(const Rectangle *plane, const Vector3 p)
 {
     Vector3 dir = sub(p, plane->pos);
-
     return dot(dir, plane->n);
 }
+
+float getShortestDistanceRectToPoint( const Rectangle *rect, const Vector3 p)
+{
+    Vector3 vDist = sub(p, rect->pos);
+    assert( fabs(length(rect->n) -1) < 1E-6);
+    
+    // distance from rectangle origin to "p", projected onto the rectangle's normal
+    Vector3 vProjectedDistance = mul(rect->n, dot(vDist, rect->n));
+    
+    Vector3 vProjectedPointOnPlane = sub(p, vProjectedDistance);
+    assert( fabs(getDistanceToPlane(rect, vProjectedPointOnPlane)) < 1E-6);
+    
+    // distance vector from rectangle origin to projected "p"
+    Vector3 vProjectedDist = sub( vProjectedPointOnPlane, rect->pos);
+    
+    Vector3 hNorm = normalized(rect->height);
+    Vector3 wNorm = normalized(rect->width);
+    
+    float u = dot( vProjectedDist, hNorm) /length(rect->height);
+    float v = dot( vProjectedDist, wNorm) /length(rect->width);
+    
+    u = (u < 0) ? 0 : ( (u > 1) ? 1 : u);
+    v = (v < 0) ? 0 : ( (v > 1) ? 1 : v);
+    
+    Vector3 vProjectedClampedPoint = 
+        add3( rect->pos, 
+              mul(rect->width, v),
+              mul(rect->height, u));
+              
+    //printf( "u: %f, v: %f, p(%f, %f, %f)\n", u, v, vProjectedClampedPoint.s[0], vProjectedClampedPoint.s[1], vProjectedClampedPoint.s[2]);
+    
+    return length( sub( p, vProjectedClampedPoint));
+}
+
 
 int getPosition(const Rectangle *plane, const Rectangle *rect)
 {
@@ -396,19 +449,19 @@ int getPosition(const Rectangle *plane, const Rectangle *rect)
     int isLeft = 0;
     int isRight= 0;
     
-    double d = getDistance(plane, p1);
+    double d = getDistanceToPlane(plane, p1);
     isLeft |= (d < 0);
     isRight|= (d > 0);
 
-    d = getDistance(plane, p2);
+    d = getDistanceToPlane(plane, p2);
     isLeft |= (d < 0);
     isRight|= (d > 0);
     
-    d = getDistance(plane, p3);
+    d = getDistanceToPlane(plane, p3);
     isLeft |= (d < 0);
     isRight|= (d > 0);
     
-    d = getDistance(plane, p4);
+    d = getDistanceToPlane(plane, p4);
     isLeft |= (d < 0);
     isRight|= (d > 0);
     

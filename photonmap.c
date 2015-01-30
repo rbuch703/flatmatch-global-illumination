@@ -170,7 +170,7 @@ int findClosestIntersection(Vector3 ray_pos, Vector3 ray_dir, const BspTreeNode 
     int facesAwayFromSplitPlane = dot(splitPlaneNormal, ray_dir) >= 0;
     
     
-    float pos = getDistance( &(node->plane), ray_pos);
+    float pos = getDistanceToPlane( &(node->plane), ray_pos);
     //printf("\tcamera distance to split plane is %f\n", pos);
     
     if (pos < 0)    //we are left --> search left and center first, then right
@@ -193,7 +193,7 @@ int findClosestIntersection(Vector3 ray_pos, Vector3 ray_dir, const BspTreeNode 
         if (!hasChildHit && node->right && !facesAwayFromSplitPlane)
         {
             DEBUG(printf("%salso testing right child node\n", spaces));
-            float planeDist = distanceToPlane( node->plane.n, node->plane.pos, ray_pos, ray_dir);
+            float planeDist = distanceOfIntersectionWithPlane(ray_pos, ray_dir, node->plane.n, node->plane.pos);
             if (planeDist < 0) 
               planeDist = 0;
             ray_pos = add(ray_pos, mul(ray_dir, planeDist));
@@ -217,7 +217,7 @@ int findClosestIntersection(Vector3 ray_pos, Vector3 ray_dir, const BspTreeNode 
         if (!hasChildHit && node->left && !facesAwayFromSplitPlane)
         {
             DEBUG(printf("%salso testing left child node\n", spaces));
-            float planeDist = distanceToPlane( node->plane.n, node->plane.pos, ray_pos, ray_dir);
+            float planeDist = distanceOfIntersectionWithPlane(ray_pos, ray_dir, node->plane.n, node->plane.pos);
             if (planeDist < 0) 
               planeDist = 0;
             ray_pos = add(ray_pos, mul(ray_dir, planeDist));

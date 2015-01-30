@@ -38,31 +38,33 @@ Rectangle createRectangle( float px, float py, float pz,
                            float wx, float wy, float wz,
                            float hx, float hy, float hz, float TILE_SIZE);
 
+float distanceOfIntersectionWithPlane(Vector3 raySrc, Vector3 rayDir, Vector3 planeNormal, Vector3 planePos);
 
-int getPosition(const Rectangle *plane, const Rectangle *rect);
-double getDistance(const Rectangle *plane, const Vector3 p);
+int   getPosition(const Rectangle *plane, const Rectangle *rect);
+float getDistanceToPlane(const Rectangle *plane, const Vector3 p);
+float getShortestDistanceRectToPoint( const Rectangle *rect, const Vector3 p);
 
-float intersects( const Rectangle *rect, Vector3 ray_src, Vector3 ray_dir, float closestDist);
-float distanceToPlane( Vector3 planeNormal, Vector3 planePos, Vector3 ray_src, Vector3 ray_dir);
-int getNumTiles(const Rectangle *rect);
-float getArea(const Rectangle *rect);
-int getTileIdAt(const Rectangle *rect, const Vector3 p);
+float intersects( const Rectangle *rect, Vector3 raySrc, Vector3 rayDir, float closestDist);
+int   isBehindRay(const Rectangle *rect, Vector3 raySrc, Vector3 rayDir);
+int   getNumTiles(const Rectangle *rect);
+float getArea(    const Rectangle *rect);
+int   getTileIdAt(const Rectangle *rect, const Vector3 p);
+
 
 Vector3 getDiffuseColor(const Rectangle *rect, const Vector3 pos);
-Vector3 getOrigin(const Rectangle *rect);
-Vector3 getWidthVector(const Rectangle *rect);
+Vector3 getOrigin(      const Rectangle *rect);
+Vector3 getWidthVector( const Rectangle *rect);
 Vector3 getHeightVector(const Rectangle *rect);
-Vector3 getTileCenter(const Rectangle *rect, int tileId);
-void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights, int tintExtra);
-int saveAsMemoryPng(const Rectangle *rect, const Vector3 *lights, int tintExtra, uint8_t**data);
-char* saveAsBase64Png(const Rectangle *rect, const Vector3 *lights, int tintExtra);
-
-void saveAsRaw(const Rectangle *rect, const char *filename, const Vector3 *lights);
+Vector3 getTileCenter(  const Rectangle *rect, int tileId);
+void  saveAs(           const Rectangle *rect, const char *filename, const Vector3 *lights, int tintExtra);
+void  saveAsRaw(        const Rectangle *rect, const char *filename, const Vector3 *lights);
+int   saveAsMemoryPng(  const Rectangle *rect, const Vector3 *lights, int tintExtra, uint8_t**data);
+char* saveAsBase64Png(  const Rectangle *rect, const Vector3 *lights, int tintExtra);
 
 
 RectangleArray initRectangleArray();
-void freeRectangleArray(RectangleArray *arr);
-void resizeRectangleArray(RectangleArray *arr, int newSize);
+void freeRectangleArray(      RectangleArray *arr);
+void resizeRectangleArray(    RectangleArray *arr, int newSize);
 void insertIntoRectangleArray(RectangleArray *arr, Rectangle rect);
 
 
