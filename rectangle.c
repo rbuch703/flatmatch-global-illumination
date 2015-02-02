@@ -10,6 +10,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 Rectangle createRectangleV( const Vector3 _pos, const Vector3 _width, const Vector3 _height, const float TILE_SIZE)
 {
@@ -111,8 +112,6 @@ int isBehindRay(const Rectangle *rect, Vector3 raySrc, Vector3 rayDir)
             dot(d4, rayDir) < 0;
 }
 
-
-#warning changed semantics, and did not yet test results for all callers
 float distanceOfIntersectionWithPlane( Vector3 raySrc, Vector3 rayDir, Vector3 planeNormal, Vector3 planePos)
 {
     //if (dot(ray_dir,n) > 0) return -1; //backface culling
@@ -127,6 +126,12 @@ float distanceOfIntersectionWithPlane( Vector3 raySrc, Vector3 rayDir, Vector3 p
     
     return fac;
 }
+
+float distanceOfIntersectionWithRectPlane( Vector3 raySrc, Vector3 rayDir, const Rectangle *plane)
+{
+    return distanceOfIntersectionWithPlane(raySrc, rayDir, plane->n, plane->pos);
+}
+
 
 /*Vector3 Rectangle::getNormalAt(const Vector3&) const {
     return n;

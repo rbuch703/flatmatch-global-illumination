@@ -1,15 +1,15 @@
 
-#include "rectangle.h"
-#include "geometry.h"
-#include "parseLayout.h"
-
 #include <stdint.h>
 #include <stdio.h> //for snprintf
 #include <string.h> //for memset
 #include <stdlib.h>
 
+#include "rectangle.h"
+#include "geometry.h"
+#include "parseLayout.h"
 #include "global_illumination_cl.h"
 #include "global_illumination_native.h"
+#include "radiosityNative.h"
 
 typedef enum MODE {PHOTON_NATIVE, PHOTON_CL, AMBIENT_OCCLUSION, RADIOSITY_NATIVE} MODE;
 

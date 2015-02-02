@@ -12,7 +12,6 @@ struct BspTreeNode;
 //typedef struct BspTreeNode BspTreeNode;
 
 void performPhotonMappingNative(Geometry *geo, int numSamplesPerArea);
-void performRadiosityNative(Geometry *geo);
 
 void performAmbientOcclusionNative(Geometry *geo);
 /* The following three functions are declared here only for the JavaScript 

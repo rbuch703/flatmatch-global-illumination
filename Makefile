@@ -1,6 +1,6 @@
 
-SRC_C = png_helper.c rectangle.c geometry.c image.c vector3_cl.c photonmap.c geoSphere.c parseLayout.c helpers.c
-SRC_CC = debugRaytracer.cc global_illumination_cl.cc 
+SRC_C = main.c png_helper.c rectangle.c geometry.c image.c vector3_cl.c photonmap.c geoSphere.c  parseLayout.c helpers.c radiosityNative.c
+SRC_CC =  global_illumination_cl.cc 
 SRC = $(SRC_C) $(SRC_CC)
 
 OBJ_C  = $(patsubst %.c,build/c_%.o,$(SRC_C))
@@ -20,7 +20,7 @@ EMPP=em++
 EMCC_FLAGS=-I./include -std=c99 -O3
 EMPP_FLAGS=-I./include -std=c++11 -O3
 
-OPT_FLAGS = #-O2
+OPT_FLAGS = -O2
 OSX_INCLUDES = #-I /usr/local/include -framework OpenCL
 OSX_LIBS = #-L /usr/local/lib -framework OpenCL
 FLAGS = -g -Wall -Wextra -msse3 $(OPT_FLAGS)
@@ -28,8 +28,8 @@ PROFILE =
 #PROFILE = -fprofile-generate
 #PROFILE = -fprofile-use
 
-CFLAGS = $(FLAGS) $(PROFILE) -std=c99 #-flto -DNDEBUG#$(OSX_INCLUDES)
-CCFLAGS = $(FLAGS) $(PROFILE) -std=c++11 #-flto #$(OSX_INCLUDES)
+CFLAGS = $(FLAGS) $(PROFILE) -std=c99 -flto -DNDEBUG#$(OSX_INCLUDES)
+CCFLAGS = $(FLAGS) $(PROFILE) -std=c++11 -flto #$(OSX_INCLUDES)
 LD_FLAGS = $(PROFILE) $(OSX_LIBS) -lOpenCL -lm  $(OPT_FLAGS) -flto
 .PHONY: all clean
 
@@ -58,7 +58,7 @@ build:
 	@echo mkdir -p $@
 
 build/c_%.o: %.c
-	@echo [CPP] $<
+	@echo [CC ] $<
 	@$(CC) $(CFLAGS) $< -c -o $@
 
 build/c_%.bc: %.c

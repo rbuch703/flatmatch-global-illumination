@@ -1,5 +1,5 @@
-#ifndef SCENEOBJECT_H
-#define SCENEOBJECT_H
+#ifndef RECTANGLE_H
+#define RECTANGLE_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -8,7 +8,6 @@ extern "C" {
 
 #include "vector3_cl.h"
 //#include "color3.h"
-#include "assert.h"
 
 //static const int   SUPER_SAMPLING = 1;
 
@@ -39,6 +38,7 @@ Rectangle createRectangle( float px, float py, float pz,
                            float hx, float hy, float hz, float TILE_SIZE);
 
 float distanceOfIntersectionWithPlane(Vector3 raySrc, Vector3 rayDir, Vector3 planeNormal, Vector3 planePos);
+float distanceOfIntersectionWithRectPlane( Vector3 raySrc, Vector3 rayDir, const Rectangle *plane);
 
 int   getPosition(const Rectangle *plane, const Rectangle *rect);
 float getDistanceToPlane(const Rectangle *plane, const Vector3 p);
