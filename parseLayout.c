@@ -513,13 +513,13 @@ Geometry* parseLayout(const Image* const src, const float scaling, const float T
     {
         geo->walls[i].lightmapSetup.s[0] = geo->numTexels;
         //objects[i].lightNumTiles = getNumTiles(&objects[i]);
-        geo->numTexels += getNumTiles(&geo->walls[i]);
+        geo->numTexels += getNumMipmapTexels(&geo->walls[i]);
     }
         
     printf( "[DBG] allocating %.2fMB for texels\n", geo->numTexels * sizeof(Vector3)/1000000.0);
     if (geo->numTexels * sizeof(Vector3) > 1000*1000*1000)
     {
-        printf("[Err] Refusing to allocate more than 1GB for texels, this would crash most GPUs. Exiting ...\n");
+        printf("[Err] Refusing to allocate more than 1GB for texels, as this would crash most GPUs. Exiting ...\n");
         exit(0);
     }
 
@@ -568,15 +568,6 @@ static int toJsonString(int width, int height, uint8_t *collisionMap, char *out,
     return outPos;
 }
 
-
-/*output format: This method outputs the collision map as a b/w image. Black pixels are impassable, white ones
- *               are traversable. To save storage space and transfer bandwith, the map is RLE-encoded as follows:
- *               - the result is a single array on run lengths
- *               - each run is given just by its length
- *               - run indices are zero-based (corresponding to the Javascript array indices)
- *               - every run with an even run index is impassable, those with odd indices are traversable
- */
-
 void dilate(int width, int height, uint8_t *collisionMap, int radius)
 {
 
@@ -601,6 +592,14 @@ void dilate(int width, int height, uint8_t *collisionMap, int radius)
     
     free(tmp);
 }
+
+/*output format: This method outputs the collision map as a b/w image. Black pixels are impassable, white ones
+ *               are traversable. To save storage space and transfer bandwith, the map is RLE-encoded as follows:
+ *               - the result is a single array on run lengths
+ *               - each run is given just by its length
+ *               - run indices are zero-based (corresponding to the Javascript array indices)
+ *               - every run with an even run index is impassable, those with odd indices are traversable
+ */
 
 char* buildCollisionMap(const Image* const img)
 {

@@ -89,8 +89,6 @@ Rectangle* findClosestIntersectionSorted(Vector3 rayPos, Vector3 rayDir, RectInf
 
 }
 
-
-
 void performRadiosityNative(Geometry *geo)
 {
 /*    for (int i = 0; i < 1000; i++)
@@ -110,13 +108,13 @@ void performRadiosityNative(Geometry *geo)
     memcpy(&rects[geo->numWalls], geo->windows, geo->numWindows * sizeof(Rectangle));
     memcpy(&rects[geo->numWalls+geo->numWindows], geo->lights, geo->numLights * sizeof(Rectangle));
 
-    /* add lightmap indices for windows and lights, which did not get them on
-       creation as they are not necessary for the other GI algorithms. */
+    /* add lightmap indices for windows and lights (which did not get them on
+       creation as they are not necessary for the other GI algorithms). */
     int numTexels = geo->numTexels;
     for (int i = geo->numWalls; i < geo->numWalls + geo->numWindows; i++)
     {
         rects[i].lightmapSetup.s[0] = numTexels;
-        numTexels += getNumTiles(&rects[i]);
+        numTexels += getNumMipmapTexels(&rects[i]);
     }
     int firstWindowTexel = geo->numTexels;
     int firstLightTexel  = numTexels;
@@ -124,7 +122,7 @@ void performRadiosityNative(Geometry *geo)
     for (int i = geo->numWalls+ geo->numWindows; i < geo->numWalls + geo->numWindows + geo->numLights; i++)
     {
         rects[i].lightmapSetup.s[0] = numTexels;
-        numTexels += getNumTiles(&rects[i]);
+        numTexels += getNumMipmapTexels(&rects[i]);
     }
 
    
@@ -133,18 +131,18 @@ void performRadiosityNative(Geometry *geo)
     Vector3 *srcTexels = malloc( numTexels * sizeof(Vector3));
     Vector3 *destTexels = malloc( numTexels * sizeof(Vector3));
     
+   
+    for (int i = 0; i < firstWindowTexel; i++)
+        srcTexels[i] = vec3(0,0,0); //is a wall texel
     
+    for (int i = firstWindowTexel; i < firstLightTexel; i++)
+        srcTexels[i] = vec3(30,30,30); //is a window texel
+
+    for (int i = firstLightTexel; i < numTexels; i++)
+        srcTexels[i] = vec3(28,28,32); //is a light texel
+
     for (int i = 0; i < numTexels; i++)
-    {
-        if (i < firstWindowTexel) //is a wall texel
-            srcTexels[i] = vec3(0,0,0);
-        else if (i < firstLightTexel) //is a window texel
-            srcTexels[i] = vec3(30,30,30);
-        else
-            srcTexels[i] = vec3(28,28,32);
-        
         destTexels[i] = vec3(0,0,0);
-    }
 
     int geoSphereNumVectors = 10000;
     int32_t **sourceTexelIds = malloc(numTexels * sizeof(int32_t*));
@@ -196,7 +194,10 @@ void performRadiosityNative(Geometry *geo)
                 float dist = INFINITY;
                 Rectangle* target = findClosestIntersectionSorted(pos, dir, rectInfos, numRectInfos, &dist);
                 //printf("[DBG] target: %p\n", target);
-                assert(target);
+                if (!target)
+                    printf("[WARN] ray (%f,%f,%f)-> (%f, %f, %f) hit no target\n",
+                       pos.s[0], pos.s[1], pos.s[2], dir.s[0], dir.s[1], dir.s[2]);
+                //assert(target);
                 if (!target)
                     continue;
                     
@@ -204,7 +205,12 @@ void performRadiosityNative(Geometry *geo)
                 //assert(fac >= 0);
                    
                 Vector3 hitPos = add (pos, mul(dir, dist));
-                int srcTexelId = target->lightmapSetup.s[0] + getTileIdAt( target, hitPos);
+                int tileId = getTileIdAt( target, hitPos);
+                int tileX = tileId % target->lightmapSetup.s[1];
+                int tileY = tileId / target->lightmapSetup.s[1];
+                int srcTexelId = getMipmapTexelId(target, tileX, tileY, 0);
+                //printf("tid: %d\n", srcTexelId);
+                //target->lightmapSetup.s[0] + ;
 
                 // "the j'th source for light incoming to 'texelId' is 'srcTexelId' "
                 sourceTexelIds[texelIdx][k] = srcTexelId;
@@ -221,7 +227,7 @@ void performRadiosityNative(Geometry *geo)
     }
     printf("[INF] done; now distributing radiosity\n");
 
-    for (int depth = 0; depth < 1/*12*/; depth++)
+    for (int depth = 0; depth < 7/*12*/; depth++)
     {
         for (int destTexelId = 0; destTexelId < numTexels; destTexelId++)
             for (int j = 0; j < geoSphereNumVectors; j++)
@@ -239,6 +245,9 @@ void performRadiosityNative(Geometry *geo)
                                 mul(destTexels[i], reflectance/geoSphereNumVectors));
             destTexels[i] = vec3(0,0,0);
         }
+        
+        for (int i = 0; i < numRects; i++)
+            mipmap( &rects[i], srcTexels);
     }
     
     // copy back only those texels corresponding to the walls (omitted window texels)

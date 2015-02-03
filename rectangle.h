@@ -44,11 +44,14 @@ int   getPosition(const Rectangle *plane, const Rectangle *rect);
 float getDistanceToPlane(const Rectangle *plane, const Vector3 p);
 float getShortestDistanceRectToPoint( const Rectangle *rect, const Vector3 p);
 
-float intersects( const Rectangle *rect, Vector3 raySrc, Vector3 rayDir, float closestDist);
-int   isBehindRay(const Rectangle *rect, Vector3 raySrc, Vector3 rayDir);
-int   getNumTiles(const Rectangle *rect);
-float getArea(    const Rectangle *rect);
-int   getTileIdAt(const Rectangle *rect, const Vector3 p);
+float intersects(        const Rectangle *rect, Vector3 raySrc, Vector3 rayDir, float closestDist);
+int   isBehindRay(       const Rectangle *rect, Vector3 raySrc, Vector3 rayDir);
+int   getNumTiles(       const Rectangle *rect);
+int   getNumMipmapTexels(const Rectangle *rect);
+float getArea(           const Rectangle *rect);
+int   getTileIdAt(       const Rectangle *rect, const Vector3 p);
+int   getMipmapTexelId(  const Rectangle *rect, int x, int y, int mipmapLevel);
+void  mipmap(            const Rectangle *rect, Vector3* texels);
 
 
 Vector3 getDiffuseColor(const Rectangle *rect, const Vector3 pos);

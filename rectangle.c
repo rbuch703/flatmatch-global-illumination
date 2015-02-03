@@ -163,41 +163,39 @@ int getNumTiles(const Rectangle *rect)
     return rect->lightmapSetup.s[1] * rect->lightmapSetup.s[2];//hNumTiles * vNumTiles;
 }
 
+int getNumMipmapTexels(const Rectangle *rect)
+{
+    int w = rect->lightmapSetup.s[1];   //hNumTiles
+    int h = rect->lightmapSetup.s[2];   //vNumTiles
+    int numTexels = w*h;
+
+    while (w > 1 || h > 1)
+    {        
+        if (w > 1)
+        {
+            assert( w % 2 == 0);
+            w /= 2;
+        }
+        
+        if (h > 1)
+        {
+            assert( h% 2 == 0);
+            h /= 2;
+        }
+
+        assert(w > 0 && h > 0);
+        numTexels += (w*h);
+        
+    }
+    return numTexels;
+    
+}
 
 float getArea(const Rectangle *rect)
 {
     return length(rect->width) * length(rect->height);
 }
 
-/*
-int getTileIdAt(const Rectangle *rect, const Vector3 p)
-{
-    Vector3 pDir = sub(p,rect->pos); //vector from rectangle origin (its lower left corner) to current point
-    //float dx, dy;
-    
-    float width_len  = length(rect->width);
-    float height_len = length(rect->height);
-    
-    float dx = dot( div_vec3( rect->width, width_len), pDir);
-    float dy = dot( div_vec3( rect->height, height_len), pDir);
-
-    float hLength = length(rect->width);
-    float vLength = length(rect->height);
-    
-    int hNumTiles = max( ceil(hLength / TILE_SIZE), 1);
-    int vNumTiles = max( ceil(vLength / TILE_SIZE), 1);
-    
-    int tx = (dx * hNumTiles) / hLength;
-    int ty = (dy * vNumTiles) / vLength;
-    if (tx < 0) tx = 0;
-    if (tx >= hNumTiles) tx = hNumTiles - 1;
-    if (ty < 0) ty = 0;
-    if (ty >= vNumTiles) ty = vNumTiles - 1;
-    
-    assert(ty * hNumTiles + tx < getNumTiles(rect));
-    return ty * hNumTiles + tx;
-}
-*/
 static int clamp_int(int val, int lo, int hi)
 {
     return val < lo ? lo : (val > hi ? hi : val);
@@ -231,6 +229,35 @@ int getTileIdAt(const Rectangle *rect, const Vector3 p)
     return ty * hNumTiles + tx;
 }
 
+int getMipmapTexelId(  const Rectangle *rect, int x, int y, int mipmapLevel)
+{
+    int w = rect->lightmapSetup.s[1];
+    int h = rect->lightmapSetup.s[2];
+    int baseIdx = rect->lightmapSetup.s[0];
+    
+    while (mipmapLevel && (w > 1 || h > 1))
+    {
+        // if both are one, this is the last mipmap level
+        assert( w > 1 || h > 1);
+        baseIdx += (w*h);
+        if (w > 1)
+        { 
+            w = w / 2;
+            x = x / 2;
+        }
+        
+        if (h > 1) 
+        {
+            h = h / 2;
+            y = y / 2;
+        }
+        mipmapLevel -= 1;
+    }
+    
+    return baseIdx + (y * w) + x;
+    return -1;
+}
+
 
 //convert light energy to perceived brightness
 float convert(float color)
@@ -239,7 +266,7 @@ float convert(float color)
 //        return 1 - exp(-2*color);
 //    else
 //        return 1/16.0*color + 0.75;
-    return 1 - exp(-1.5*color);
+    return 1 - exp(-2*color);
     //return 5/8.0* pow(color, 1/3.0);
 }
 
@@ -475,6 +502,76 @@ int getPosition(const Rectangle *plane, const Rectangle *rect)
     
     return 0;    
 }
+
+static void mipmapInternalHorizontal(Vector3* texelBase, int width)
+{
+    if (width == 1) 
+        return;
+    
+    Vector3 *srcTexels = texelBase;
+    Vector3 *destTexels= texelBase + width;
+    
+    assert(width % 2 == 0);
+    int targetWidth = width / 2;
+    for (int i = 0; i < targetWidth; i++)
+    {
+        Vector3 avg = mul( add(srcTexels[i*2], srcTexels[i*2+1]), 0.5);
+        destTexels[i] = avg;
+    }
+    
+    mipmapInternalHorizontal(destTexels, targetWidth);
+}
+
+static void mipmapInternalVertical(Vector3* texelBase, int height)
+{
+    /*for either horizontal or vertical mipmap levels of height/width one,
+      the internal memory layout is identical. Thus, the horizontal mipmapping
+      algorithm can be used for vertical mipmapping as well. */
+    mipmapInternalHorizontal(texelBase, height);
+}    
+
+static void mipmapInternal(Vector3* texelBase, int width, int height )
+{
+    if (width == 1 && height == 1)
+        return;
+        
+    if (height == 1)
+        return mipmapInternalHorizontal(texelBase, width);
+        
+    if (width == 1)
+        return mipmapInternalVertical(texelBase, height);
+        
+    assert(width > 1 && height > 1);
+    Vector3 *srcTexels = texelBase;
+    Vector3 *destTexels= texelBase + (width*height);
+    
+    assert(width % 2 == 0);
+    int targetWidth = width / 2;
+    
+    assert(height % 2 == 0);
+    int targetHeight= height/ 2;
+    
+    for (int i = 0; i < targetWidth; i++)
+        for (int j = 0; j < targetHeight; j++)
+    {
+        Vector3 avg = mul( add4(
+            srcTexels[(j*2  ) * width + (i*2  )], 
+            srcTexels[(j*2+1) * width + (i*2  )],
+            srcTexels[(j*2  ) * width + (i*2+1)], 
+            srcTexels[(j*2+1) * width + (i*2+1)]), 0.25);
+        //avg.s[2] = 1;
+        destTexels[j*targetWidth + i] = avg;
+    }
+    
+    mipmapInternal(destTexels, targetWidth, targetHeight);
+}
+
+void mipmap(const Rectangle* rect, Vector3* texels)
+{
+    mipmapInternal(&texels[rect->lightmapSetup.s[0]],
+                   rect->lightmapSetup.s[1], rect->lightmapSetup.s[2] );
+}
+
 
 RectangleArray initRectangleArray()
 {
