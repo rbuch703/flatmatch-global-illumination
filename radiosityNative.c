@@ -93,6 +93,16 @@ Rectangle* findClosestIntersectionSorted(Vector3 rayPos, Vector3 rayDir, RectInf
 
 void performRadiosityNative(Geometry *geo)
 {
+/*    for (int i = 0; i < 1000; i++)
+    {
+        Vector3 dir = getCosineDistributedRandomRay( vec3(0,0,1));
+        printf("%f, %f, %f\n", dir.s[0], dir.s[1], dir.s[2]);
+    }
+    exit(0);*/
+
+
+    static const float reflectance = 0.3;
+
     // create an array of all rectangles, including windows and lighting
     int numRects = geo->numWalls + geo->numWindows + geo->numLights;
     Rectangle* rects = malloc( numRects * sizeof(Rectangle));
@@ -116,8 +126,8 @@ void performRadiosityNative(Geometry *geo)
         rects[i].lightmapSetup.s[0] = numTexels;
         numTexels += getNumTiles(&rects[i]);
     }
-    
-    
+
+   
     printf("%d/%d texels\n", geo->numTexels, numTexels);
     
     Vector3 *srcTexels = malloc( numTexels * sizeof(Vector3));
@@ -135,83 +145,100 @@ void performRadiosityNative(Geometry *geo)
         
         destTexels[i] = vec3(0,0,0);
     }
-    
-//    BspTreeNode* root = buildBspTree(rects, numRects);
 
-
-    int geoSphereNumVectors = 100;
-    
+    int geoSphereNumVectors = 10000;
+    int32_t **sourceTexelIds = malloc(numTexels * sizeof(int32_t*));
+    for (int i = 0; i < numTexels; i++)
+    {
+        sourceTexelIds[i] = malloc( geoSphereNumVectors * sizeof(int32_t));
+        for (int j = 0; j < geoSphereNumVectors; j++)
+            sourceTexelIds[i][j] = -1;
+    }
+            
+    printf("[INF] Determining form factors.\n");
     printf("\n\e[1A\e7");
     //while(1);
     
-    for (int depth = 0; depth < 8; depth++)
+    for (int i = 0; i < geo->numWalls; i++)
     {
-        for (int i = 0; i < geo->numWalls; i++)
+        if ( (i+1)% 10 == 0)
+            printf("\e8[INF] processing wall %d/%d\e[K\n", i+1, geo->numWalls);
+        Rectangle* wall = &geo->walls[i];
+
+        /*Vector3 b1, b2;
+        createBase( wall->n, &b1, &b2);*/
+        
+
+        for (int j = 0; j < getNumTiles(wall); j++)
         {
-            if ( (i+1)% 10 == 0)
-                printf("\e8processing wall #%d %d/%d\e[K\n", depth, i+1, geo->numWalls);
-            Rectangle* wall = &geo->walls[i];
+            /*printf("[DBG] tile pos: (%f, %f, %f), normal: (%f, %f, %f)\n", 
+                    wall->pos.s[0], wall->pos.s[1], wall->pos.s[2],
+                    wall->n.s[0], wall->n.s[1], wall->n.s[2]);*/
+            int texelIdx = wall->lightmapSetup.s[0] + j;
 
-            Vector3 b1, b2;
-            createBase( wall->n, &b1, &b2);
-            
+            RectInfo *rectInfos;    
+            int numRectInfos = getSortedIntersectableRects(rects, numRects, getTileCenter(wall, j), wall->n, &rectInfos);
+            //printf("got list of %d rects\n", numRectInfos);
+            //printf("normal: %f, %f, %f\n", wall->n.s[0], wall->n.s[1], wall->n.s[2]);
 
-            for (int j = 0; j < getNumTiles(wall); j++)
-            {        
-                /*printf("[DBG] tile pos: (%f, %f, %f), normal: (%f, %f, %f)\n", 
-                        wall->pos.s[0], wall->pos.s[1], wall->pos.s[2],
-                        wall->n.s[0], wall->n.s[1], wall->n.s[2]);*/
-                int texelIdx = wall->lightmapSetup.s[0] + j;
-                geo->texels[texelIdx] = vec3(0,0,0);
+            for (int k = 0; k < geoSphereNumVectors; k++)
+            {
+                Vector3 dir = getCosineDistributedRandomRay(wall->n);
+                //float fac = dot(dir, wall->n);
 
-                RectInfo *rectInfos;    
-                int numRectInfos = getSortedIntersectableRects(rects, numRects, getTileCenter(wall, j), wall->n, &rectInfos);
-                //printf("got list of %d rects\n", numRectInfos);
-                //printf("normal: %f, %f, %f\n", wall->n.s[0], wall->n.s[1], wall->n.s[2]);
-
-                for (int k = 0; k < geoSphereNumVectors; k++)
-                {
-                    Vector3 dir = getCosineDistributedRandomRay(wall->n);
-                    //float fac = dot(dir, wall->n);
-
-                    assert(fabsf(length(dir) - 1.0f) < 1E-6);
-                    
-                    Vector3 pos = getTileCenter(wall, j);
-                    /*printf("[DBG] pos: (%f, %f, %f), dir: (%f, %f, %f)\n",
-                           pos.s[0], pos.s[1], pos.s[2], dir.s[0], dir.s[1], dir.s[2]);*/
-                    pos = add(pos, mul(dir, 1E-5));
-
-                    float dist = INFINITY;
-                    Rectangle* target = findClosestIntersectionSorted(pos, dir, rectInfos, numRectInfos, &dist);
-                    //printf("[DBG] target: %p\n", target);
-                    assert(target);
-                    if (!target)
-                        continue;
-                        
-                    //float fac = -dot(target->n, dir);
-                    //assert(fac >= 0);
-                       
-                    Vector3 hitPos = add (pos, mul(dir, dist));
-                    int srcTexelId = target->lightmapSetup.s[0] + getTileIdAt( target, hitPos);
-
-                    //printf("target is %d\n", srcTexelId);
-                    //printf("%d\n", srcTexelId);
-                    //if (target->lightmapSetup.s[0] > geo->numTexels)
-                    //    printf("#\n");
-
-                    inc( &destTexels[texelIdx], 
-                         mul( srcTexels[srcTexelId], 0.5 * 1.0/geoSphereNumVectors) );
-                }
+                assert(fabsf(length(dir) - 1.0f) < 1E-6);
                 
-                free(rectInfos);
+                Vector3 pos = getTileCenter(wall, j);
+                /*printf("[DBG] pos: (%f, %f, %f), dir: (%f, %f, %f)\n",
+                       pos.s[0], pos.s[1], pos.s[2], dir.s[0], dir.s[1], dir.s[2]);*/
+                pos = add(pos, mul(dir, 1E-5));
+
+                float dist = INFINITY;
+                Rectangle* target = findClosestIntersectionSorted(pos, dir, rectInfos, numRectInfos, &dist);
+                //printf("[DBG] target: %p\n", target);
+                assert(target);
+                if (!target)
+                    continue;
+                    
+                //float fac = -dot(target->n, dir);
+                //assert(fac >= 0);
+                   
+                Vector3 hitPos = add (pos, mul(dir, dist));
+                int srcTexelId = target->lightmapSetup.s[0] + getTileIdAt( target, hitPos);
+
+                // "the j'th source for light incoming to 'texelId' is 'srcTexelId' "
+                sourceTexelIds[texelIdx][k] = srcTexelId;
+
+                //printf("target is %d\n", srcTexelId);
+                //printf("%d\n", srcTexelId);
+                //if (target->lightmapSetup.s[0] > geo->numTexels)
+                //    printf("#\n");
+
             }
+            
+            free(rectInfos);
         }
+    }
+    printf("[INF] done; now distributing radiosity\n");
+
+    for (int depth = 0; depth < 1/*12*/; depth++)
+    {
+        for (int destTexelId = 0; destTexelId < numTexels; destTexelId++)
+            for (int j = 0; j < geoSphereNumVectors; j++)
+            {
+                int srcTexelId = sourceTexelIds[destTexelId][j];
+                if (srcTexelId < 0)
+                    continue;
+                    
+                inc( &destTexels[destTexelId], srcTexels[srcTexelId]);
+            }
+
         for (int i = 0; i < numTexels; i++)
         {
-            srcTexels[i] = add( mul(srcTexels[i], 0.5), destTexels[i]);
+            srcTexels[i] = add( mul(srcTexels[i], 1-reflectance), 
+                                mul(destTexels[i], reflectance/geoSphereNumVectors));
             destTexels[i] = vec3(0,0,0);
         }
-
     }
     
     // copy back only those texels corresponding to the walls (omitted window texels)
@@ -221,7 +248,11 @@ void performRadiosityNative(Geometry *geo)
     free(rects);
     free(srcTexels);
     free(destTexels);
-    
+
+    for (int i = 0; i < numTexels; i++)
+        free(sourceTexelIds[i]);
+
+    free(sourceTexelIds);   
     //freeBspTree(root);
 //    free(root);
 
