@@ -65,7 +65,7 @@ build/c_%.bc: %.c
 	@echo [EMCC] $<
 	@$(EMCC) $(EMCC_FLAGS) $< -o $@
 
-build/cc_%.o: %.cc 
+build/cc_%.o: %.cc
 	@echo [CXX] $<
 	@$(CPP) $(CCFLAGS) $< -c -o $@
 

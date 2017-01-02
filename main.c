@@ -26,7 +26,7 @@ int main(int argc, const char** argv)
         return -1;
     }
     
-    MODE illuminationMode = RADIOSITY_NATIVE;
+    MODE illuminationMode = PHOTON_CL;
   
     //string filename = (argc >= 2) ? argv[1] : "out.png" ;
     float scale = argc < 3 ? 30 : atof(argv[2]);
