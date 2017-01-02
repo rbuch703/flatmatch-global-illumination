@@ -8,17 +8,14 @@
 #endif
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <assert.h>
-
-#include <iostream>
-#include <list>
-#include <vector>
 
 #include "rectangle.h"
 #include "geometry.h"
 #include "global_illumination_cl.h"
 
-using namespace std;
+#define UNUSED(x) (void)(x)
 
 const char* getDeviceString(cl_device_id dev_id)
 {
@@ -31,7 +28,7 @@ const char* getDeviceString(cl_device_id dev_id)
         clGetDeviceInfo( dev_id,   CL_DEVICE_NAME  , 1000, deviceString, NULL);
     assert(status == CL_SUCCESS);
     
-  	return deviceString;
+    return deviceString;
 }
 
 const char* getPlatformString(cl_platform_id platform_id)
@@ -45,19 +42,30 @@ const char* getPlatformString(cl_platform_id platform_id)
         clGetPlatformInfo( platform_id, CL_PLATFORM_NAME, 1000, str, NULL);
     assert(status == CL_SUCCESS);
     
-  	return str;
+    return str;
 }
 
 
-void clErrorFunc ( const char *errinfo, const void * /*private_info*/, size_t /*cb*/, void * /*user_data*/)
+void clErrorFunc ( const char *errinfo, const void * private_info, size_t cb, void * user_data)
 {
-    cout << errinfo << endl;
+    UNUSED(private_info);
+    UNUSED(cb);
+    UNUSED(user_data);
+
+    if (errinfo != NULL)
+    {
+        printf("%s\n", errinfo);
+    }
 }
 
+typedef struct {
+    cl_platform_id platform_id;
+    cl_device_id device_id;
+} Environment;
 
-list<pair<cl_platform_id, cl_device_id>> getEnvironments()
+int getEnvironments( Environment* environments, int num_environment_slots)
 {
-    list<pair<cl_platform_id, cl_device_id>> environments;
+    int num_environments = 0;
     cl_uint numPlatforms = 0;	//the NO. of platforms
     clGetPlatformIDs(0, NULL, &numPlatforms);
     
@@ -71,12 +79,20 @@ list<pair<cl_platform_id, cl_device_id>> getEnvironments()
 	    cl_device_id* devices = (cl_device_id*) malloc(numDevices * sizeof(cl_device_id));
         clGetDeviceIDs(platforms[i],  CL_DEVICE_TYPE_ALL, numDevices, devices, NULL);
 	    for (cl_uint j = 0; j < numDevices; j++)
-	        environments.push_back( pair<cl_platform_id, cl_device_id>(platforms[i], devices[j]));
+	    {
+	        if (num_environments < num_environment_slots && environments)
+	        {
+	            environments[num_environments].platform_id = platforms[i];
+	            environments[num_environments].device_id = devices[j];
+	        }
+
+	        num_environments++;
+        }
 
         free(devices);
 	}
     free(platforms);
-    return environments;
+    return num_environments;
 }
 
 
@@ -85,7 +101,10 @@ list<pair<cl_platform_id, cl_device_id>> getEnvironments()
  */ 
 void getFittingEnvironment( cl_platform_id /*out*/*platform_id, cl_device_id /*out*/*device_id)
 {
-    list<pair<cl_platform_id, cl_device_id>> environments = getEnvironments();
+    int num_environments = getEnvironments(NULL, 0);
+    Environment* environments = malloc( sizeof(Environment) * num_environments);
+
+    getEnvironments(environments, num_environments);
 
     //cout << "found " << environments.size() << " CL compute environment(s):" << endl;
     /*
@@ -97,44 +116,41 @@ void getFittingEnvironment( cl_platform_id /*out*/*platform_id, cl_device_id /*o
     // traverse the list from end to start. This heuristic helps to select a non-primary GPU as the device (if present)
     // Since the non-primary GPU is usually not concerned with screen rendering, using it with OpenCL should not impact
     // computer usage, while using the primary GPU may result in screen freezes during heavy OpenCL load
-    for (list<pair<cl_platform_id, cl_device_id>>::reverse_iterator env = environments.rbegin(); env != environments.rend(); env++)
+
+    for (int i = num_environments - 1; i >= 0; i--)
     {
         cl_device_type device_type = 0;
-        	cl_int res = clGetDeviceInfo (env->second, CL_DEVICE_TYPE, sizeof(cl_device_type), &device_type, NULL);
+#ifndef NDEBUG
+            cl_int res =
+#endif
+            clGetDeviceInfo (environments[i].device_id, CL_DEVICE_TYPE, sizeof(cl_device_type), &device_type, NULL);
         	assert(res == CL_SUCCESS);
         
         if ( device_type == CL_DEVICE_TYPE_ACCELERATOR || device_type == CL_DEVICE_TYPE_GPU)
         //if ( device_type == CL_DEVICE_TYPE_CPU)
         {
-            *platform_id = env->first;
-            *device_id = env->second;
+            *platform_id = environments[i].platform_id;
+            *device_id = environments[i].device_id;
+            free(environments);
             return;
         }
     }
     
     //2nd pass: no GPU or dedicated accelerator found --> fall back to CPU or default implementations
-    assert (environments.size() >= 1 && "No suitable OpenCL-capable device found");
-    list<pair<cl_platform_id, cl_device_id>>::const_iterator env = environments.begin();
+    assert (num_environments >= 1 && "No suitable OpenCL-capable device found");
     
-    *platform_id = env->first;
-    *device_id = env->second;
-    
-    env++;
-    //test code: (arbitrarily) select the second platform
-    /*if (env != environments.end())
-    {
-        *platform_id = env->first;
-        *device_id = env->second;
-    }*/
-    return;
-    
+    *platform_id = environments[0].platform_id;
+    *device_id = environments[0].device_id;
+    free(environments);
+
 }
 
 void initCl(cl_context *ctx, cl_device_id *device_id) {
     
     cl_platform_id platform_id;
     getFittingEnvironment( &platform_id, device_id);
-    cout << "[INF] Selected device '" << getDeviceString(*device_id) << "'" << endl << endl;//"' on platform '" << getPlatformString(platform_id) << "' , " << endl << endl;
+
+    printf( "[INF] Selected device '%s'\n\n", getDeviceString(*device_id));
     
     cl_context_properties properties[] = {CL_CONTEXT_PLATFORM, (cl_context_properties)platform_id, 0};
 
@@ -186,28 +202,33 @@ cl_program createProgram(cl_context ctx, cl_device_id device, const char* src)
         clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, NULL, &size);
         char* msg = (char*)malloc(size);
         clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, size, msg, NULL);
-        cout << msg << endl;
+        printf("%s\n", msg);
         free(msg);
-        cout << "Compilation errors found, exiting ..." << endl;
+
+        printf("Compilation errors found, exiting ...\n");
         exit(0);
     }
     return program;
 }
 
 
-void photonMapLightSource(cl_context ctx, cl_command_queue queue, cl_kernel kernel, const Rectangle &lightSource, float numSamplesPerArea, cl_int isWindow, size_t maxWorkGroupSize, cl_mem rectBuffer, cl_mem lightColorsBuffer, int numWalls)
+void photonMapLightSource(cl_context ctx, cl_command_queue queue, cl_kernel kernel, const Rectangle *lightSource, float numSamplesPerArea, cl_int isWindow, size_t maxWorkGroupSize, cl_mem rectBuffer, cl_mem lightColorsBuffer, int numWalls)
 {
-    Vector3 xDir= getWidthVector(  &lightSource);
-    Vector3 yDir= getHeightVector( &lightSource);
+    Vector3 xDir= getWidthVector(  lightSource);
+    Vector3 yDir= getHeightVector( lightSource);
     
     float area = length(xDir) * length(yDir);
     uint64_t numSamples = (numSamplesPerArea * area) / 100; //  the OpenCL kernel does 100 iterations per call)
     numSamples = (numSamples / maxWorkGroupSize + 1) * maxWorkGroupSize;    //must be a multiple of the local work size
     cl_int st = 0;
 
-    cl_mem windowBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY| CL_MEM_USE_HOST_PTR , sizeof(Rectangle),(void *)&lightSource, &st );
+    cl_mem windowBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY| CL_MEM_USE_HOST_PTR , sizeof(Rectangle),(void *)lightSource, &st );
+
 	if (st)
-    	cout << "buffer creation preparation errors: " << st << endl;
+	{
+        printf("buffer creation preparation error: %d\n", st);
+        exit(0);
+	}
 
     st |= clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&windowBuffer);
     st |= clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&rectBuffer);
@@ -216,7 +237,7 @@ void photonMapLightSource(cl_context ctx, cl_command_queue queue, cl_kernel kern
     st |= clSetKernelArg(kernel, 5, sizeof(cl_int), (void *)&isWindow);
 	if (st)
 	{
-    	cout << "Kernel Arg preparation errors: " << st << endl;
+        printf("Kernel Arg preparation errors: %d\n", st);
     	exit(0);
 	}
 
@@ -224,7 +245,8 @@ void photonMapLightSource(cl_context ctx, cl_command_queue queue, cl_kernel kern
     //       performance (but not more than two kernels as this stresses GPUs too much
     while (numSamples)
     {
-        cout << "\rPhoton-Mapping window " << " with " << (int)(numSamples*100/1000000) << "M samples   " << flush;
+        printf("\rphoton-mapping window with %d M samples   ", (int)(numSamples*100/1000000));
+        fflush(stdout); // write output from above to console *now*
         
         cl_int idx = rand();
         st |= clSetKernelArg(kernel, 4, sizeof(cl_int), (void *)&idx);
@@ -237,13 +259,13 @@ void photonMapLightSource(cl_context ctx, cl_command_queue queue, cl_kernel kern
         //clFinish(queue);
     	if (st)
     	{
-        	cout << "Kernel execution error: " << st << endl;
+            printf( "Kernel execution error: %d\n", st);
     	    exit(-1);
     	}
     	
         clFinish(queue);
 	    }
-	    cout << endl;
+	    printf("\n");
     	
     clReleaseMemObject(windowBuffer);
 
@@ -280,10 +302,10 @@ void performGlobalIlluminationCl(Geometry *geo, int numSamplesPerArea)
     //cout << "Maximum workgroup size for this kernel on this device is " << maxWorkGroupSize << endl;
 
     for ( int i = 0; i < geo->numWindows; i++)
-        photonMapLightSource(ctx, queue, kernel, geo->windows[i], numSamplesPerArea, true, maxWorkGroupSize, rectBuffer, lightColorsBuffer, geo->numWalls);
+        photonMapLightSource(ctx, queue, kernel, &geo->windows[i], numSamplesPerArea, 1, maxWorkGroupSize, rectBuffer, lightColorsBuffer, geo->numWalls);
 
     for ( int i = 0; i < geo->numLights; i++)
-        photonMapLightSource(ctx, queue, kernel, geo->lights[i], numSamplesPerArea, false, maxWorkGroupSize, rectBuffer, lightColorsBuffer, geo->numWalls);
+        photonMapLightSource(ctx, queue, kernel, &geo->lights[i], numSamplesPerArea, 0, maxWorkGroupSize, rectBuffer, lightColorsBuffer, geo->numWalls);
 
     
     clFinish(queue);

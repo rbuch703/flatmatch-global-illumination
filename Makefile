@@ -1,14 +1,11 @@
 
-SRC_C = main.c png_helper.c rectangle.c geometry.c image.c vector3_cl.c photonmap.c geoSphere.c  parseLayout.c helpers.c radiosityNative.c
-SRC_CC =  global_illumination_cl.cc 
+SRC_C = main.c png_helper.c rectangle.c geometry.c image.c vector3_cl.c photonmap.c geoSphere.c  parseLayout.c helpers.c radiosityNative.c global_illumination_cl.c
 SRC = $(SRC_C) $(SRC_CC)
 
-OBJ_C  = $(patsubst %.c,build/c_%.o,$(SRC_C))
-OBJ_CC = $(patsubst %.cc,build/cc_%.o,$(SRC_CC))
+OBJ_C  = $(patsubst %.c,build/%.o,$(SRC_C))
 OBJ    = $(OBJ_C) $(OBJ_CC)
 
-BC_C  = $(patsubst %.c,build/c_%.bc,$(SRC_C))
-#BC_CC = $(patsubst %.cc,build/cc_%.bc,$(SRC_CC))
+BC_C  = $(patsubst %.c,build/%.bc,$(SRC_C))
 BC    = $(BC_C) $(BC_CC)
 
 
@@ -16,9 +13,7 @@ CC = gcc#clang
 CPP= g++#clang++
 
 EMCC=emcc
-EMPP=em++
 EMCC_FLAGS=-I./include -std=c99 -O3
-EMPP_FLAGS=-I./include -std=c++11 -O3
 
 OPT_FLAGS = -O2
 OSX_INCLUDES = #-I /usr/local/include -framework OpenCL
@@ -57,17 +52,13 @@ build:
 	@echo [MKDIR] $@
 	@echo mkdir -p $@
 
-build/c_%.o: %.c
+build/%.o: %.c
 	@echo [CC ] $<
 	@$(CC) $(CFLAGS) $< -c -o $@
 
-build/c_%.bc: %.c
+build/%.bc: %.c
 	@echo [EMCC] $<
 	@$(EMCC) $(EMCC_FLAGS) $< -o $@
-
-build/cc_%.o: %.cc
-	@echo [CXX] $<
-	@$(CPP) $(CCFLAGS) $< -c -o $@
 
 #build/cc_%.bc: %.cc 
 #	@echo [EM++] $<
@@ -90,8 +81,7 @@ clean:
 
 make.dep: $(SRC_C) $(SRC_CC)
 	@echo [DEP]
-	@$(CC)  -MM -I /usr/local/include $(SRC_C) | sed "s/\([[:graph:]]*\)\.o/build\/c_\\1.o/g" > make.dep
-#	@$(CPP) -MM -I /usr/local/include $(SRC_CC)| sed "s/\([[:graph:]]*\)\.o/build\/cc_\\1.o/g" >> make.dep
+	@$(CC)  -MM -I /usr/local/include $(SRC_C) | sed "s/\([[:graph:]]*\)\.o/build\/\\1.o/g" > make.dep
 
 include make.dep
 
