@@ -345,6 +345,7 @@ void saveAs(const Rectangle *rect, const char *filename, const Vector3 *lights, 
     free (data);
 }
 
+/*
 int saveAsMemoryPng(const Rectangle *rect, const Vector3 *lights, int tintExtra, uint8_t**pngDataOut)
 {
     uint8_t *rawData;
@@ -362,8 +363,9 @@ int saveAsMemoryPng(const Rectangle *rect, const Vector3 *lights, int tintExtra,
     free (rawData);
     return pngDataSize;
 }
+*/
 
-
+/*
 char* saveAsBase64Png(const Rectangle *rect, const Vector3 *lights, int tintExtra)
 {
     uint8_t *rawData;
@@ -384,7 +386,7 @@ char* saveAsBase64Png(const Rectangle *rect, const Vector3 *lights, int tintExtr
     
     return tmp;
 }
-
+*/
 
 typedef struct {
     int pixelWidth;

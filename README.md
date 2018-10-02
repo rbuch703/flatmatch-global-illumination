@@ -5,14 +5,15 @@
 Dependencies:
 - gcc (C and C++ frontends)
 - GNU make
-- headers and libraries for libpng, e.g. the Ubuntu package "libpng12-dev"
+- headers and libraries for libpng, e.g. the Ubuntu package "libpng-dev"
 - OpenCL development headers, e.g. the Ubuntu package "opencl-headers"
 - either
-  - an OpenCL implementation ("ICD") of your GPU vendor (AMD and Nvidia have been tested), or
-  - an OpenCL implementation supporting your CPU (AMD and Intel SDKs have been tested)
+  - an OpenCL implementation ("ICD") of your _GPU_ vendor (AMD and Nvidia have been tested), or
+  - an OpenCL implementation supporting your _CPU_ (AMD and Intel SDKs have been tested)
+    - e.g. the Ubuntu package "beignet-dev"
 
 Build instructions:
-- to select a CPU-based implementation change both occurrences of CL_DEVICE_TYPE_GPU in main.cc to CL_DEVICE_TYPE_CPU
+- to select a CPU-based implementation change both occurrences of CL_DEVICE_TYPE_GPU in global_illumination_cl.c to CL_DEVICE_TYPE_CPU
 - make sure that only one OpenCL ICD is installed (otherwise the code around "clGetPlatformID" would need to be modified)
 - "make" (for GPU-based computations)
 - Note: this project mixes C and C++ code. This is not a good coding style, but happened when adding the C API-based OpenCL renderer

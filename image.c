@@ -226,6 +226,7 @@ Image* loadImage(const char* filename)
     return res;
 }
 
+/*
 Image* loadImageFromMemory(const uint8_t *const pngData, int pngDataSize)
 {
     int colorType;
@@ -241,7 +242,7 @@ Image* loadImageFromMemory(const uint8_t *const pngData, int pngDataSize)
     
     return res;
 }
-
+*/
 
 Image* cloneImage(const Image * const img)
 {

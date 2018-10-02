@@ -25,7 +25,7 @@ typedef struct PngOutput {
     uint32_t position;
 } PngOutput;
 
-
+/*
 static void readFromMemory(png_structp png_ptr, png_bytep outBytes,
    png_size_t byteCountToRead)
 {
@@ -34,6 +34,7 @@ static void readFromMemory(png_structp png_ptr, png_bytep outBytes,
     memcpy( outBytes, io->data + io->position, byteCountToRead);
     io->position += byteCountToRead;
 }
+*/
 
 static int read_png_core(png_structp png_ptr, png_infop info_ptr, int *width, int *height, int *color_type, uint8_t** pixel_buffer)
 {
@@ -74,6 +75,7 @@ static int read_png_core(png_structp png_ptr, png_infop info_ptr, int *width, in
 
 }
 
+/*
 int read_png_from_memory(const uint8_t *data, int numBytesIn, int *width, int *height, int *color_type, uint8_t** pixel_buffer )
 {
     png_structp png_ptr;
@@ -105,7 +107,7 @@ int read_png_from_memory(const uint8_t *data, int numBytesIn, int *width, int *h
     //png_set_sig_bytes(png_ptr, 8);
     return read_png_core(png_ptr, info_ptr, width, height, color_type, pixel_buffer);
 }
-
+*/
 void read_png_file(const char* file_name, int *width, int *height, int *color_type, uint8_t** pixel_buffer )
 {
     png_structp png_ptr;
@@ -153,6 +155,7 @@ void read_png_file(const char* file_name, int *width, int *height, int *color_ty
         voidp write_io_ptr, png_rw_ptr write_data_fn,
         png_flush_ptr output_flush_fn);*/
 
+/*
 static void writeToMemory(png_structp png_ptr, png_bytep src_data, png_size_t numBytes)
 {
     //printf("supposed to write %ld bytes coming from %p\n", numBytes, src_data);
@@ -167,12 +170,13 @@ static void writeToMemory(png_structp png_ptr, png_bytep src_data, png_size_t nu
     memcpy( io->data + io->position, src_data, numBytes);
     io->position += numBytes;
     
-}
+}*/
 
+/*
 static void flush( png_structp png_ptr __attribute__ ((unused)) )
 {
     //printf("supposed to flush\n");
-}
+}*/
       
 static void write_png_core(png_structp png_ptr, png_infop info_ptr, int width, int height, int color_type, uint8_t *pixel_buffer)
 {
@@ -205,7 +209,8 @@ static void write_png_core(png_structp png_ptr, png_infop info_ptr, int width, i
     png_destroy_write_struct(&png_ptr, &info_ptr);
 
 }
-        
+
+#if 0
 void write_png_to_memory(uint8_t **outData, int *outSize, int width, int height, int color_type, uint8_t *pixel_buffer)
 {
     png_structp png_ptr;
@@ -245,6 +250,7 @@ void write_png_to_memory(uint8_t **outData, int *outSize, int width, int height,
     *outData = realloc(io.data, io.position); //reduce allocated area to actually used size
     *outSize = io.position;
 }
+#endif
         
 void write_png_file(const char* file_name, int width, int height, int color_type, uint8_t *pixel_buffer)
 {

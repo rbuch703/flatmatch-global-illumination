@@ -61,7 +61,7 @@ Vector3 getHeightVector(const Rectangle *rect);
 Vector3 getTileCenter(  const Rectangle *rect, int tileId);
 void  saveAs(           const Rectangle *rect, const char *filename, const Vector3 *lights, int tintExtra);
 void  saveAsRaw(        const Rectangle *rect, const char *filename, const Vector3 *lights);
-int   saveAsMemoryPng(  const Rectangle *rect, const Vector3 *lights, int tintExtra, uint8_t**data);
+//int   saveAsMemoryPng(  const Rectangle *rect, const Vector3 *lights, int tintExtra, uint8_t**data);
 char* saveAsBase64Png(  const Rectangle *rect, const Vector3 *lights, int tintExtra);
 
 
