@@ -1,0 +1,19 @@
+{
+    "rowid": $ROW_ID,
+    "landlordOfferId": "9214.025",
+    "landlord": "WOBAU",
+    "collisionMap": $COLLISION_MAP,
+    "numRooms": 3,
+    "lon": $LONGITUDE,
+    "detailsUrl": "mieten_WhgDetails.asp?ObjID=41971",
+    "area": 67.0,
+    "layoutId": $ROW_ID,
+    "level": $LEVEL,
+    "lat": $LATITUDE,
+    "layout": $LAYOUT,
+    "hasBalcony": 1,
+    "rent": 512.82,
+    "scale": $SCALE,
+    "address": "Apollostr. 5",
+    "yaw": $YAW
+}
